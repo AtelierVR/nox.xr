@@ -1,0 +1,55 @@
+{
+  "type": "mod",
+  "id": "nox.xr",
+  "provides": [
+    "fr.hactazia.xr",
+    "xr"
+  ],
+  "name": "XR Controller",
+  "version": "1.0.0",
+  "license": "GPL-3.0",
+  "icon": null,
+  "contact": {
+    "email": "hactazia@gmail.com",
+    "source": "https://github.com/AtelierVR/nox.xr",
+    "website": "https://nox.hactazia.fr/",
+    "issues": "https://github.com/AtelierVR/nox.xr/issues"
+  },
+  "authors": [
+    {
+      "name": "Hactazia",
+      "email": "hactazia@gmail.com",
+      "website": "https://hactazia.fr/"
+    }
+  ],
+  "contributors": [],
+  "relations": [
+    {
+      "id": "controller",
+      "type": "depends",
+      "version": ">=1.0.0"
+    }
+  ],
+  "constraints": [
+    {
+      "type": "after",
+      "id": "ui"
+    },
+    {
+      "type": "after",
+      "id": "avatar"
+    },
+    {
+      "type": "after",
+      "id": "user"
+    }
+  ],
+  "entrypoints": {
+    "client": [
+      "Nox.XR.Clients.Client"
+    ]
+  },
+  "references": [],
+  
+  "permissions": []
+}
