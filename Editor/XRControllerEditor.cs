@@ -1,13 +1,27 @@
 #if UNITY_EDITOR
-using api.nox.xr;
+using Nox.XR;
 using UnityEditor;
 using UnityEngine;
 
-namespace Mods.api.nox.xr.editor {
+namespace Nox.XR.Editor {
 	[CustomEditor(typeof(XRController))]
-	public class XRProxyEditor : Editor {
+	public class XRProxyEditor : UnityEditor.Editor {
+
+		[MenuItem("Nox/XR/Open XR Settings")]
+		public static void OpenXRSettings()
+			=> SettingsService.OpenProjectSettings("Project/XR Plug-in Management");
+		
+		[MenuItem("Nox/XR/Enable VR")]
+		public static void EnableVR()
+			=> XRController.NoVRFlag = false;
+
+		[MenuItem("Nox/XR/Disable VR")]
+		public static void DisableVR()
+			=> XRController.NoVRFlag = true;
+
 		public override void OnInspectorGUI() {
 			base.OnInspectorGUI();
+			
 			var controller = (XRController)target;
 			if (!controller) {
 				EditorGUILayout.LabelField("Controller is null");
@@ -25,12 +39,12 @@ namespace Mods.api.nox.xr.editor {
 						ability.Value.ToString()
 					);
 			}
-			
+
 			EditorGUILayout.Space();
-			
+
 			EditorGUILayout.ObjectField(controller.GetAvatar()?.GetDescriptor().GetAnchor(), typeof(GameObject), true);
 		}
-		
+
 		public override bool RequiresConstantRepaint() {
 			return true;
 		}

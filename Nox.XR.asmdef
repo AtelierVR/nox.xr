@@ -1,41 +1,49 @@
 {
-    "name": "Nox.XR",
-    "rootNamespace": "",
-    "references": [
-        "Nox.CCK",
-        "UniTask",
-        "Nox.CCK.Avatars",
-        "Nox.Controllers",
-        "Unity.XR.Management",
-        "AutoHandAssembly",
-        "NaughtyAttributes.Core",
-        "NaughtyAttributes.Editor",
-        "Nox.Players",
-        "Nox.Entities",
-        "Nox.UI",
-        "Unity.XR.Interaction.Toolkit",
-        "Nox.Avatars",
-        "Nox.Avatars.Parameters",
-        "Nox.Users",
-        "Nox.Avatars.Camera",
-        "Nox.Avatars.Rigging",
-        "RootMotion",
-        "Nox.CCK.Worlds",
-        "Nox.Avatars.Runtime"
-    ],
-    "includePlatforms": [],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [
-        {
-            "name": "rootmotion.finalik",
-            "expression": "",
-            "define": "HAS_FINALIK"
-        }
-    ],
-    "noEngineReferences": false
+  "name": "Nox.XR",
+  "rootNamespace": "",
+  "references": [
+    "Nox.CCK",
+    "UniTask",
+    "Nox.CCK.Avatars",
+    "Nox.CCK.XR",
+    "Nox.Controllers",
+    "AutoHandAssembly",
+    "NaughtyAttributes.Core",
+    "NaughtyAttributes.Editor",
+    "Nox.Players",
+    "Nox.Entities",
+    "Unity.XR.Management",
+    "Unity.XR.Interaction.Toolkit",
+    "Nox.UI",
+    "Nox.Avatars",
+    "Nox.Avatars.Parameters",
+    "Nox.Users",
+    "Nox.Avatars.Camera",
+    "Nox.Avatars.Rigging",
+    "RootMotion",
+    "Nox.CCK.Worlds",
+    "Nox.Avatars.Runtime",
+    "Unity.XR.CoreUtils",
+    "Nox.KeyBindings"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "rootmotion.finalik",
+      "expression": "",
+      "define": "HAS_FINALIK"
+    },
+    {
+      "name": "com.earnestrobot.autohand",
+      "expression": "",
+      "define": "HAS_AUTOHAND"
+    }
+  ],
+  "noEngineReferences": false
 }

@@ -1,10 +1,13 @@
 {
-    "name": "Nox.XR",
+    "name": "Nox.XR.Editor",
     "rootNamespace": "",
     "references": [
         "Nox.CCK",
         "UniTask",
-        "Nox.XR"
+        "Nox.XR",
+        "Nox.Avatars",
+        "Nox.Editor.Panel",
+        "Nox.CCK.XR"
     ],
     "includePlatforms": [
         "Editor"

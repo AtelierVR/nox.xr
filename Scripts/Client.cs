@@ -3,19 +3,20 @@ using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars;
 using Nox.UI;
+using Nox.CCK.XR;
 using Nox.Users;
-using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.XR;
 using UnityEngine.XR.Management;
 using Logger = Nox.CCK.Utils.Logger;
 
-namespace api.nox.xr {
+namespace Nox.XR {
 	public class Client : IClientModInitializer {
-		static internal Client           Instance;
+		public static Client Instance;
 		static internal IClientModCoreAPI CoreAPI;
 
 		static internal IUiAPI UiAPI
@@ -27,53 +28,34 @@ namespace api.nox.xr {
 				?.GetInstance<IAvatarAPI>();
 
 		static internal IUserAPI UserAPI
-			=> CoreAPI.ModAPI.GetMod("user")
+			=> CoreAPI.ModAPI.GetMod("users")
 				?.GetInstance<IUserAPI>();
-
-		#if UNITY_EDITOR
-		private static bool NoVRFlag {
-			get => Config.LoadEditor().Get("no-vr", false);
-			set {
-				var config = Config.LoadEditor();
-				config.Set("no-vr", value);
-				config.Save();
-			}
-		}
-
-		[UnityEditor.MenuItem("Nox/XR/Enable VR")]
-		public static void EnableVR()
-			=> NoVRFlag = false;
-
-		[UnityEditor.MenuItem("Nox/XR/Disable VR")]
-		public static void DisableVR()
-			=> NoVRFlag = true;
-		#else
-        private static bool NoVRFlag
-            => System.Array.Exists(
-                System.Environment.GetCommandLineArgs(),
-                arg => arg == "--no-vr"
-            );
-		#endif
 
 		private bool _isXRInitialized;
 
 		[NoxPublic(NoxAccess.Read)]
-		public readonly UnityEvent<bool> OnXRHeadsetChange = new();
-
+		public readonly UnityEvent<bool> OnHeadsetConnected = new();
 
 		[NoxPublic(NoxAccess.Method)]
 		public bool IsXRInitialized()
 			=> _isXRInitialized;
 
+		public async UniTask WaitXRInitialization(CancellationToken ct = default) {
+			if (IsXRInitialized())
+				return;
+
+			await UniTask.WaitUntil(IsXRInitialized, cancellationToken: ct);
+		}
+
 		[NoxPublic(NoxAccess.Method)]
 		public bool IsReady()
-			=> IsXRInitialized() && HasHeadset();
+			=> IsXRInitialized() && XRInputs.HasHeadset;
 
 		public async UniTask OnInitializeClientAsync(IClientModCoreAPI api) {
 			CoreAPI  = api;
 			Instance = this;
 
-			if (NoVRFlag) {
+			if (XRController.NoVRFlag) {
 				Logger.LogWarning("VR disabled by flag.");
 				return;
 			}
@@ -94,11 +76,11 @@ namespace api.nox.xr {
 
 		private async UniTask OnDeviceConnectedAsync(InputDevice device) {
 			Logger.LogDebug($"New XR Device:");
-			Logger.LogDebug(" - name: "            + device.name);
+			Logger.LogDebug(" - name: " + device.name);
 			Logger.LogDebug(" - characteristics: " + device.characteristics);
-			Logger.LogDebug(" - manufacturer: "    + device.manufacturer);
-			Logger.LogDebug(" - serial number: "   + device.serialNumber);
-			Logger.LogDebug(" - subsystem: "       + device.subsystem);
+			Logger.LogDebug(" - manufacturer: " + device.manufacturer);
+			Logger.LogDebug(" - serial number: " + device.serialNumber);
+			Logger.LogDebug(" - subsystem: " + device.subsystem);
 
 			var usages = new List<InputFeatureUsage>();
 			device.TryGetFeatureUsages(usages);
@@ -107,19 +89,20 @@ namespace api.nox.xr {
 
 			if (device.TryGetHapticCapabilities(out var hapticCapabilities)) {
 				Logger.LogDebug(" - haptic capabilities:");
-				Logger.LogDebug("   - num channels: "        + hapticCapabilities.numChannels);
-				Logger.LogDebug("   - supports buffer: "     + hapticCapabilities.supportsBuffer);
-				Logger.LogDebug("   - supports impulse: "    + hapticCapabilities.supportsImpulse);
+				Logger.LogDebug("   - num channels: " + hapticCapabilities.numChannels);
+				Logger.LogDebug("   - supports buffer: " + hapticCapabilities.supportsBuffer);
+				Logger.LogDebug("   - supports impulse: " + hapticCapabilities.supportsImpulse);
 				Logger.LogDebug("   - buffer optimal size: " + hapticCapabilities.bufferOptimalSize);
-				Logger.LogDebug("   - buffer max size: "     + hapticCapabilities.bufferMaxSize);
+				Logger.LogDebug("   - buffer max size: " + hapticCapabilities.bufferMaxSize);
 				Logger.LogDebug("   - buffer frequency Hz: " + hapticCapabilities.bufferFrequencyHz);
 			}
 
 			if (device.characteristics.HasFlag(InputDeviceCharacteristics.HeadMounted)) {
-				OnXRHeadsetChange.Invoke(true);
+				OnHeadsetConnected.Invoke(true);
 				if (await XRController.Make())
 					Logger.Log("XR Controller has been created.");
-				else Logger.LogWarning("Failed to create XR Controller.");
+				else
+					Logger.LogWarning("Failed to create XR Controller.");
 			}
 		}
 
@@ -129,11 +112,16 @@ namespace api.nox.xr {
 		private async UniTask OnDeviceDisconnectedAsync(InputDevice device) {
 			Logger.Log($"XR Device disconnected: {device.name} {device.characteristics}");
 			if (device.characteristics.HasFlag(InputDeviceCharacteristics.HeadMounted)) {
-				OnXRHeadsetChange.Invoke(false);
+				OnHeadsetConnected.Invoke(false);
 				if (await XRController.Remove())
 					Logger.Log("XR Controller has been removed.");
-				else Logger.LogWarning("Failed to remove XR Controller.");
+				else
+					Logger.LogWarning("Failed to remove XR Controller.");
 			}
+		}
+
+		private void OnDeviceConfigChanged(InputDevice device) {
+			Logger.Log($"XR Device config changed: {device.name} {device.characteristics}");
 		}
 
 
@@ -177,8 +165,9 @@ namespace api.nox.xr {
 
 			_isXRInitialized = true;
 
-			InputDevices.deviceConnected    += OnDeviceConnected;
-			InputDevices.deviceDisconnected += OnDeviceDisconnected;
+			InputDevices.deviceConnected     += OnDeviceConnected;
+			InputDevices.deviceDisconnected  += OnDeviceDisconnected;
+			InputDevices.deviceConfigChanged += OnDeviceConfigChanged;
 
 			var devices = new List<InputDevice>();
 			InputDevices.GetDevices(devices);
@@ -198,45 +187,14 @@ namespace api.nox.xr {
 			XRGeneralSettings.Instance.Manager.DeinitializeLoader();
 			_isXRInitialized = false;
 
-			InputDevices.deviceConnected    -= OnDeviceConnected;
-			InputDevices.deviceDisconnected -= OnDeviceDisconnected;
+			InputDevices.deviceConnected     -= OnDeviceConnected;
+			InputDevices.deviceDisconnected  -= OnDeviceDisconnected;
+			InputDevices.deviceConfigChanged -= OnDeviceConfigChanged;
 
-			OnXRHeadsetChange.Invoke(false);
+			OnHeadsetConnected.Invoke(false);
 			Logger.Log("XR stopped.");
 		}
 
-
-		[NoxPublic(NoxAccess.Method)]
-		public bool HasHeadset() {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevicesAtXRNode(XRNode.Head, devices);
-			return devices.Count > 0;
-		}
-
-		[NoxPublic(NoxAccess.Method)]
-		public bool HasHandRight() {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevicesAtXRNode(XRNode.RightHand, devices);
-			return devices.Count > 0;
-		}
-
-		[NoxPublic(NoxAccess.Method)]
-		public bool HasHandLeft() {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevicesAtXRNode(XRNode.LeftHand, devices);
-			return devices.Count > 0;
-		}
-
-		[NoxPublic(NoxAccess.Method)]
-		public bool HasHand()
-			=> HasHandRight() && HasHandLeft();
-
-		[NoxPublic(NoxAccess.Method)]
-		public bool HasTracker(XRNode node) {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevicesAtXRNode(node, devices);
-			return devices.Count > 0;
-		}
 
 		[NoxPublic(NoxAccess.Method)]
 		public List<InputDevice> GetAllTrackers() {
@@ -251,21 +209,5 @@ namespace api.nox.xr {
 				.ToList();
 		}
 
-		[NoxPublic(NoxAccess.Method)]
-		public bool GetTrackerPose(XRNode node, out Vector3 position, out Quaternion rotation) {
-			position = Vector3.zero;
-			rotation = Quaternion.identity;
-
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevicesAtXRNode(node, devices);
-
-			if (devices.Count == 0) return false;
-
-			var  device      = devices[0];
-			bool hasPosition = device.TryGetFeatureValue(CommonUsages.devicePosition, out position);
-			bool hasRotation = device.TryGetFeatureValue(CommonUsages.deviceRotation, out rotation);
-
-			return hasPosition && hasRotation;
-		}
 	}
 }

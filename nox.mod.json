@@ -46,7 +46,10 @@
   ],
   "entrypoints": {
     "client": [
-      "Nox.XR.Clients.Client"
+      "Nox.XR.Client"
+    ],
+    "editor": [
+      "Nox.XR.Editor.XRDevicesPanel"
     ]
   },
   "references": [],

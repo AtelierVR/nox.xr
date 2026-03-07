@@ -1,4 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <linker>
-	<assembly fullname="api.nox.xr" preserve="all" />
+	<assembly fullname="Nox.CCK.XR" preserve="all" />
+	<assembly fullname="Nox.XR" preserve="all" />
+	<assembly fullname="Nox.XR.Editor" preserve="all" />
 </linker>
