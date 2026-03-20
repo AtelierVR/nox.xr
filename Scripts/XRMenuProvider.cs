@@ -33,7 +33,7 @@ namespace Nox.XR {
 				return false;
 			}
 
-			Menu.SetActive(false);
+			Menu.Active = false;
 
 			Keybindings.KeyEvent.AddListener(OnKey);
 
@@ -61,7 +61,7 @@ namespace Nox.XR {
 				? AutoHandPlayer.handLeft
 				: AutoHandPlayer.handRight;
 
-			if (Menu.GetActive())
+			if (Menu.Active)
 				Close();
 			else
 				Open(hand);
@@ -73,7 +73,7 @@ namespace Nox.XR {
 				return;
 			}
 
-			Menu.SetActive(true);
+			Menu.Active = true;
 			hand.TryGrab(Grabbable);
 		}
 
@@ -83,7 +83,7 @@ namespace Nox.XR {
 				return;
 			}
 
-			Menu.SetActive(false);
+			Menu.Active = false;
 			Grabbable.HandsRelease();
 		}
 
