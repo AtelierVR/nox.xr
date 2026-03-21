@@ -319,17 +319,49 @@ namespace Nox.XR {
 			}
 		}
 
+		private static readonly (FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] _fingerMap = {
+			(FingerEnum.thumb,  PlayerRig.LeftThumb,  PlayerRig.LeftThumbNail,  PlayerRig.LeftThumbTip),
+			(FingerEnum.index,  PlayerRig.LeftIndex,  PlayerRig.LeftIndexNail,  PlayerRig.LeftIndexTip),
+			(FingerEnum.middle, PlayerRig.LeftMiddle, PlayerRig.LeftMiddleNail, PlayerRig.LeftMiddleTip),
+			(FingerEnum.ring,   PlayerRig.LeftRing,   PlayerRig.LeftRingNail,   PlayerRig.LeftRingTip),
+			(FingerEnum.pinky,  PlayerRig.LeftPinky,  PlayerRig.LeftPinkyNail,  PlayerRig.LeftPinkyTip),
+		};
+
+		private static readonly (FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] _fingerMapRight = {
+			(FingerEnum.thumb,  PlayerRig.RightThumb,  PlayerRig.RightThumbNail,  PlayerRig.RightThumbTip),
+			(FingerEnum.index,  PlayerRig.RightIndex,  PlayerRig.RightIndexNail,  PlayerRig.RightIndexTip),
+			(FingerEnum.middle, PlayerRig.RightMiddle, PlayerRig.RightMiddleNail, PlayerRig.RightMiddleTip),
+			(FingerEnum.ring,   PlayerRig.RightRing,   PlayerRig.RightRingNail,   PlayerRig.RightRingTip),
+			(FingerEnum.pinky,  PlayerRig.RightPinky,  PlayerRig.RightPinkyNail,  PlayerRig.RightPinkyTip),
+		};
+
+		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Hand hand,
+			(FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] map) {
+			if (hand == null || hand.fingers == null || hand.fingers.Length == 0) return;
+			foreach (var entry in map) {
+				var finger = System.Array.Find(hand.fingers, f => f.fingerType == entry.finger);
+				if (finger == null) continue;
+				if (finger.knuckleJoint) parts[entry.proximal.ToIndex()]     = finger.knuckleJoint;
+				if (finger.middleJoint)  parts[entry.intermediate.ToIndex()] = finger.middleJoint;
+				if (finger.distalJoint)  parts[entry.distal.ToIndex()]       = finger.distalJoint;
+			}
+		}
+
 		private Dictionary<ushort, Transform> GetParts() {
 			var parts = new Dictionary<ushort, Transform> {
 				{ PlayerRig.Base.ToIndex(), player.transform },
 				{ PlayerRig.Head.ToIndex(), player.headCamera.transform }
 			};
 
-			if (player.handLeft)
+			if (player.handLeft) {
 				parts.Add(PlayerRig.LeftHand.ToIndex(), player.handLeft.transform);
+				AddFingerParts(parts, player.handLeft, _fingerMap);
+			}
 
-			if (player.handRight)
+			if (player.handRight) {
 				parts.Add(PlayerRig.RightHand.ToIndex(), player.handRight.transform);
+				AddFingerParts(parts, player.handRight, _fingerMapRight);
+			}
 
 			return parts;
 		}

@@ -172,6 +172,7 @@ MonoBehaviour:
   m_RepeatRate: 0.1
   m_TrackedDeviceDragThresholdMultiplier: 2
   m_TrackedScrollDeltaMultiplier: 5
+  m_NonTrackedScrollDeltaMultiplier: 6
   m_BypassUIToolkitEvents: 1
   m_ActiveInputMode: 1
   m_EnableXRInput: 1
@@ -683,6 +684,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -14647,6 +14649,18 @@ PrefabInstance:
     - target: {fileID: 7439882295212036103, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
       propertyPath: m_Name
       value: Handheld UI
+      objectReference: {fileID: 0}
+    - target: {fileID: 8563147187270507210, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
+      propertyPath: instantGrab
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8563147187270507210, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
+      propertyPath: ignoreWeight
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8563147187270507210, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
+      propertyPath: allowHeldSwapping
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9133183295858187757, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
       propertyPath: m_IsActive

@@ -74,6 +74,16 @@ namespace Nox.XR {
 			}
 
 			Menu.Active = true;
+
+			// Teleport the grabbable onto the palm so ForceGrab's raycast hits immediately
+			// and GrabType.InstantGrab snaps without any travel animation.
+			Grabbable.transform.position = hand.palmTransform.position;
+			Grabbable.transform.rotation = hand.palmTransform.rotation;
+			if (Grabbable.body != null) {
+				Grabbable.body.position = hand.palmTransform.position;
+				Grabbable.body.rotation = hand.palmTransform.rotation;
+			}
+
 			hand.TryGrab(Grabbable);
 		}
 
