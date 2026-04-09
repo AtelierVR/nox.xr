@@ -218,7 +218,7 @@ namespace Nox.XR {
 
 		// Avatar management fields
 		private IRuntimeAvatar _attachedRuntimeAvatar;
-		private IAvatarIdentifier _avatarIdentifier;
+		private Identifier _avatarIdentifier;
 		private CancellationTokenSource _avatarLoadingCts;
 		private EventSubscription _onUserUpdate;
 
@@ -261,8 +261,8 @@ namespace Nox.XR {
 				SetAbilities(ability.Key, ability.Value);
 
 			if (controller is IControllerAvatar ca) {
-				var identifier = ca.GetAvatar()?.GetIdentifier();
-				if (identifier != null && identifier.IsValid())
+				var identifier = ca.GetAvatar()?.Identifier ?? Identifier.Invalid;
+				if (identifier.IsValid())
 					SetAvatar(identifier).Forget();
 			}
 
@@ -394,7 +394,7 @@ namespace Nox.XR {
 				return false;
 			}
 
-			var descriptor = _attachedRuntimeAvatar.GetDescriptor();
+			var descriptor = _attachedRuntimeAvatar.Descriptor;
 			if (descriptor == null) {
 				Logger.LogError("Avatar descriptor is null, cannot set avatar.");
 				_attachedRuntimeAvatar = old;
@@ -408,17 +408,17 @@ namespace Nox.XR {
 				return false;
 			}
 
-			root.name += $" {runtimeAvatar.GetIdentifier()?.ToString() ?? "null"} XR";
+			root.name += $" {runtimeAvatar.Identifier.ToString()} XR";
 
 			if (old != null)
 				await old.Dispose();
 
-			Logger.LogDebug($"Attaching avatar to {runtimeAvatar.GetDescriptor()}", runtimeAvatar.GetDescriptor().GetAnchor());
+			Logger.LogDebug($"Attaching avatar to {runtimeAvatar.Descriptor}", runtimeAvatar.Descriptor.GetAnchor());
 			root.transform.SetParent(transform, false);
 			root.transform.localPosition = Vector3.zero;
 			root.transform.localRotation = Quaternion.identity;
 
-			var parameterModule = _attachedRuntimeAvatar?.GetDescriptor()
+			var parameterModule = _attachedRuntimeAvatar?.Descriptor
 				?.GetModules<IParameterModule>()
 				.FirstOrDefault();
 
@@ -549,18 +549,18 @@ namespace Nox.XR {
 		}
 
 		private void LoadAvatarFromUser(ICurrentUser user)
-			=> SetAvatar(AvatarIdentifier.From(user?.GetAvatarId())).Forget();
+			=> SetAvatar(user.Avatar).Forget();
 
 		private readonly Dictionary<string, object> _avatarParameters;
 
-		public async UniTask<IRuntimeAvatar> SetAvatar(IAvatarIdentifier identifier, Action<string, float> progress = null) {
+		public async UniTask<IRuntimeAvatar> SetAvatar(Identifier identifier, Action<string, float> progress = null) {
 			return null;
 
-			Logger.LogDebug($"Loading avatar for identifier {identifier?.ToString() ?? "null"}");
+			Logger.LogDebug($"Loading avatar for identifier {identifier.ToString()}");
 
 			var playerAvatar = _attachedPlayer as ILocalPlayerAvatar;
 
-			if (identifier == null || !identifier.IsValid()) {
+			if (!identifier.IsValid()) {
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarFailed(new Exception("Invalid avatar identifier."));
 				return null;
@@ -583,7 +583,7 @@ namespace Nox.XR {
 			};
 
 			var asset = (await Client.AvatarAPI.SearchAssets(identifier, req)
-					.AttachExternalCancellation(_avatarLoadingCts.Token)).GetAssets()
+					.AttachExternalCancellation(_avatarLoadingCts.Token)).Items
 				.FirstOrDefault();
 			if (_avatarLoadingCts.IsCancellationRequested)
 				return null;
@@ -591,17 +591,17 @@ namespace Nox.XR {
 			if (asset == null) {
 				Logger.LogWarning($"Avatar asset not found for identifier {identifier.ToString()}");
 				var err = await Client.AvatarAPI.LoadError(_avatarParameters);
-				err.SetIdentifier(identifier);
+				err.Identifier = identifier;
 				await SetAvatar(err);
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarFailed(new Exception("Avatar asset not found."));
 				return null;
 			}
 
-			if (!Client.AvatarAPI.HasInCache(asset.GetHash())) {
+			if (!Client.AvatarAPI.HasInCache(asset.Hash)) {
 				var download = Client.AvatarAPI.DownloadToCache(
-					asset.GetUrl(),
-					hash: asset.GetHash(),
+					asset.Url,
+					hash: asset.Hash,
 					progress: p => progress?.Invoke($"Downloading avatar {identifier.ToString()}", p),
 					token: _avatarLoadingCts.Token
 				);
@@ -611,7 +611,7 @@ namespace Nox.XR {
 			}
 
 			var avatar = await Client.AvatarAPI.LoadFromCache(
-				asset.GetHash(),
+				asset.Hash,
 				_avatarParameters,
 				progress: p => progress?.Invoke($"Loading avatar {identifier.ToString()}", p),
 				token: _avatarLoadingCts.Token
@@ -622,7 +622,7 @@ namespace Nox.XR {
 			if (avatar == null) {
 				Logger.LogError($"Failed to load avatar from cache for identifier {identifier.ToString()}");
 				var err = await Client.AvatarAPI.LoadError(_avatarParameters);
-				err.SetIdentifier(identifier);
+				err.Identifier = identifier;
 				await SetAvatar(err);
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarFailed(new Exception("Failed to load avatar from cache."));
@@ -630,7 +630,7 @@ namespace Nox.XR {
 			}
 
 			Logger.LogDebug($"Avatar loaded: {identifier.ToString()}");
-			avatar.SetIdentifier(identifier);
+			avatar.Identifier = identifier;
 			await SetAvatar(avatar);
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();
@@ -665,7 +665,7 @@ namespace Nox.XR {
 
 				await SetAvatar(avatar);
 
-				var currentUser = Client.UserAPI.GetCurrent();
+				var currentUser = Client.UserAPI.Current;
 				if (currentUser != null) {
 					LoadAvatarFromUser(currentUser);
 				} else {
@@ -678,13 +678,13 @@ namespace Nox.XR {
 
 		// ReSharper disable Unity.PerformanceAnalysis
 		private void SynchronizeParametersAvatar() {
-			var parameterModule = _attachedRuntimeAvatar?.GetDescriptor()
+			var parameterModule = _attachedRuntimeAvatar?.Descriptor
 				?.GetModules<IParameterModule>()
 				.FirstOrDefault();
-			var cameraModule = _attachedRuntimeAvatar?.GetDescriptor()
+			var cameraModule = _attachedRuntimeAvatar?.Descriptor
 				?.GetModules<ICameraModule>()
 				.FirstOrDefault();
-			var riggingModule = _attachedRuntimeAvatar?.GetDescriptor()
+			var riggingModule = _attachedRuntimeAvatar?.Descriptor
 				?.GetModules<IRiggingModule>()
 				.FirstOrDefault();
 			if (parameterModule == null)
