@@ -177,7 +177,7 @@ namespace Nox.XR {
 			}
 
 
-			xr.gameObject.name = $"[{xr.GetType().Name}_{xr.GetInstanceID()}]";
+			xr.gameObject.name = $"[{xr.GetType().Name}_{xr.GetEntityId().GetHashCode()}]";
 			DontDestroyOnLoad(xr);
 
 			// Attendre plusieurs frames avant d'activer pour permettre au système XR de s'initialiser
