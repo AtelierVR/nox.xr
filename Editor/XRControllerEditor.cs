@@ -42,7 +42,7 @@ namespace Nox.XR.Editor {
 
 			EditorGUILayout.Space();
 
-			EditorGUILayout.ObjectField(controller.GetAvatar()?.Descriptor.GetAnchor(), typeof(GameObject), true);
+			EditorGUILayout.ObjectField(controller.GetAvatar()?.Descriptor.Anchor, typeof(GameObject), true);
 		}
 
 		public override bool RequiresConstantRepaint() {
