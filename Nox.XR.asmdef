@@ -24,7 +24,9 @@
     "Nox.CCK.Worlds",
     "Nox.Avatars.Runtime",
     "Unity.XR.CoreUtils",
-    "Nox.KeyBindings"
+    "Nox.KeyBindings",
+    "Nox.Settings",
+    "Nox.CCK.Settings"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

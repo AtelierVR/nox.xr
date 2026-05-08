@@ -45,11 +45,15 @@
     }
   ],
   "entrypoints": {
+    "main": [
+      "Nox.XR.Main"
+    ],
     "client": [
       "Nox.XR.Client"
     ],
     "editor": [
-      "Nox.XR.Editor.XRDevicesPanel"
+      "Nox.XR.Editor.XRDevicesPanel",
+      "Nox.XR.Editor.SetupSettings"
     ]
   },
   "references": [],
