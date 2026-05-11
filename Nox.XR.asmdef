@@ -9,7 +9,6 @@
     "Nox.Controllers",
     "AutoHandAssembly",
     "NaughtyAttributes.Core",
-    "NaughtyAttributes.Editor",
     "Nox.Players",
     "Nox.Entities",
     "Unity.XR.Management",
