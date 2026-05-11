@@ -11,13 +11,18 @@ namespace Nox.XR.Editor {
 		public static void OpenXRSettings()
 			=> SettingsService.OpenProjectSettings("Project/XR Plug-in Management");
 		
-		[MenuItem("Nox/XR/Enable VR")]
-		public static void EnableVR()
-			=> XRController.NoVRFlag = false;
+		private const string XRMenuPath = "Nox/XR/Enable XR";
 
-		[MenuItem("Nox/XR/Disable VR")]
-		public static void DisableVR()
-			=> XRController.NoVRFlag = true;
+		[MenuItem(XRMenuPath, false)]
+		public static void ToggleVR() {
+			XRController.NoVRFlag = !XRController.NoVRFlag;
+		}
+
+		[MenuItem(XRMenuPath, true)]
+		private static bool ToggleVRValidate() {
+			Menu.SetChecked(XRMenuPath, !XRController.NoVRFlag);
+			return true;
+		}
 
 		public override void OnInspectorGUI() {
 			base.OnInspectorGUI();
