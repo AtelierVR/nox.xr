@@ -53,7 +53,6 @@ namespace Nox.XR.Editor {
 		private Label _xrInitializedLabel;
 		private Label _xrReadyLabel;
 		private Label _hasHeadsetLabel;
-		private Button _refreshButton;
 		private float _lastRefreshTime;
 
 		public XRDevicesInstance(XRDevicesPanel panel, IWindow window, Dictionary<string, object> data) {
@@ -75,6 +74,9 @@ namespace Nox.XR.Editor {
 			EditorApplication.update -= OnEditorUpdate;
 			_panel.Instance          =  null;
 		}
+
+		public IToolOption[] GetOptions()
+			=> new IToolOption[] { new DefaultToolOption("Refresh", OnRefreshClicked) };
 
 		private void OnEditorUpdate() {
 			// Refresh devices info every second
@@ -98,38 +100,42 @@ namespace Nox.XR.Editor {
 			if (_noVrFlagLabel != null) {
 				var noVrFlag = XRController.NoVRFlag;
 				_noVrFlagLabel.text = noVrFlag ? "Disabled (--no-vr)" : "Enabled";
-				_noVrFlagLabel.style.color = noVrFlag ? new Color(0.8f, 0.3f, 0.3f) : new Color(0.3f, 0.8f, 0.3f);
+				_noVrFlagLabel.EnableInClassList("text-danger", noVrFlag);
+				_noVrFlagLabel.EnableInClassList("text-success", !noVrFlag);
 			}
 
 			if (_xrInitializedLabel != null && Client.Instance != null) {
 				var isInitialized = Client.Instance.IsXRInitialized();
 				_xrInitializedLabel.text = isInitialized ? "Initialized" : "Not Initialized";
-				_xrInitializedLabel.style.color = isInitialized ? new Color(0.3f, 0.8f, 0.3f) : new Color(0.8f, 0.3f, 0.3f);
+				_xrInitializedLabel.EnableInClassList("text-success", isInitialized);
+				_xrInitializedLabel.EnableInClassList("text-danger", !isInitialized);
 			}
 
 			if (_xrReadyLabel != null && Client.Instance != null) {
 				var isReady = Client.Instance.IsReady();
 				_xrReadyLabel.text = isReady ? "Ready" : "Not Ready";
-				_xrReadyLabel.style.color = isReady ? new Color(0.3f, 0.8f, 0.3f) : new Color(0.8f, 0.8f, 0.3f);
+				_xrReadyLabel.EnableInClassList("text-success", isReady);
+				_xrReadyLabel.EnableInClassList("text-warning", !isReady);
 			}
 
 			if (_hasHeadsetLabel != null && Client.Instance != null) {
 				var hasHeadset = XRInputs.HasHeadset;
 				_hasHeadsetLabel.text = hasHeadset ? "Detected" : "Not Detected";
-				_hasHeadsetLabel.style.color = hasHeadset ? new Color(0.3f, 0.8f, 0.3f) : new Color(0.8f, 0.3f, 0.3f);
+				_hasHeadsetLabel.EnableInClassList("text-success", hasHeadset);
+				_hasHeadsetLabel.EnableInClassList("text-danger", !hasHeadset);
 			}
 
 			// Update HMD status
 			var hmdDevices = new List<InputDevice>();
 			InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.HeadMounted, hmdDevices);
-
 			if (hmdDevices.Count > 0) {
-				var hmd = hmdDevices[0];
-				_hmdStatusLabel.text        = $"Connected: {hmd.name}";
-				_hmdStatusLabel.style.color = new Color(0.3f, 0.8f, 0.3f);
+				_hmdStatusLabel.text = $"Connected: {hmdDevices[0].name}";
+				_hmdStatusLabel.EnableInClassList("text-success", true);
+				_hmdStatusLabel.EnableInClassList("text-danger", false);
 			} else {
-				_hmdStatusLabel.text        = "Not Connected";
-				_hmdStatusLabel.style.color = new Color(0.8f, 0.3f, 0.3f);
+				_hmdStatusLabel.text = "Not Connected";
+				_hmdStatusLabel.EnableInClassList("text-success", false);
+				_hmdStatusLabel.EnableInClassList("text-danger", true);
 			}
 
 			// Update Left Controller status
@@ -138,14 +144,14 @@ namespace Nox.XR.Editor {
 				InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller,
 				leftControllers
 			);
-
 			if (leftControllers.Count > 0) {
-				var controller = leftControllers[0];
-				_leftControllerStatusLabel.text        = $"Connected: {controller.name}";
-				_leftControllerStatusLabel.style.color = new Color(0.3f, 0.8f, 0.3f);
+				_leftControllerStatusLabel.text = $"Connected: {leftControllers[0].name}";
+				_leftControllerStatusLabel.EnableInClassList("text-success", true);
+				_leftControllerStatusLabel.EnableInClassList("text-danger", false);
 			} else {
-				_leftControllerStatusLabel.text        = "Not Connected";
-				_leftControllerStatusLabel.style.color = new Color(0.8f, 0.3f, 0.3f);
+				_leftControllerStatusLabel.text = "Not Connected";
+				_leftControllerStatusLabel.EnableInClassList("text-success", false);
+				_leftControllerStatusLabel.EnableInClassList("text-danger", true);
 			}
 
 			// Update Right Controller status
@@ -154,14 +160,14 @@ namespace Nox.XR.Editor {
 				InputDeviceCharacteristics.Right | InputDeviceCharacteristics.Controller,
 				rightControllers
 			);
-
 			if (rightControllers.Count > 0) {
-				var controller = rightControllers[0];
-				_rightControllerStatusLabel.text        = $"Connected: {controller.name}";
-				_rightControllerStatusLabel.style.color = new Color(0.3f, 0.8f, 0.3f);
+				_rightControllerStatusLabel.text = $"Connected: {rightControllers[0].name}";
+				_rightControllerStatusLabel.EnableInClassList("text-success", true);
+				_rightControllerStatusLabel.EnableInClassList("text-danger", false);
 			} else {
-				_rightControllerStatusLabel.text        = "Not Connected";
-				_rightControllerStatusLabel.style.color = new Color(0.8f, 0.3f, 0.3f);
+				_rightControllerStatusLabel.text = "Not Connected";
+				_rightControllerStatusLabel.EnableInClassList("text-success", false);
+				_rightControllerStatusLabel.EnableInClassList("text-danger", true);
 			}
 
 			// List all devices
@@ -169,64 +175,33 @@ namespace Nox.XR.Editor {
 			var devices = new List<InputDevice>();
 			InputDevices.GetDevices(devices);
 
-			if (devices.Count == 0) {
-				var noDeviceLabel = new Label("No VR devices detected") {
-					style = {
-						unityTextAlign = TextAnchor.MiddleCenter,
-						paddingTop     = 20,
-						paddingBottom  = 20,
-						color          = new Color(0.6f, 0.6f, 0.6f)
-					}
-				};
-				_devicesList.Add(noDeviceLabel);
-			} else {
-				foreach (var device in devices) {
-					var deviceContainer = new VisualElement {
-						style = {
-							backgroundColor         = new Color(0.25f, 0.25f, 0.25f),
-							marginBottom            = 5,
-							paddingBottom           = 10,
-							paddingLeft             = 10,
-							paddingRight            = 10,
-							paddingTop              = 10,
-							borderBottomLeftRadius  = 4,
-							borderBottomRightRadius = 4,
-							borderTopLeftRadius     = 4,
-							borderTopRightRadius    = 4
-						}
-					};
+			var noDevicesLabel = _content?.Q<Label>("no-devices");
+			noDevicesLabel?.EnableInClassList("hidden", devices.Count > 0);
 
-					var nameLabel = new Label($"Device: {device.name}") {
-						style = {
-							unityFontStyleAndWeight = FontStyle.Bold,
-							marginBottom            = 5
-						}
-					};
-					deviceContainer.Add(nameLabel);
+			foreach (var device in devices) {
+				var deviceContainer = new GroupBox();
+				deviceContainer.AddToClassList("p-8");
+				deviceContainer.AddToClassList("m-0");
+				deviceContainer.AddToClassList("border-b");
 
-					var manufacturerLabel = new Label($"Manufacturer: {device.manufacturer}");
-					deviceContainer.Add(manufacturerLabel);
+				var nameLabel = new Label($"Device: {device.name}");
+				nameLabel.AddToClassList("text-bold");
+				nameLabel.AddToClassList("mb-4");
+				deviceContainer.Add(nameLabel);
 
-					var serialLabel = new Label($"Serial: {device.serialNumber}");
-					deviceContainer.Add(serialLabel);
+				deviceContainer.Add(new Label($"Manufacturer: {device.manufacturer}"));
+				deviceContainer.Add(new Label($"Serial: {device.serialNumber}"));
 
-					var characteristicsLabel = new Label($"Characteristics: {device.characteristics}") {
-						style = {
-							whiteSpace = WhiteSpace.Normal,
-							flexWrap   = Wrap.Wrap
-						}
-					};
-					deviceContainer.Add(characteristicsLabel);
+				var characteristicsLabel = new Label($"Characteristics: {device.characteristics}");
+				characteristicsLabel.AddToClassList("text-wrap");
+				deviceContainer.Add(characteristicsLabel);
 
-					var isValidLabel = new Label($"Valid: {device.isValid}") {
-						style = {
-							color = device.isValid ? new Color(0.3f, 0.8f, 0.3f) : new Color(0.8f, 0.3f, 0.3f)
-						}
-					};
-					deviceContainer.Add(isValidLabel);
+				var isValidLabel = new Label($"Valid: {device.isValid}");
+				isValidLabel.EnableInClassList("text-success", device.isValid);
+				isValidLabel.EnableInClassList("text-danger", !device.isValid);
+				deviceContainer.Add(isValidLabel);
 
-					_devicesList.Add(deviceContainer);
-				}
+				_devicesList.Add(deviceContainer);
 			}
 		}
 
@@ -234,230 +209,20 @@ namespace Nox.XR.Editor {
 			if (_content != null)
 				return _content;
 
-			var root = new VisualElement {
-				style = {
-					paddingTop    = 10,
-					paddingBottom = 10,
-					paddingLeft   = 10,
-					paddingRight  = 10
-				}
-			};
+			_content = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("xr-devices.uxml").CloneTree();
+			_content.AddToClassList("flex-fill");
 
-			// Title
-			var titleLabel = new Label("VR Devices Information") {
-				style = {
-					fontSize                = 18,
-					unityFontStyleAndWeight = FontStyle.Bold,
-					marginBottom            = 10,
-					unityTextAlign          = TextAnchor.MiddleCenter
-				}
-			};
-			root.Add(titleLabel);
+			_noVrFlagLabel            = _content.Q<Label>("vr-mode");
+			_xrInitializedLabel       = _content.Q<Label>("xr-system");
+			_xrReadyLabel             = _content.Q<Label>("xr-ready");
+			_hasHeadsetLabel          = _content.Q<Label>("headset-detection");
+			_hmdStatusLabel           = _content.Q<Label>("hmd-status");
+			_leftControllerStatusLabel  = _content.Q<Label>("left-controller");
+			_rightControllerStatusLabel = _content.Q<Label>("right-controller");
+			_devicesList              = _content.Q<VisualElement>("devices-list");
 
-			// Refresh button
-			_refreshButton = new Button(OnRefreshClicked) {
-				text = "Refresh Devices",
-				style = {
-					marginBottom = 10
-				}
-			};
-			root.Add(_refreshButton);
-
-			// XR System Status section
-			var xrSystemContainer = new VisualElement {
-				style = {
-					backgroundColor         = new Color(0.2f, 0.2f, 0.25f),
-					paddingBottom           = 10,
-					paddingLeft             = 10,
-					paddingRight            = 10,
-					paddingTop              = 10,
-					marginBottom            = 10,
-					borderBottomLeftRadius  = 4,
-					borderBottomRightRadius = 4,
-					borderTopLeftRadius     = 4,
-					borderTopRightRadius    = 4
-				}
-			};
-
-			var xrSystemTitle = new Label("XR System Status") {
-				style = {
-					fontSize                = 14,
-					unityFontStyleAndWeight = FontStyle.Bold,
-					marginBottom            = 5
-				}
-			};
-			xrSystemContainer.Add(xrSystemTitle);
-
-			// NoVR Flag Status
-			var noVrContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var noVrLabel = new Label("VR Mode: ") {
-				style = {
-					width = 150
-				}
-			};
-			_noVrFlagLabel = new Label("Checking...");
-			noVrContainer.Add(noVrLabel);
-			noVrContainer.Add(_noVrFlagLabel);
-			xrSystemContainer.Add(noVrContainer);
-
-			// XR Initialized Status
-			var xrInitContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var xrInitLabel = new Label("XR System: ") {
-				style = {
-					width = 150
-				}
-			};
-			_xrInitializedLabel = new Label("Checking...");
-			xrInitContainer.Add(xrInitLabel);
-			xrInitContainer.Add(_xrInitializedLabel);
-			xrSystemContainer.Add(xrInitContainer);
-
-			// XR Ready Status
-			var xrReadyContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var xrReadyLabel = new Label("XR Ready: ") {
-				style = {
-					width = 150
-				}
-			};
-			_xrReadyLabel = new Label("Checking...");
-			xrReadyContainer.Add(xrReadyLabel);
-			xrReadyContainer.Add(_xrReadyLabel);
-			xrSystemContainer.Add(xrReadyContainer);
-
-			// Has Headset Status
-			var hasHeadsetContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var hasHeadsetLabel = new Label("Headset Detection: ") {
-				style = {
-					width = 150
-				}
-			};
-			_hasHeadsetLabel = new Label("Checking...");
-			hasHeadsetContainer.Add(hasHeadsetLabel);
-			hasHeadsetContainer.Add(_hasHeadsetLabel);
-			xrSystemContainer.Add(hasHeadsetContainer);
-
-			root.Add(xrSystemContainer);
-
-			// Quick status section
-			var statusContainer = new VisualElement {
-				style = {
-					backgroundColor         = new Color(0.2f, 0.2f, 0.2f),
-					paddingBottom           = 10,
-					paddingLeft             = 10,
-					paddingRight            = 10,
-					paddingTop              = 10,
-					marginBottom            = 10,
-					borderBottomLeftRadius  = 4,
-					borderBottomRightRadius = 4,
-					borderTopLeftRadius     = 4,
-					borderTopRightRadius    = 4
-				}
-			};
-
-			var statusTitle = new Label("Quick Status") {
-				style = {
-					fontSize                = 14,
-					unityFontStyleAndWeight = FontStyle.Bold,
-					marginBottom            = 5
-				}
-			};
-			statusContainer.Add(statusTitle);
-
-			// HMD Status
-			var hmdContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var hmdLabel = new Label("HMD: ") {
-				style = {
-					width = 150
-				}
-			};
-			_hmdStatusLabel = new Label("Checking...");
-			hmdContainer.Add(hmdLabel);
-			hmdContainer.Add(_hmdStatusLabel);
-			statusContainer.Add(hmdContainer);
-
-			// Left Controller Status
-			var leftContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var leftLabel = new Label("Left Controller: ") {
-				style = {
-					width = 150
-				}
-			};
-			_leftControllerStatusLabel = new Label("Checking...");
-			leftContainer.Add(leftLabel);
-			leftContainer.Add(_leftControllerStatusLabel);
-			statusContainer.Add(leftContainer);
-
-			// Right Controller Status
-			var rightContainer = new VisualElement {
-				style = {
-					flexDirection = FlexDirection.Row,
-					marginBottom  = 5
-				}
-			};
-			var rightLabel = new Label("Right Controller: ") {
-				style = {
-					width = 150
-				}
-			};
-			_rightControllerStatusLabel = new Label("Checking...");
-			rightContainer.Add(rightLabel);
-			rightContainer.Add(_rightControllerStatusLabel);
-			statusContainer.Add(rightContainer);
-
-			root.Add(statusContainer);
-
-			// Devices list section
-			var devicesTitle = new Label("All Detected Devices") {
-				style = {
-					fontSize                = 14,
-					unityFontStyleAndWeight = FontStyle.Bold,
-					marginBottom            = 5,
-					marginTop               = 10
-				}
-			};
-			root.Add(devicesTitle);
-
-			_devicesList = new ScrollView {
-				style = {
-					maxHeight = 400
-				}
-			};
-			root.Add(_devicesList);
-
-			// Initial refresh
 			RefreshDevices();
-
-			return _content = root;
+			return _content;
 		}
 	}
 }
