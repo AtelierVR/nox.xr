@@ -1,0 +1,45 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
+    <Style src="project://database/Packages/nox.editor/Assets/nox.editor/panels.uss?fileID=7433441132597879392&amp;guid=714eb72dda480a944a65e84bce8547a4&amp;type=3#panels" />
+    <ui:ScrollView style="flex-grow: 1;">
+        <ui:GroupBox class="p-8 py-16 m-0 border-b">
+            <ui:Label text="XR System Status" class="text-lg mb-8" />
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="VR Mode:" class="opacity-75 key-label" />
+                <ui:Label name="vr-mode" text="Checking..." />
+            </ui:VisualElement>
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="XR System:" class="opacity-75 key-label" />
+                <ui:Label name="xr-system" text="Checking..." />
+            </ui:VisualElement>
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="XR Ready:" class="opacity-75 key-label" />
+                <ui:Label name="xr-ready" text="Checking..." />
+            </ui:VisualElement>
+            <ui:VisualElement class="flex-row align-center">
+                <ui:Label text="Headset Detection:" class="opacity-75 key-label" />
+                <ui:Label name="headset-detection" text="Checking..." />
+            </ui:VisualElement>
+        </ui:GroupBox>
+        <ui:GroupBox class="p-8 py-16 m-0 border-b">
+            <ui:Label text="Quick Status" class="text-lg mb-8" />
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="HMD:" class="opacity-75 key-label" />
+                <ui:Label name="hmd-status" text="Checking..." />
+            </ui:VisualElement>
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="Left Controller:" class="opacity-75 key-label" />
+                <ui:Label name="left-controller" text="Checking..." />
+            </ui:VisualElement>
+            <ui:VisualElement class="flex-row align-center">
+                <ui:Label text="Right Controller:" class="opacity-75 key-label" />
+                <ui:Label name="right-controller" text="Checking..." />
+            </ui:VisualElement>
+        </ui:GroupBox>
+        <ui:GroupBox class="p-8 py-16 m-0">
+            <ui:Label text="All Detected Devices" class="text-lg mb-8" />
+            <ui:VisualElement name="devices-list" />
+            <ui:Label name="no-devices" text="No VR devices detected" class="text-center opacity-75" />
+        </ui:GroupBox>
+    </ui:ScrollView>
+</ui:UXML>
