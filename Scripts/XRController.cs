@@ -13,6 +13,7 @@ using Nox.Avatars.Parameters;
 using Nox.Avatars.Players;
 using Nox.Avatars.Rigging;
 using Nox.Avatars.Runtime.Network;
+using Nox.Avatars.Scale;
 using Nox.CCK.Avatars;
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Network;
@@ -25,11 +26,14 @@ using Nox.Controllers;
 using Nox.Players;
 using Nox.Users;
 using Nox.XR.Providers;
-using RootMotion.FinalIK;
 using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+#if HAS_FINALIK
+using RootMotion.FinalIK;
+#endif
 
 namespace Nox.XR {
+	[UnityEngine.DefaultExecutionOrder(15)]
 	public class XRController : MonoBehaviour, IController, IControllerAvatar, INoxObject {
 		/// <summary>
 		/// Check if a headset is currently connected directly via Unity XR API
@@ -191,8 +195,8 @@ namespace Nox.XR {
 			if (xr.eventSystem)
 				xr.eventSystem.enabled = true;
 
-			// if (xr._attachedRuntimeAvatar == null)
-			//  	xr.SetupAvatar().Forget();
+			if (xr._attachedRuntimeAvatar == null)
+				xr.SetupAvatar().Forget();
 
 			xr._onUserUpdate = Client.CoreAPI.EventAPI.Subscribe("user_update", xr.OnUserUpdate);
 			Keybindings.Rebind();
@@ -336,6 +340,48 @@ namespace Nox.XR {
 			(FingerEnum.pinky,  PlayerRig.RightPinky,  PlayerRig.RightPinkyNail,  PlayerRig.RightPinkyTip),
 		};
 
+		private static readonly (FingerEnum finger, HumanBodyBones proximal, HumanBodyBones intermediate, HumanBodyBones distal)[] _leftFingerBoneMap = {
+			(FingerEnum.thumb,  HumanBodyBones.LeftThumbProximal,  HumanBodyBones.LeftThumbIntermediate,  HumanBodyBones.LeftThumbDistal),
+			(FingerEnum.index,  HumanBodyBones.LeftIndexProximal,  HumanBodyBones.LeftIndexIntermediate,  HumanBodyBones.LeftIndexDistal),
+			(FingerEnum.middle, HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal),
+			(FingerEnum.ring,   HumanBodyBones.LeftRingProximal,   HumanBodyBones.LeftRingIntermediate,   HumanBodyBones.LeftRingDistal),
+			(FingerEnum.pinky,  HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal),
+		};
+
+		private static readonly (FingerEnum finger, HumanBodyBones proximal, HumanBodyBones intermediate, HumanBodyBones distal)[] _rightFingerBoneMap = {
+			(FingerEnum.thumb,  HumanBodyBones.RightThumbProximal,  HumanBodyBones.RightThumbIntermediate,  HumanBodyBones.RightThumbDistal),
+			(FingerEnum.index,  HumanBodyBones.RightIndexProximal,  HumanBodyBones.RightIndexIntermediate,  HumanBodyBones.RightIndexDistal),
+			(FingerEnum.middle, HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal),
+			(FingerEnum.ring,   HumanBodyBones.RightRingProximal,   HumanBodyBones.RightRingIntermediate,   HumanBodyBones.RightRingDistal),
+			(FingerEnum.pinky,  HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal),
+		};
+
+		private void SyncAvatarFingers() {
+			if (_attachedRuntimeAvatar == null || player == null) return;
+			var avatarAnimator = _attachedRuntimeAvatar.Descriptor?.Animator;
+			if (avatarAnimator == null) return;
+			SyncHandFingers(avatarAnimator, player.handLeft, _leftFingerBoneMap);
+			SyncHandFingers(avatarAnimator, player.handRight, _rightFingerBoneMap);
+		}
+
+		private static void SyncHandFingers(Animator animator, Hand hand,
+				(FingerEnum finger, HumanBodyBones proximal, HumanBodyBones intermediate, HumanBodyBones distal)[] map) {
+			if (hand == null || hand.fingers == null) return;
+			foreach (var entry in map) {
+				var finger = System.Array.Find(hand.fingers, f => f.fingerType == entry.finger);
+				if (finger == null) continue;
+				var proximalBone = animator.GetBoneTransform(entry.proximal);
+				var intermediateBone = animator.GetBoneTransform(entry.intermediate);
+				var distalBone = animator.GetBoneTransform(entry.distal);
+				if (proximalBone != null && finger.knuckleJoint != null)
+					proximalBone.localRotation = finger.knuckleJoint.localRotation;
+				if (intermediateBone != null && finger.middleJoint != null)
+					intermediateBone.localRotation = finger.middleJoint.localRotation;
+				if (distalBone != null && finger.distalJoint != null)
+					distalBone.localRotation = finger.distalJoint.localRotation;
+			}
+		}
+
 		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Hand hand,
 			(FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] map) {
 			if (hand == null || hand.fingers == null || hand.fingers.Length == 0) return;
@@ -374,7 +420,6 @@ namespace Nox.XR {
 			=> _attachedRuntimeAvatar;
 
 		public async UniTask<bool> SetAvatar(IRuntimeAvatar runtimeAvatar) {
-			return false;
 			Logger.LogDebug("Setting avatar for XRController");
 
 			// Vérifier que le controller n'est pas détruit
@@ -419,13 +464,26 @@ namespace Nox.XR {
 			root.transform.localPosition = Vector3.zero;
 			root.transform.localRotation = Quaternion.identity;
 
+			// Adapt collider max height to the avatar's eye height.
+			var scaleModule = _attachedRuntimeAvatar.Descriptor.GetModules<IScaleAvatarModule>().FirstOrDefault();
+			player.minMaxHeight = new Vector2(player.minMaxHeight.x, scaleModule?.Height ?? 1.7f);
+
 			var parameterModule = _attachedRuntimeAvatar?.Descriptor
 				?.GetModules<IParameterModule>()
 				.FirstOrDefault();
 
 			if (parameterModule == null) {
 				Logger.LogWarning("Avatar has no parameter module, cannot configure tracking parameters.");
+				root.SetActive(true);
+				Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _attachedRuntimeAvatar);
 				return true;
+			}
+
+			// Attendre que l'Animator soit prêt avant de configurer les paramètres
+			var animator = _attachedRuntimeAvatar?.Descriptor?.Animator;
+			if (animator && !animator.runtimeAnimatorController) {
+				Logger.LogDebug("Waiting for Animator to be ready...");
+				await UniTask.WaitUntil(() => animator.runtimeAnimatorController);
 			}
 
 			var parameters = parameterModule.GetParameters();
@@ -443,11 +501,9 @@ namespace Nox.XR {
 							param.Set(XRInputs.HasHandRight);
 							break;
 						case "tracking/left_foot/active":
-							// param.Set(Client.Instance.HasFootLeft());
-							param.Set(false);
-							break;
 						case "tracking/right_foot/active":
-							// param.Set(Client.Instance.HasFootRight());
+						case "tracking/left_toes/active":
+						case "tracking/right_toes/active":
 							param.Set(false);
 							break;
 						case "VRMode" or "in_vr":
@@ -461,20 +517,34 @@ namespace Nox.XR {
 
 			root.SetActive(true);
 
-			#if HAS_FINALIK
-			if (player != null && root.TryGetComponent<VRIK>(out var component)) {
-				var proxy = component.GetOrAddComponent<AutoHandVRIK>();
-				if (player.handRight != null) {
-					proxy.rightHand              = player.handRight;
-					proxy.rightTrackedController = player.handRight.transform;
-				}
-
-				if (player.handLeft != null) {
-					proxy.leftHand              = player.handLeft;
-					proxy.leftTrackedController = player.handLeft.transform;
+#if HAS_FINALIK
+			// Parent VRIK IK targets directly to the tracked transforms with zero local offset.
+			// VRIK locomotion (weight=1) handles XZ root repositioning; LateUpdate handles Y.
+			// No VRIKCalibrator needed: VRIK auto-computes wristToPalmAxis/palmToThumbAxis on initiation.
+			if (player != null) {
+				var riggingModule = descriptor.GetModules<IRiggingModule>().FirstOrDefault();
+				if (riggingModule != null) {
+					if (riggingModule.TryGetPart(HumanBodyBones.Head.ToIndex(), out var headPart) && player.headCamera != null)
+						headPart.GetTransform().SetParent(player.headCamera.transform, false);
+					if (riggingModule.TryGetPart(HumanBodyBones.LeftHand.ToIndex(), out var leftPart) && player.handLeft != null)
+						leftPart.GetTransform().SetParent(player.handLeft.transform, false);
+					if (riggingModule.TryGetPart(HumanBodyBones.RightHand.ToIndex(), out var rightPart) && player.handRight != null)
+						rightPart.GetTransform().SetParent(player.handRight.transform, false);
 				}
 			}
-			#endif
+#else
+			if (player != null) {
+				var riggingModule = descriptor.GetModules<IRiggingModule>().FirstOrDefault();
+				if (riggingModule != null) {
+					if (riggingModule.TryGetPart(HumanBodyBones.Head.ToIndex(), out var headPart) && player.headCamera != null)
+						headPart.GetTransform().SetParent(player.headCamera.transform, true);
+					if (riggingModule.TryGetPart(HumanBodyBones.LeftHand.ToIndex(), out var leftPart) && player.handLeft != null)
+						leftPart.GetTransform().SetParent(player.handLeft.transform, true);
+					if (riggingModule.TryGetPart(HumanBodyBones.RightHand.ToIndex(), out var rightPart) && player.handRight != null)
+						rightPart.GetTransform().SetParent(player.handRight.transform, true);
+				}
+			}
+#endif
 
 			Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _attachedRuntimeAvatar);
 
@@ -540,8 +610,16 @@ namespace Nox.XR {
 			SynchronizeParametersAvatar();
 		}
 
-		// private void LateUpdate()
-		// 	=> UpdateCamera();
+		private void LateUpdate() {
+			// Keep avatar root Y aligned with the physics body (VRIK locomotion handles XZ).
+			var anchor = _attachedRuntimeAvatar?.Descriptor?.Anchor;
+			if (anchor != null && player != null) {
+				var pos = anchor.transform.position;
+				pos.y = player.transform.position.y;
+				anchor.transform.position = pos;
+			}
+			SyncAvatarFingers();
+		}
 
 		private void OnUserUpdate(EventData context) {
 			if (!context.TryGet(0, out ICurrentUser user) || user == null || !IsCurrent())
@@ -555,8 +633,6 @@ namespace Nox.XR {
 		private readonly Dictionary<string, object> _avatarParameters;
 
 		public async UniTask<IRuntimeAvatar> SetAvatar(Identifier identifier, Action<string, float> progress = null) {
-			return null;
-
 			Logger.LogDebug($"Loading avatar for identifier {identifier.ToString()}");
 
 			var playerAvatar = _attachedPlayer as ILocalPlayerAvatar;
@@ -789,10 +865,10 @@ namespace Nox.XR {
 					case "tracking/head/position": {
 						var cPos = player.headCamera.transform.position;
 
-						if (riggingModule != null && cameraModule != null) {
-							var headBone = riggingModule.GetBone(HumanBodyBones.Head);
-							if (headBone == cameraModule.GetAnchor())
-								cPos += cameraModule.GetOffset();
+						if (cameraModule != null) {
+							var anchor = cameraModule.GetAnchor();
+							if (anchor != null)
+								cPos -= anchor.TransformDirection(cameraModule.GetOffset());
 						}
 
 						var value = param.Get().ToVector3();
@@ -872,6 +948,20 @@ namespace Nox.XR {
 					// ...existing code for other tracking parameters...
 				}
 			}
+
+			// Update max height: Height param > EyeHeight param > camera world Y > 1.7f
+			var heightP = parameterModule.GetParameter("Height")
+				?? parameterModule.GetParameter("EyeHeight");
+			float maxHeight;
+			if (heightP != null)
+				maxHeight = heightP.Get().ToFloat();
+			else if (player.headCamera)
+				maxHeight = player.headCamera.transform.position.y - player.transform.position.y;
+			else
+				maxHeight = 1.7f;
+
+			if (!Mathf.Approximately(player.minMaxHeight.y, maxHeight))
+				player.minMaxHeight = new Vector2(player.minMaxHeight.x, maxHeight);
 		}
 
 

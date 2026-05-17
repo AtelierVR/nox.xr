@@ -22,6 +22,7 @@
     "RootMotion",
     "Nox.CCK.Worlds",
     "Nox.Avatars.Runtime",
+    "Nox.Avatars.Scale",
     "Unity.XR.CoreUtils",
     "Nox.KeyBindings",
     "Nox.Settings",
