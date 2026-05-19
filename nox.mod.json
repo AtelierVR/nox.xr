@@ -28,20 +28,39 @@
       "id": "controller",
       "type": "depends",
       "version": ">=1.0.0"
+    },
+    {
+      "id": "avatar",
+      "type": "depends",
+      "version": ">=1.0.0"
+    },
+    {
+      "id": "users",
+      "type": "depends",
+      "version": ">=1.0.0"
+    },
+    {
+      "id": "keybinding",
+      "type": "depends",
+      "version": ">=1.0.0"
     }
   ],
   "constraints": [
-    {
-      "type": "after",
-      "id": "ui"
-    },
     {
       "type": "after",
       "id": "avatar"
     },
     {
       "type": "after",
-      "id": "user"
+      "id": "users"
+    },
+    {
+      "type": "after",
+      "id": "controller"
+    },
+    {
+      "type": "after",
+      "id": "keybinding"
     }
   ],
   "entrypoints": {
@@ -57,6 +76,5 @@
     ]
   },
   "references": [],
-  
   "permissions": []
 }

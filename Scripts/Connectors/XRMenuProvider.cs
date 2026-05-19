@@ -7,7 +7,7 @@ using UnityEngine.XR;
 using Hand = Autohand.Hand;
 using Logger = Nox.CCK.Utils.Logger;
 
-namespace Nox.XR {
+namespace Nox.XR.Connectors {
 	public class XRMenuProvider : MonoBehaviour, IMenuProvider, IDisposable {
 		public RectTransform Container;
 		public Grabbable Grabbable;
@@ -35,7 +35,7 @@ namespace Nox.XR {
 
 			Menu.Active = false;
 
-			Keybindings.KeyEvent.AddListener(OnKey);
+			Keybindings.KeyFloatEvent.AddListener(OnKey);
 
 			return true;
 		}
@@ -98,7 +98,7 @@ namespace Nox.XR {
 		}
 
 		public void Dispose() {
-			Keybindings.KeyEvent.RemoveListener(OnKey);
+			Keybindings.KeyFloatEvent.RemoveListener(OnKey);
 			Menu?.Dispose();
 			Menu = null;
 		}
