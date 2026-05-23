@@ -43,6 +43,10 @@
       "id": "keybinding",
       "type": "depends",
       "version": ">=1.0.0"
+    },
+    {
+      "id": "settings",
+      "type": "depends"
     }
   ],
   "constraints": [
