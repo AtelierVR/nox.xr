@@ -60,6 +60,7 @@ namespace Nox.XR {
 				return;
 			}
 
+			await UniTask.Yield();
 			await StartLoader();
 		}
 
