@@ -1,5 +1,6 @@
 {
   "name": "nox.xr",
   "displayName": "Nox - XR Controller",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "description": "XR/VR input device management, tracking, and controller mapping."
 }

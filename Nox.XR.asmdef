@@ -26,7 +26,7 @@
     "Nox.Avatars.Runtime",
     "Nox.Avatars.Scale",
     "Unity.XR.CoreUtils",
-    "Nox.KeyBindings",
+    "Nox.KeyBinding",
     "Nox.Settings",
     "Nox.CCK.Settings"
   ],

@@ -7,6 +7,7 @@
   ],
   "name": "XR Controller",
   "version": "1.0.0",
+  "description": "XR/VR input device management, tracking, and controller mapping.",
   "license": "GPL-3.0",
   "icon": null,
   "contact": {
