@@ -23,7 +23,6 @@
       "website": "https://hactazia.fr/"
     }
   ],
-  "contributors": [],
   "relations": [
     {
       "id": "controller",
@@ -79,7 +78,5 @@
       "Nox.XR.Editor.XRDevicesPanel",
       "Nox.XR.Editor.SetupSettings"
     ]
-  },
-  "references": [],
-  "permissions": []
+  }
 }
