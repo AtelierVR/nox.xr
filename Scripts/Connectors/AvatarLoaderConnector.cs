@@ -198,7 +198,7 @@ namespace Nox.XR.Connectors {
 			return true;
 		}
 
-		public async UniTask<IRuntimeAvatar> SetAvatar(Identifier identifier, Action<string, float> progress = null) {
+		public async UniTask<IRuntimeAvatar> SetAvatar(Identifier identifier, Action<string, float> progress = null, bool forceReload = false) {
 			Logger.LogDebug($"Loading avatar for identifier {identifier.ToString()}");
 
 			if (this == null || gameObject == null)
@@ -212,7 +212,7 @@ namespace Nox.XR.Connectors {
 				return null;
 			}
 
-			if (identifier.Equals(_avatarIdentifier)) {
+			if (!forceReload && identifier.Equals(_avatarIdentifier)) {
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarReady();
 				return _runtimeAvatar;
@@ -311,6 +311,16 @@ namespace Nox.XR.Connectors {
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();
 			return avatar;
+		}
+
+		public async UniTask<IRuntimeAvatar> ReloadAvatar(Action<string, float> progress = null) {
+			var identifier = _runtimeAvatar?.Identifier ?? _avatarIdentifier;
+			if (!identifier.IsValid()) {
+				Logger.LogWarning("Cannot reload avatar: current avatar identifier is invalid.");
+				return null;
+			}
+
+			return await SetAvatar(identifier, progress, true);
 		}
 
 		public async UniTask SetupAvatar() {

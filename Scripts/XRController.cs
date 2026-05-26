@@ -422,6 +422,9 @@ namespace Nox.XR {
 		public async UniTask<IRuntimeAvatar> SetAvatar(Identifier identifier, Action<string, float> progress = null)
 			=> avatarLoader != null ? await avatarLoader.SetAvatar(identifier, progress) : null;
 
+		public async UniTask<IRuntimeAvatar> ReloadAvatar(Action<string, float> progress = null)
+			=> avatarLoader != null ? await avatarLoader.ReloadAvatar(progress) : null;
+
 
 		// ReSharper disable Unity.PerformanceAnalysis
 		public void SetPart(ushort index, TransformObject tr) {
