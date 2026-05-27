@@ -335,6 +335,8 @@ namespace Nox.XR {
 		}
 
 		private Dictionary<ushort, Transform> GetParts() {
+			if (!player) return new Dictionary<ushort, Transform>();
+
 			var parts = new Dictionary<ushort, Transform> {
 				{ PlayerRig.Base.ToIndex(), player.transform },
 				{ PlayerRig.Head.ToIndex(), player.headCamera.transform }
