@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Autohand;
+using Nox.CCK.Utils;
 using UnityEngine;
 
 namespace Nox.XR.Connectors
@@ -27,6 +29,7 @@ namespace Nox.XR.Connectors
 				Merge(l, Fallbacks[0]);
 				SetupFingers(l);
 			}
+
 			if (r != null) {
 				Merge(r, Fallbacks[1]);
 				SetupFingers(r);
@@ -44,16 +47,24 @@ namespace Nox.XR.Connectors
 			if (hand == null) return;
 			// Retrieve all AutoHand.Finger components in the hand's hierarchy
 			var fingers = hand.GetComponentsInChildren<Finger>(true);
-			foreach (var finger in fingers)
-			{
-				var connector = finger.gameObject.GetComponent<FingerKeybindConnector>();
-				if (connector == null)
-					connector = finger.gameObject.AddComponent<FingerKeybindConnector>();
+			var pokes = new List<(string key, PokeInteractor poke)>(fingers.Length);
+			foreach (var finger in fingers) {
+				var connector = finger.gameObject.GetOrAddComponent<FingerKeybindConnector>();
 
 				string handSide = hand.left ? "left" : "right";
 				string typeName = finger.fingerType.ToString().ToLower();
-				connector.BindKey = $"finger.{handSide}.{typeName}";
+				var bindKey = $"finger.{handSide}.{typeName}";
+				connector.BindKey = bindKey;
+
+				if (finger.tip != null) {
+					var poke = finger.tip.gameObject.GetOrAddComponent<PokeInteractor>();
+					poke.Radius = finger.tipRadius;
+					pokes.Add((bindKey, poke));
+				}
 			}
+
+			var handPoke = hand.gameObject.GetOrAddComponent<HandPokeConnector>();
+			handPoke.Setup(hand, pokes.ToArray());
 		}
 
 		public static void Merge(Hand hand, Hand original)

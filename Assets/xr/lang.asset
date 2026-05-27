@@ -29,10 +29,12 @@ MonoBehaviour:
       value: "Disable"
     - key: settings.entry.xr.general.no_vr.label
       value: "Disable VR (Editor)"
+    - key: settings.entry.xr.general.poke.label
+      value: "Enable Finger Poke"
     - key: settings.entry.xr.general.ipd.label
       value: "IPD (Inter-Pupillary Distance)"
-    - key: settings.range.value.meters
-      value: "{0:0.000} m"
+    - key: settings.entry.xr.general.poke_disable_percent.label
+      value: "Poke Disable Threshold"
   - IETF: fr-FR
     entries:
     - key: settings.page.xr.label
@@ -49,7 +51,9 @@ MonoBehaviour:
       value: "Désactiver"
     - key: settings.entry.xr.general.no_vr.label
       value: "Désactiver la VR (Éditeur)"
+    - key: settings.entry.xr.general.poke.label
+      value: "Activer le poke des doigts"
     - key: settings.entry.xr.general.ipd.label
       value: "IPD (Distance Inter-Pupillaire)"
-    - key: settings.range.value.meters
-      value: "{0:0.000} m"
+    - key: settings.entry.xr.general.poke_disable_percent.label
+      value: "Seuil de désactivation du poke"

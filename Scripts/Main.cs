@@ -23,6 +23,8 @@ namespace Nox.XR {
 
 			_settings = new IHandler[] {
 				new StartVRSetting(),
+				new PokeEnabledSetting(),
+				new PokeDisablePercentSetting(),
 				new IPDSetting()
 			};
 
