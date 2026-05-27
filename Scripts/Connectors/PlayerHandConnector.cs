@@ -23,14 +23,37 @@ namespace Nox.XR.Connectors
 			var l = (h1?.left ?? false) ? h1 : h2;
 			var r = (h1?.left ?? false) ? h2 : h1;
 
-			if (l != null) Merge(l, Fallbacks[0]);
-			if (r != null) Merge(r, Fallbacks[1]);
+			if (l != null) {
+				Merge(l, Fallbacks[0]);
+				SetupFingers(l);
+			}
+			if (r != null) {
+				Merge(r, Fallbacks[1]);
+				SetupFingers(r);
+			}
 
 			player.handLeft  = l ?? Fallbacks[0];
 			player.handRight = r ?? Fallbacks[1];
 
 			Fallbacks[0].gameObject.SetActive(player.handLeft  == Fallbacks[0]);
 			Fallbacks[1].gameObject.SetActive(player.handRight == Fallbacks[1]);
+		}
+
+		private void SetupFingers(Hand hand)
+		{
+			if (hand == null) return;
+			// Retrieve all AutoHand.Finger components in the hand's hierarchy
+			var fingers = hand.GetComponentsInChildren<Finger>(true);
+			foreach (var finger in fingers)
+			{
+				var connector = finger.gameObject.GetComponent<FingerKeybindConnector>();
+				if (connector == null)
+					connector = finger.gameObject.AddComponent<FingerKeybindConnector>();
+
+				string handSide = hand.left ? "left" : "right";
+				string typeName = finger.fingerType.ToString().ToLower();
+				connector.BindKey = $"finger.{handSide}.{typeName}";
+			}
 		}
 
 		public static void Merge(Hand hand, Hand original)

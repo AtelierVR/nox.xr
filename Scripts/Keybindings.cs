@@ -18,6 +18,18 @@ namespace Nox.XR {
 			("nox.ui", "menu.left", "<XRController>{LeftHand}/{SecondaryButton}", value => SetFloatValue("menu.left", value), 0f),
 			("nox.ui", "menu.right", "<XRController>{RightHand}/{SecondaryButton}", value => SetFloatValue("menu.right", value), 0f),
 			("nox.movement", "jump", "<XRController>{LeftHand}/{PrimaryButton}", value => SetFloatValue("jump", value), 0f),
+			
+			("nox.hand", "finger.left.thumb", "<XRController>{LeftHand}/{PrimaryTouch}", value => SetFloatValue("finger.left.thumb", value), 0f),
+			("nox.hand", "finger.left.index", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("finger.left.index", value), 0f),
+			("nox.hand", "finger.left.middle", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.middle", value), 0f),
+			("nox.hand", "finger.left.ring", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.ring", value), 0f),
+			("nox.hand", "finger.left.pinky", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.pinky", value), 0f),
+			
+			("nox.hand", "finger.right.thumb", "<XRController>{RightHand}/{PrimaryTouch}", value => SetFloatValue("finger.right.thumb", value), 0f),
+			("nox.hand", "finger.right.index", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("finger.right.index", value), 0f),
+			("nox.hand", "finger.right.middle", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.middle", value), 0f),
+			("nox.hand", "finger.right.ring", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.ring", value), 0f),
+			("nox.hand", "finger.right.pinky", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.pinky", value), 0f),
 		};
 
 		private static readonly (string, string, string, Action<Vector2>, Vector2)[] Vector2Keys = {
