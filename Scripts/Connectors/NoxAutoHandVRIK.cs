@@ -131,19 +131,8 @@ namespace Nox.XR.Connectors {
 			if (parent == null) return null;
 			var go = new GameObject("HandOffset");
 			go.transform.SetParent(parent, false);
-			if (source != null) {
-				// We want the hand's pivot point to coincide with the controller transform.
-				// pivot_world = anchor_world + anchor_rot * pivotPos  →  must equal controller
-				// anchor_rot  = controller_rot * Inverse(pivotRot)
-				// anchor_pos  = controller_pos - anchor_rot * pivotPos
-				//             = controller_pos + (controller_rot * Inverse(pivotRot)) * (-pivotPos)
-				// In controller local space:
-				//   localRot = Inverse(pivotRot)
-				//   localPos = Inverse(pivotRot) * (-pivotPos)
-				var invRot = Quaternion.Inverse(source.RotationOffset);
-				go.transform.localRotation = invRot;
-				go.transform.localPosition = invRot * (-source.PositionOffset);
-			}
+			var setup = go.AddComponent<HandOffsetSetup>();
+			setup.Setup(source);
 			return go.transform;
 		}
 
