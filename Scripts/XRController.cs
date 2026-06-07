@@ -19,6 +19,8 @@ using Nox.CCK.Mods.Events;
 using Nox.CCK.Network;
 using Nox.CCK.Players;
 using Nox.CCK.Utils;
+using Nox.Microphone.Players;
+using Nox.Sessions;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 using Transform = UnityEngine.Transform;
@@ -74,6 +76,11 @@ namespace Nox.XR {
 			=> Client.CoreAPI.ModAPI
 				.GetMod("controller")
 				?.GetInstance<IControllerAPI>();
+
+		private static ISessionAPI SessionAPI
+			=> Client.CoreAPI.ModAPI
+				.GetMod("session")
+				?.GetInstance<ISessionAPI>();
 
 		/// <summary>
 		/// Check if the current proxy is better than XR proxy.
@@ -220,9 +227,14 @@ namespace Nox.XR {
 		public EventSystem eventSystem;
 		private IPlayer _attachedPlayer;
 		public XRInteractionGroup[] interactions;
+		[SerializeField] public MicrophoneConnector microphone;
+
+		private ISessionAPI _sessionApi;
 
 
 		public void Dispose() {
+			_sessionApi?.OnCurrentChanged.RemoveListener(OnSessionChanged);
+			microphone?.Unbind();
 			if (XRInputs.Provider is AutoHandProvider)
 				XRInputs.Provider = null;
 			avatarLoader?.ClearRig();
@@ -230,6 +242,21 @@ namespace Nox.XR {
 			Keybindings.Clear();
 			Menu.Dispose();
 			Destroy(gameObject);
+		}
+
+		private void Awake() {
+			_sessionApi = SessionAPI;
+			if (_sessionApi == null) return;
+			_sessionApi.OnCurrentChanged.AddListener(OnSessionChanged);
+			if (_sessionApi.Current != null && _sessionApi.TryGet(_sessionApi.Current, out var current))
+				OnSessionChanged(null, current);
+		}
+
+		private void OnSessionChanged(ISession old, ISession next) {
+			if (microphone == null) return;
+			microphone.Unbind();
+			if (next?.LocalPlayer is ILocalPlayerVoice voice)
+				microphone.Bind(voice);
 		}
 
 		[NoxPublic(NoxAccess.Method)]

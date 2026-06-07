@@ -28,7 +28,10 @@
     "Unity.XR.CoreUtils",
     "Nox.KeyBinding",
     "Nox.Settings",
-    "Nox.CCK.Settings"
+    "Nox.CCK.Settings",
+    "Nox.Microphone",
+    "Nox.CCK.Microphone",
+    "Nox.Sessions"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
