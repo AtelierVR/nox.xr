@@ -225,8 +225,7 @@ namespace Nox.XR.Connectors {
 			if (version == ushort.MaxValue) {
 				var avatarData = await Client.AvatarAPI.Fetch(identifier)
 					.AttachExternalCancellation(_avatarLoadingCts.Token);
-				if (avatarData != null && avatarData.Release != ushort.MaxValue)
-					version = avatarData.Release;
+				version = avatarData.Release.Value;
 			}
 
 			var req = new AssetSearchRequest {
