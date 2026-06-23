@@ -55,8 +55,8 @@ namespace Nox.XR {
 			CoreAPI  = api;
 			Instance = this;
 
-			if (XRController.NoVRFlag) {
-				Logger.LogWarning("VR disabled by flag.");
+			if (!Settings.EnableXRSetting.Value) {
+				Logger.LogWarning("VR disabled by setting or --no-vr flag.");
 				return;
 			}
 

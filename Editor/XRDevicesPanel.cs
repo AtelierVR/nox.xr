@@ -98,7 +98,7 @@ namespace Nox.XR.Editor {
 
 			// Update XR System Status
 			if (_noVrFlagLabel != null) {
-				var noVrFlag = XRController.NoVRFlag;
+				var noVrFlag = !Settings.EnableXRSetting.Value;
 				_noVrFlagLabel.text = noVrFlag ? "Disabled (--no-vr)" : "Enabled";
 				_noVrFlagLabel.EnableInClassList("text-danger", noVrFlag);
 				_noVrFlagLabel.EnableInClassList("text-success", !noVrFlag);

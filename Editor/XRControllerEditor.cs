@@ -15,12 +15,12 @@ namespace Nox.XR.Editor {
 
 		[MenuItem(XRMenuPath, false)]
 		public static void ToggleVR() {
-			XRController.NoVRFlag = !XRController.NoVRFlag;
+			Settings.EnableXRSetting.Value = !Settings.EnableXRSetting.Value;
 		}
 
 		[MenuItem(XRMenuPath, true)]
 		private static bool ToggleVRValidate() {
-			Menu.SetChecked(XRMenuPath, !XRController.NoVRFlag);
+			Menu.SetChecked(XRMenuPath, Settings.EnableXRSetting.Value);
 			return true;
 		}
 

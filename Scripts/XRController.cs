@@ -52,23 +52,6 @@ namespace Nox.XR {
 
 		private const string DefaultId = "xr";
 
-		#if UNITY_EDITOR
-		public static bool NoVRFlag {
-			get => Config.LoadEditor().Get("no-vr", false);
-			set {
-				var config = Config.LoadEditor();
-				config.Set("no-vr", value);
-				config.Save();
-			}
-		}
-		#else
-        public static bool NoVRFlag
-            => System.Array.Exists(
-                System.Environment.GetCommandLineArgs(),
-                arg => arg == "--no-vr"
-            );
-		#endif
-
 		/// <summary>
 		/// Get the proxy mod API.
 		/// </summary>

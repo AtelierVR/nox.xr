@@ -27,8 +27,8 @@ MonoBehaviour:
       value: "Enable"
     - key: settings.entry.xr.general.start_vr.stop
       value: "Disable"
-    - key: settings.entry.xr.general.no_vr.label
-      value: "Disable VR (Editor)"
+    - key: settings.entry.xr.general.enable_xr.label
+      value: "Enable XR"
     - key: settings.entry.xr.general.poke.label
       value: "Enable Finger Poke"
     - key: settings.entry.xr.general.ipd.label
@@ -49,8 +49,8 @@ MonoBehaviour:
       value: "Activer"
     - key: settings.entry.xr.general.start_vr.stop
       value: "Désactiver"
-    - key: settings.entry.xr.general.no_vr.label
-      value: "Désactiver la VR (Éditeur)"
+    - key: settings.entry.xr.general.enable_xr.label
+      value: "Activer la XR"
     - key: settings.entry.xr.general.poke.label
       value: "Activer le poke des doigts"
     - key: settings.entry.xr.general.ipd.label

@@ -22,6 +22,7 @@ namespace Nox.XR {
 			LanguageManager.AddPack(_lang);
 
 			_settings = new IHandler[] {
+				new EnableXRSetting(),
 				new StartVRSetting(),
 				new PokeEnabledSetting(),
 				new PokeDisablePercentSetting(),

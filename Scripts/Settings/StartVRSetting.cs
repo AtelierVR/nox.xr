@@ -17,12 +17,16 @@ namespace Nox.XR.Settings {
 		public override bool IsActive() => true;
 
 		public override void OnUpdated(IHandler handler) {
-			if (handler == this)
+			if (handler is EnableXRSetting) {
+				SetInteractable(EnableXRSetting.Value);
+				RefreshLabel();
+			} else if (handler == this)
 				RefreshLabel();
 		}
 
 		public StartVRSetting() {
-			SetLabel($"settings.entry.xr.general.start_vr.label");
+			SetLabel("settings.entry.xr.general.start_vr.label");
+			SetInteractable(EnableXRSetting.Value);
 			RefreshLabel();
 		}
 
