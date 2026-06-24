@@ -40,7 +40,7 @@ namespace Nox.XR.Settings {
 		protected override GameObject GetPrefab()
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/button.prefab");
 
-		protected override void OnClick(IMenu menu)
+		public override void OnClick(IContext context)
 			=> OnClickAsync().Forget();
 
 		private async UniTask OnClickAsync() {
