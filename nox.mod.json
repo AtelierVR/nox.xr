@@ -25,7 +25,7 @@
   ],
   "relations": [
     {
-      "id": "controller",
+      "id": "controllers",
       "type": "depends",
       "version": ">=1.0.0"
     },
@@ -60,7 +60,7 @@
     },
     {
       "type": "after",
-      "id": "controller"
+      "id": "controllers"
     },
     {
       "type": "after",
