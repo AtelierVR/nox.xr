@@ -2,14 +2,18 @@ using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Initializers;
 using UnityEditor;
 using UnityEditor.XR.Management;
-using UnityEngine.XR.Management;
+using UnityEngine.XR.OpenXR;
+using UnityEngine.XR.OpenXR.Features.Interactions;
 
 namespace Nox.XR.Editor
 {
     public class SetupSettings : IEditorModInitializer
     {
         public void OnInitializeEditor(IEditorModCoreAPI api)
-            => ApplyXRStartupSettings();
+        {
+            ApplyXRStartupSettings();
+            EnableViveTrackerProfile();
+        }
 
         public void OnDisposeEditor() { }
 
@@ -43,6 +47,25 @@ namespace Nox.XR.Editor
 
             if (dirty)
                 AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Enables the HTC Vive Tracker OpenXR interaction profile for Standalone,
+        /// so that Vive Trackers are detected without the SteamVR plugin.
+        /// </summary>
+        private static void EnableViveTrackerProfile()
+        {
+            var settings = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Standalone);
+            if (settings == null)
+                return;
+
+            var feature = settings.GetFeature<HTCViveTrackerProfile>();
+            if (feature?.enabled != false)
+                return;
+
+            feature.enabled = true;
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
         }
     }
 }

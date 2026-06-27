@@ -204,8 +204,7 @@ namespace Nox.XR {
 			return devices.Where(
 					d => d.characteristics.HasFlag(InputDeviceCharacteristics.TrackedDevice)
 						&& !d.characteristics.HasFlag(InputDeviceCharacteristics.HeadMounted)
-						&& !d.characteristics.HasFlag(InputDeviceCharacteristics.Left)
-						&& !d.characteristics.HasFlag(InputDeviceCharacteristics.Right)
+						&& !d.characteristics.HasFlag(InputDeviceCharacteristics.Controller)
 				)
 				.ToList();
 		}

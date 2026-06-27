@@ -26,12 +26,14 @@
     "Nox.Avatars.Runtime",
     "Nox.Avatars.Scale",
     "Unity.XR.CoreUtils",
+    "Unity.XR.OpenXR",
+    "Unity.InputSystem",
     "Nox.KeyBinding",
     "Nox.Settings",
     "Nox.CCK.Settings",
-    "Nox.Microphone",
-    "Nox.CCK.Microphone",
-    "Nox.Sessions"
+    "Nox.Audio",
+    "Nox.Sessions",
+    "Nox.CCK.Audio"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

@@ -26,7 +26,8 @@ namespace Nox.XR {
 				new StartVRSetting(),
 				new PokeEnabledSetting(),
 				new PokeDisablePercentSetting(),
-				new IPDSetting()
+				new IPDSetting(),
+				new FullBodyTrackingSetting()
 			};
 
 			foreach (var setting in _settings)

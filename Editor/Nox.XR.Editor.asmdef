@@ -9,7 +9,8 @@
         "Nox.Editor.Panel",
         "Nox.CCK.XR",
         "Unity.XR.Management",
-        "Unity.XR.Management.Editor"
+        "Unity.XR.Management.Editor",
+        "Unity.XR.OpenXR"
     ],
     "includePlatforms": [
         "Editor"

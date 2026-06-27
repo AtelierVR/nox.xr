@@ -80,7 +80,7 @@ namespace Nox.XR.Editor {
 
 		private void OnEditorUpdate() {
 			// Refresh devices info every second
-			if (Time.realtimeSinceStartup - _lastRefreshTime > 1f) {
+			if (Time.realtimeSinceStartup - _lastRefreshTime > 0.5f) {
 				_lastRefreshTime = Time.realtimeSinceStartup;
 				if (_content != null) {
 					RefreshDevices();
@@ -170,7 +170,7 @@ namespace Nox.XR.Editor {
 				_rightControllerStatusLabel.EnableInClassList("text-danger", true);
 			}
 
-			// List all devices
+			// List all devices with live pose
 			_devicesList.Clear();
 			var devices = new List<InputDevice>();
 			InputDevices.GetDevices(devices);
@@ -196,6 +196,20 @@ namespace Nox.XR.Editor {
 				characteristicsLabel.AddToClassList("text-wrap");
 				deviceContainer.Add(characteristicsLabel);
 
+				// Live pose
+				var hasPos = device.TryGetFeatureValue(CommonUsages.devicePosition, out var pos);
+				var hasRot = device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rot);
+				if (hasPos && hasRot) {
+					var posLabel = new Label($"Position: {pos.x:F3}, {pos.y:F3}, {pos.z:F3}");
+					posLabel.AddToClassList("text-small");
+					deviceContainer.Add(posLabel);
+
+					var euler = rot.eulerAngles;
+					var rotLabel = new Label($"Rotation: {euler.x:F1}°, {euler.y:F1}°, {euler.z:F1}°");
+					rotLabel.AddToClassList("text-small");
+					deviceContainer.Add(rotLabel);
+				}
+
 				var isValidLabel = new Label($"Valid: {device.isValid}");
 				isValidLabel.EnableInClassList("text-success", device.isValid);
 				isValidLabel.EnableInClassList("text-danger", !device.isValid);
@@ -212,14 +226,14 @@ namespace Nox.XR.Editor {
 			_content = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("xr-devices.uxml").CloneTree();
 			_content.AddToClassList("flex-fill");
 
-			_noVrFlagLabel            = _content.Q<Label>("vr-mode");
-			_xrInitializedLabel       = _content.Q<Label>("xr-system");
-			_xrReadyLabel             = _content.Q<Label>("xr-ready");
-			_hasHeadsetLabel          = _content.Q<Label>("headset-detection");
-			_hmdStatusLabel           = _content.Q<Label>("hmd-status");
+			_noVrFlagLabel             = _content.Q<Label>("vr-mode");
+			_xrInitializedLabel        = _content.Q<Label>("xr-system");
+			_xrReadyLabel              = _content.Q<Label>("xr-ready");
+			_hasHeadsetLabel           = _content.Q<Label>("headset-detection");
+			_hmdStatusLabel            = _content.Q<Label>("hmd-status");
 			_leftControllerStatusLabel  = _content.Q<Label>("left-controller");
 			_rightControllerStatusLabel = _content.Q<Label>("right-controller");
-			_devicesList              = _content.Q<VisualElement>("devices-list");
+			_devicesList               = _content.Q<VisualElement>("devices-list");
 
 			RefreshDevices();
 			return _content;
