@@ -27,6 +27,28 @@ namespace Nox.XR.Connectors {
 			}
 		}
 
+		/// <summary>
+		/// Converts the player's world-space body velocity into a reference frame
+		/// aligned with the player's look direction (head forward projected onto
+		/// the horizontal plane). This fixed the mismatch between the raw
+		/// `player.body.linearVelocity` and the avatar's "true angular forward".
+		/// </summary>
+		private Vector3 GetLookVelocity() {
+			var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
+			Vector3 lookForward;
+			if (player.headCamera != null) {
+				lookForward = player.headCamera.transform.forward;
+				lookForward.y = 0f;
+				if (lookForward.sqrMagnitude < 1e-6f)
+					lookForward = transform.forward;
+			} else {
+				lookForward = transform.forward;
+			}
+			lookForward.Normalize();
+			var lookRotation = Quaternion.LookRotation(lookForward, Vector3.up);
+			return Quaternion.Inverse(lookRotation) * worldVelocity;
+		}
+
 		// ReSharper disable Unity.PerformanceAnalysis
 		private void SynchronizeParametersAvatar() {
 			var avatar = avatarLoader?.GetAvatar();
@@ -44,6 +66,7 @@ namespace Nox.XR.Connectors {
 			if (parameterModule == null)
 				return;
 			var parameters = parameterModule.GetParameters();
+			Vector3? localVelocity = null;
 			foreach (var param in parameters) {
 				var n = param.GetName();
 				switch (n) {
@@ -56,39 +79,35 @@ namespace Nox.XR.Connectors {
 						break;
 					}
 					case "VelocityX": {
-						var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
-						var localVelocity = transform.InverseTransformDirection(worldVelocity);
-						var value         = param.Get().ToFloat();
-						if (Mathf.Approximately(value, localVelocity.x))
+						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
+						var value    = param.Get().ToFloat();
+						if (Mathf.Approximately(value, velocity.x))
 							continue;
-						param.Set(localVelocity.x);
+						param.Set(velocity.x);
 						break;
 					}
 					case "VelocityY": {
-						var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
-						var localVelocity = transform.InverseTransformDirection(worldVelocity);
-						var value         = param.Get().ToFloat();
-						if (Mathf.Approximately(value, localVelocity.y))
+						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
+						var value    = param.Get().ToFloat();
+						if (Mathf.Approximately(value, velocity.y))
 							continue;
-						param.Set(localVelocity.y);
+						param.Set(velocity.y);
 						break;
 					}
 					case "VelocityZ": {
-						var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
-						var localVelocity = transform.InverseTransformDirection(worldVelocity);
-						var value         = param.Get().ToFloat();
-						if (Mathf.Approximately(value, localVelocity.z))
+						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
+						var value    = param.Get().ToFloat();
+						if (Mathf.Approximately(value, velocity.z))
 							continue;
-						param.Set(localVelocity.z);
+						param.Set(velocity.z);
 						break;
 					}
 					case "Velocity": {
-						var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
-						var localVelocity = transform.InverseTransformDirection(worldVelocity);
-						var value         = param.Get().ToVector3();
-						if (value == localVelocity)
+						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
+						var value    = param.Get().ToVector3();
+						if (value == velocity)
 							continue;
-						param.Set(localVelocity);
+						param.Set(velocity);
 						break;
 					}
 					case "VelocityMagnitude": {
