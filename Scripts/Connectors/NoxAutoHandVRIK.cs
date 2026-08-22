@@ -138,11 +138,20 @@ namespace Nox.XR.Connectors {
 
 		private static void SetupHandPhysics(Hand hand) {
 			if (hand == null) return;
-			hand.enableMovement = false;
+			// Match the fallback hands: keep the hand physics-driven (non-kinematic,
+			// enableMovement=true) so HandFollow.FixedUpdate → UpdateHandPhysicsMovement drives
+			// the Rigidbody via velocity (MoveTo/TorqueTo). That is exactly what makes the
+			// fallback hands collide with everything. The previous setup (kinematic +
+			// enableMovement=false) froze the body, so HandFollow never ran, the Rigidbody was
+			// never edited on the fly, and the avatar hands passed straight through objects.
+			hand.enableMovement = true;
 			var rb = hand.GetComponent<Rigidbody>();
 			if (rb == null) return;
-			rb.isKinematic = true;
+			rb.isKinematic = false;
 			rb.useGravity  = false;
+			// Non-kinematic body moved by physics velocity — ContinuousDynamic avoids tunneling
+			// at high hand speeds (same as AutoHandPlayer's body).
+			rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 		}
 	}
 }
