@@ -7,16 +7,12 @@ using Cysharp.Threading.Tasks;
 using Nox.Avatars;
 using Nox.Avatars.AutoHand;
 using Nox.Avatars.Hand;
-using Nox.Avatars.Runtime.Network;
 using Nox.Avatars.Parameters;
 using Nox.Avatars.Players;
-using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
-using Nox.CCK;
 using Nox.CCK.XR;
 using Nox.CCK.Avatars;
 using Nox.CCK.Mods.Events;
-using Nox.CCK.Network;
 using Nox.CCK.Utils;
 using Nox.Users;
 using UnityEngine;
@@ -24,23 +20,22 @@ using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
 
 namespace Nox.XR.Connectors {
-	public class AvatarLoaderConnector : MonoBehaviour {
+    [RequireComponent(typeof(XRController))]
+    public class AvatarLoaderConnector : MonoBehaviour {
 		public AutoHandPlayer player;
-		public PlayerHandConnector handConnector;
+		public PlayerHandConnector connector;
 
-		private IRuntimeAvatar _runtimeAvatar;
-		private Identifier _avatarIdentifier;
-		private CancellationTokenSource _avatarLoadingCts;
+		private IRuntimeAvatar _runtime;
+		private CancellationTokenSource _context;
 		private EventSubscription _onUserUpdate;
-		private Dictionary<string, object> _avatarParameters;
+		private Dictionary<string, object> _parameters;
 
-		private void Awake() {
-			_avatarParameters = new Dictionary<string, object> {
+		private void Awake()
+			=> _parameters = new Dictionary<string, object> {
 				["source"] = GetComponent<XRController>(),
 				["xr"]     = true,
 				["local"]  = true
 			};
-		}
 
 		public void StartUserTracking() {
 			_onUserUpdate = Client.CoreAPI.EventAPI.Subscribe("user_update", OnUserUpdate);
@@ -51,22 +46,22 @@ namespace Nox.XR.Connectors {
 				Client.CoreAPI.EventAPI.Unsubscribe(_onUserUpdate);
 				_onUserUpdate = null;
 			}
-			_avatarLoadingCts?.Cancel();
-			_avatarLoadingCts?.Dispose();
-			_avatarLoadingCts = null;
+			_context?.Cancel();
+			_context?.Dispose();
+			_context = null;
 			ClearRig();
-			_runtimeAvatar?.Dispose();
-			_runtimeAvatar = null;
+			_runtime?.Dispose();
+			_runtime = null;
 		}
 
 		public IRuntimeAvatar GetAvatar()
-			=> _runtimeAvatar;
+			=> _runtime;
 
 		private void ApplyRig(IRuntimeAvatar runtime) {
-			if (_runtimeAvatar?.Descriptor == null || !handConnector)
+			if (_runtime?.Descriptor == null || !connector)
 				return;
 
-			var handModule = _runtimeAvatar.Descriptor.GetModules<IHandModule>().FirstOrDefault();
+			var handModule = _runtime.Descriptor.GetModules<IHandModule>().FirstOrDefault();
 			if (handModule == null)
 				return;
 
@@ -76,7 +71,7 @@ namespace Nox.XR.Connectors {
 			var left  = leftData != null ? HandToAutoHand.Convert(leftData) : null;
 			var right = rightData != null ? HandToAutoHand.Convert(rightData) : null;
 
-			handConnector.Set(left, right);
+			connector.Set(left, right);
 
 			#if HAS_FINALIK
 			var vrik = runtime.Descriptor.Anchor.GetComponentInChildren<RootMotion.FinalIK.VRIK>();
@@ -84,20 +79,19 @@ namespace Nox.XR.Connectors {
 				var autovrik = vrik.GetOrAddComponent<NoxAutoHandVRIK>();
 
 				autovrik.leftHand             = left;
-				autovrik.leftTrackedController = handConnector.Fallbacks[0].follow;
+				autovrik.leftTrackedController = connector.Fallbacks[0].follow;
 				autovrik.leftHandSource        = leftData;
 				autovrik.rightHand             = right;
-				autovrik.rightTrackedController = handConnector.Fallbacks[1].follow;
+				autovrik.rightTrackedController = connector.Fallbacks[1].follow;
 				autovrik.rightHandSource        = rightData;
 			}
 			#endif
 		}
 
-		public void ClearRig() {
-			handConnector?.Clear();
-		}
+		public void ClearRig()
+			=> connector?.Clear();
 
-		public async UniTask<bool> SetAvatar(IRuntimeAvatar runtimeAvatar) {
+		public async UniTask<bool> SetAvatar(IRuntimeAvatar runtime) {
 			Logger.LogDebug("Setting avatar for XRController");
 
 			if (!this || !gameObject) {
@@ -105,69 +99,64 @@ namespace Nox.XR.Connectors {
 				return false;
 			}
 
-			if (runtimeAvatar == _runtimeAvatar)
+			if (runtime == _runtime)
 				return true;
 
-			var old = _runtimeAvatar;
-			_runtimeAvatar = runtimeAvatar;
+			var old = _runtime;
+			_runtime = runtime;
 
-			if (_runtimeAvatar == null) {
+			if (_runtime == null) {
 				Logger.LogWarning("Setting avatar to null, removing current avatar.");
-				_runtimeAvatar = old;
+				_runtime = old;
 				return false;
 			}
 
-			var descriptor = _runtimeAvatar.Descriptor;
+			var descriptor = _runtime.Descriptor;
 			if (descriptor == null) {
 				Logger.LogError("Avatar descriptor is null, cannot set avatar.");
-				_runtimeAvatar = old;
+				_runtime = old;
 				return false;
 			}
 
 			var root = descriptor.Anchor;
 			if (!root) {
 				Logger.LogError("Avatar descriptor root is null, cannot set avatar.");
-				_runtimeAvatar = old;
+				_runtime = old;
 				return false;
 			}
 
-			root.name += $" {runtimeAvatar.Identifier.ToString()} XR";
-			_avatarIdentifier = runtimeAvatar.Identifier;
+			root.name += $" {runtime.Identifier.ToString()} XR";
 
 			if (old != null)
 				await old.Dispose();
 
-			Logger.LogDebug($"Attaching avatar to {_runtimeAvatar.Descriptor}", runtimeAvatar.Descriptor.Anchor);
+			Logger.LogDebug($"Attaching avatar to {_runtime.Descriptor}", runtime.Descriptor.Anchor);
 			root.transform.SetParent(transform, false);
-			root.transform.localPosition = Vector3.zero;
-			root.transform.localRotation = Quaternion.identity;
+			root.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
-			var scaleModule = _runtimeAvatar.Descriptor.GetModules<IScaleAvatarModule>().FirstOrDefault();
+            var scaleModule = _runtime.Descriptor.GetModules<IScaleAvatarModule>().FirstOrDefault();
 			player.minMaxHeight = new Vector2(player.minMaxHeight.x, scaleModule?.Height ?? 1.7f);
 
-
-			var parameterModule = _runtimeAvatar?.Descriptor
+			var parameterModule = _runtime?.Descriptor
 				?.GetModules<IParameterModule>()
 				.FirstOrDefault();
 
 			if (parameterModule == null) {
 				Logger.LogWarning("Avatar has no parameter module, cannot configure tracking parameters.");
 				root.SetActive(true);
-				Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _runtimeAvatar);
+				Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _runtime);
 				return true;
 			}
 
-			var animator = _runtimeAvatar?.Descriptor?.Animator;
+			var animator = _runtime?.Descriptor?.Animator;
 			if (animator && !animator.runtimeAnimatorController) {
 				Logger.LogDebug("Waiting for Animator to be ready...");
 				await UniTask.WaitUntil(() => animator.runtimeAnimatorController);
 			}
 
 			var parameters = parameterModule.GetParameters();
-			if (parameters != null) {
-				foreach (var param in parameters) {
-					var n = param.GetName();
-					switch (n) {
+				foreach (var param in parameters)
+					switch (param.GetName()) {
 						case "tracking/head/active":
 							param.Set(XRInputs.HasHeadset);
 							break;
@@ -189,13 +178,11 @@ namespace Nox.XR.Connectors {
 							param.Set(true);
 							break;
 					}
-				}
-			}
 
-			ApplyRig(_runtimeAvatar);
+			ApplyRig(_runtime);
 			root.SetActive(true);
 
-			Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _runtimeAvatar);
+			Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _runtime);
 			return true;
 		}
 
@@ -213,19 +200,19 @@ namespace Nox.XR.Connectors {
 				return null;
 			}
 
-			if (!forceReload && identifier.Equals(_avatarIdentifier)) {
+			if (!forceReload && _runtime.Arguments.ContainsKey("error") && identifier.Equals(_runtime.Identifier)) {
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarReady();
-				return _runtimeAvatar;
+				return _runtime;
 			}
 
-			_avatarLoadingCts?.Cancel();
-			_avatarLoadingCts = new CancellationTokenSource();
+			_context?.Cancel();
+			_context = new CancellationTokenSource();
 
 			var version = identifier.GetVersion();
 			if (version == ushort.MaxValue) {
 				var avatarData = await Client.AvatarAPI.Fetch(identifier)
-					.AttachExternalCancellation(_avatarLoadingCts.Token);
+					.AttachExternalCancellation(_context.Token);
 				version = avatarData.Release.Value;
 			}
 
@@ -237,16 +224,17 @@ namespace Nox.XR.Connectors {
 			};
 
 			var asset = (await Client.AvatarAPI.SearchAssets(identifier, req)
-					.AttachExternalCancellation(_avatarLoadingCts.Token)).Items
+					.AttachExternalCancellation(_context.Token)).Items
 				.FirstOrDefault();
-			if (_avatarLoadingCts.IsCancellationRequested)
+			if (_context.IsCancellationRequested)
 				return null;
 
 			if (asset == null) {
 				Logger.LogWarning($"Avatar asset not found for identifier {identifier.ToString()}");
-				var err = await Client.AvatarAPI.LoadError(_avatarParameters);
+				var err = await Client.AvatarAPI.LoadError(_parameters);
 				err.Identifier = identifier;
 				await SetAvatar(err);
+				err.Arguments.Add("error", new[] { "asset_not_found" });
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarFailed(new Exception("Avatar asset not found."));
 				return null;
@@ -257,20 +245,20 @@ namespace Nox.XR.Connectors {
 					asset.Url,
 					hash: asset.Hash,
 					progress: p => progress?.Invoke($"Downloading avatar {identifier.ToString()}", p),
-					token: _avatarLoadingCts.Token
+					token: _context.Token
 				);
 				await download.Start();
-				if (_avatarLoadingCts.IsCancellationRequested)
+				if (_context.IsCancellationRequested)
 					return null;
 			}
 
 			var avatar = await Client.AvatarAPI.LoadFromCache(
 				asset.Hash,
-				_avatarParameters,
+				_parameters,
 				progress: p => progress?.Invoke($"Loading avatar {identifier.ToString()}", p),
-				token: _avatarLoadingCts.Token
+				token: _context.Token
 			);
-			if (_avatarLoadingCts.IsCancellationRequested)
+			if (_context.IsCancellationRequested)
 				return null;
 
 			if (avatar == null && Client.AvatarAPI.HasInCache(asset.Hash)) {
@@ -280,25 +268,26 @@ namespace Nox.XR.Connectors {
 					asset.Url,
 					hash: asset.Hash,
 					progress: p => progress?.Invoke($"Re-downloading avatar {identifier.ToString()}", p),
-					token: _avatarLoadingCts.Token
+					token: _context.Token
 				);
 				await reDownload.Start();
-				if (_avatarLoadingCts.IsCancellationRequested)
+				if (_context.IsCancellationRequested)
 					return null;
 				avatar = await Client.AvatarAPI.LoadFromCache(
 					asset.Hash,
-					_avatarParameters,
+					_parameters,
 					progress: p => progress?.Invoke($"Loading avatar {identifier.ToString()}", p),
-					token: _avatarLoadingCts.Token
+					token: _context.Token
 				);
-				if (_avatarLoadingCts.IsCancellationRequested)
+				if (_context.IsCancellationRequested)
 					return null;
 			}
 
 			if (avatar == null) {
 				Logger.LogError($"Failed to load avatar from cache for identifier {identifier.ToString()}");
-				var err = await Client.AvatarAPI.LoadError(_avatarParameters);
+				var err = await Client.AvatarAPI.LoadError(_parameters);
 				err.Identifier = identifier;
+				err.Arguments.Add("error", new[] { "load_failed" });
 				await SetAvatar(err);
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarFailed(new Exception("Failed to load avatar from cache."));
@@ -306,8 +295,6 @@ namespace Nox.XR.Connectors {
 			}
 
 			Logger.LogDebug($"Avatar loaded: {identifier.ToString()}");
-			avatar.Identifier = identifier;
-			_avatarIdentifier = identifier;
 			await SetAvatar(avatar);
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();
@@ -315,7 +302,7 @@ namespace Nox.XR.Connectors {
 		}
 
 		public async UniTask<IRuntimeAvatar> ReloadAvatar(Action<string, float> progress = null) {
-			var identifier = _runtimeAvatar?.Identifier ?? _avatarIdentifier;
+			var identifier = _runtime?.Identifier ?? Identifier.Invalid;
 			if (!identifier.IsValid()) {
 				Logger.LogWarning("Cannot reload avatar: current avatar identifier is invalid.");
 				return null;
@@ -325,7 +312,7 @@ namespace Nox.XR.Connectors {
 		}
 
 		public async UniTask SetupAvatar() {
-			if (_runtimeAvatar != null) {
+			if (_runtime != null) {
 				Logger.LogDebug("Avatar already set for XRController");
 				return;
 			}
@@ -343,7 +330,7 @@ namespace Nox.XR.Connectors {
 					return;
 				}
 
-				var avatar = await Client.AvatarAPI.LoadLoading(_avatarParameters);
+				var avatar = await Client.AvatarAPI.LoadLoading(_parameters);
 				if (avatar == null) {
 					Logger.LogError("Failed to create avatar for XRController");
 					return;
@@ -373,12 +360,6 @@ namespace Nox.XR.Connectors {
 		private void LoadAvatarFromUser(ICurrentUser user) {
 			if (user?.Avatar.IsValid() != true)
 				return;
-
-			// Skip reload if avatar identifier hasn't changed
-			if (user.Avatar.Equals(_avatarIdentifier))
-				return;
-
-			_avatarIdentifier = user.Avatar;
 			SetAvatar(user.Avatar).Forget();
 		}
 	}
