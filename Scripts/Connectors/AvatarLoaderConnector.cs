@@ -132,11 +132,12 @@ namespace Nox.XR.Connectors {
 			}
 
 			root.name += $" {runtimeAvatar.Identifier.ToString()} XR";
+			_avatarIdentifier = runtimeAvatar.Identifier;
 
 			if (old != null)
 				await old.Dispose();
 
-			Logger.LogDebug($"Attaching avatar to {runtimeAvatar.Descriptor}", runtimeAvatar.Descriptor.Anchor);
+			Logger.LogDebug($"Attaching avatar to {_runtimeAvatar.Descriptor}", runtimeAvatar.Descriptor.Anchor);
 			root.transform.SetParent(transform, false);
 			root.transform.localPosition = Vector3.zero;
 			root.transform.localRotation = Quaternion.identity;
@@ -306,6 +307,7 @@ namespace Nox.XR.Connectors {
 
 			Logger.LogDebug($"Avatar loaded: {identifier.ToString()}");
 			avatar.Identifier = identifier;
+			_avatarIdentifier = identifier;
 			await SetAvatar(avatar);
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();
@@ -368,7 +370,16 @@ namespace Nox.XR.Connectors {
 			LoadAvatarFromUser(user);
 		}
 
-		private void LoadAvatarFromUser(ICurrentUser user)
-			=> SetAvatar(user.Avatar).Forget();
+		private void LoadAvatarFromUser(ICurrentUser user) {
+			if (user?.Avatar.IsValid() != true)
+				return;
+
+			// Skip reload if avatar identifier hasn't changed
+			if (user.Avatar.Equals(_avatarIdentifier))
+				return;
+
+			_avatarIdentifier = user.Avatar;
+			SetAvatar(user.Avatar).Forget();
+		}
 	}
 }
