@@ -20,22 +20,25 @@ using Nox.XR.Connectors;
 using Nox.XR.Providers;
 using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR;
 
 namespace Nox.XR {
-	[UnityEngine.DefaultExecutionOrder(15)]
+	[DefaultExecutionOrder(15)]
 	public class XRController : MonoBehaviour, IController, IControllerAvatar, INoxObject {
+		private static readonly List<InputDevice> _devices = new();
+
 		/// <summary>
 		/// Check if a headset is currently connected directly via Unity XR API
 		/// This is used during initialization when XRInputs.Provider might not be set yet
 		/// </summary>
-		private static bool HasHeadsetDirect() {
-			var devices = new List<UnityEngine.XR.InputDevice>();
-			UnityEngine.XR.InputDevices.GetDevicesAtXRNode(UnityEngine.XR.XRNode.Head, devices);
-			return devices.Count > 0;
+		private static bool HasHeadset() {
+			_devices.Clear();
+			InputDevices.GetDevicesAtXRNode(XRNode.Head, _devices);
+			return _devices.Count > 0;
 		}
 
 		private static int DefaultPriority
-			=> Client.Instance.IsXRInitialized() && HasHeadsetDirect()
+			=> Client.Instance.IsXRInitialized() && HasHeadset()
 				? Config.Load().Get("settings.controller.xr_priority", IController.DefaultPriority + 1)
 				: IController.DefaultPriority - 1;
 
@@ -321,7 +324,7 @@ namespace Nox.XR {
 			(FingerEnum.pinky,  PlayerRig.RightPinky,  PlayerRig.RightPinkyNail,  PlayerRig.RightPinkyTip),
 		};
 
-		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Hand hand,
+		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Autohand.Hand hand,
 			(FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] map) {
 			if (hand == null || hand.fingers == null || hand.fingers.Length == 0) return;
 			foreach (var entry in map) {
@@ -383,11 +386,11 @@ namespace Nox.XR {
 			}
 
 			player.bodyCollider.material = new PhysicsMaterial {
-				dynamicFriction = 0f,
-				staticFriction  = 0f,
-				bounciness      = 0f,
-				frictionCombine = PhysicsMaterialCombine.Maximum,
-				bounceCombine   = PhysicsMaterialCombine.Average
+			    dynamicFriction = 0f,
+			    staticFriction  = 0f,
+			    bounciness      = 0f,
+			    frictionCombine = PhysicsMaterialCombine.Maximum,
+			    bounceCombine   = PhysicsMaterialCombine.Average
 			};
 
 			if (interactions == null || interactions.Length == 0) {
@@ -432,18 +435,18 @@ namespace Nox.XR {
 			Rigidbody rb;
 
 			if (index == PlayerRig.Base.ToIndex()) {
-				if (!tr.IsSamePosition(player.transform.position))
+				if (tr.Flags.HasFlag(TransformFlags.Position) && !tr.IsSamePosition(player.transform.position))
 					player.SetPosition(tr.GetPosition());
 
-				if (!tr.IsSameRotation(player.transform.rotation))
+				if (tr.Flags.HasFlag(TransformFlags.Rotation) && !tr.IsSameRotation(player.transform.rotation))
 					player.SetRotation(tr.GetRotation());
 
 				rb = player.body;
 
-				if (rb && !tr.IsSameVelocity(rb.linearVelocity))
+				if (rb && tr.Flags.HasFlag(TransformFlags.Velocity) && !tr.IsSameVelocity(rb.linearVelocity))
 					rb.linearVelocity = tr.GetVelocity();
 
-				if (rb && !tr.IsSameAngular(rb.angularVelocity))
+				if (rb && tr.Flags.HasFlag(TransformFlags.Angular) && !tr.IsSameAngular(rb.angularVelocity))
 					rb.angularVelocity = tr.GetAngular();
 				return;
 			}
@@ -454,19 +457,30 @@ namespace Nox.XR {
 			if (!part.Value)
 				return;
 
-			if (!tr.IsSamePosition(part.Value.position))
+			var hasRb = part.Value.TryGetComponent<Rigidbody>(out rb);
+
+			if (tr.Flags.HasFlag(TransformFlags.Position) && !tr.IsSamePosition(part.Value.position)) {
 				part.Value.position = tr.GetPosition();
+				if (hasRb && rb)
+					rb.position = tr.GetPosition();
+			}
 
-			if (!tr.IsSameRotation(part.Value.rotation))
+			if (tr.Flags.HasFlag(TransformFlags.Rotation) && !tr.IsSameRotation(part.Value.rotation)) {
 				part.Value.rotation = tr.GetRotation();
+				if (hasRb && rb)
+					rb.rotation = tr.GetRotation();
+			}
 
-			rb = part.Value.GetComponent<Rigidbody>();
+			if (tr.Flags.HasFlag(TransformFlags.Scale) && !tr.IsSameScale(part.Value.localScale))
+				part.Value.localScale = tr.GetScale();
 
-			if (rb && !tr.IsSameVelocity(rb.linearVelocity))
-				rb.linearVelocity = tr.GetVelocity();
+			if (hasRb && rb) {
+				if (tr.Flags.HasFlag(TransformFlags.Velocity) && !tr.IsSameVelocity(rb.linearVelocity))
+					rb.linearVelocity = tr.GetVelocity();
 
-			if (rb && !tr.IsSameAngular(rb.angularVelocity))
-				rb.angularVelocity = tr.GetAngular();
+				if (tr.Flags.HasFlag(TransformFlags.Angular) && !tr.IsSameAngular(rb.angularVelocity))
+					rb.angularVelocity = tr.GetAngular();
+			}
 		}
 
 		private void SynchronizeControllerFromPlayer() {
