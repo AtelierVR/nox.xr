@@ -27,32 +27,37 @@
     {
       "id": "controllers",
       "type": "depends",
-      "version": ">=1.0.0"
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.controllers.git"
     },
     {
-      "id": "avatar",
+      "id": "avatars",
       "type": "depends",
-      "version": ">=1.0.0"
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.avatars.git"
     },
     {
       "id": "users",
       "type": "depends",
-      "version": ">=1.0.0"
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.users.git"
     },
     {
       "id": "keybinding",
       "type": "depends",
-      "version": ">=1.0.0"
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.keybinding.git"
     },
     {
       "id": "settings",
-      "type": "depends"
+      "type": "depends",
+      "register": "git+https://github.com/AtelierVR/nox.settings.git"
     }
   ],
   "constraints": [
     {
       "type": "after",
-      "id": "avatar"
+      "id": "avatars"
     },
     {
       "type": "after",
