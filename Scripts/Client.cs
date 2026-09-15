@@ -1,15 +1,20 @@
 ﻿using Nox.CCK.Mods.Cores;
+using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars;
+using Nox.Controllers;
 using Nox.UI;
 using Nox.CCK.XR;
 using Nox.Users;
+using UnityEngine;
 using UnityEngine.Events;
+using Nox.XR.Widgets;
 using UnityEngine.XR;
 using UnityEngine.XR.Management;
 using Logger = Nox.CCK.Utils.Logger;
@@ -30,6 +35,12 @@ namespace Nox.XR {
 		static internal IUserAPI UserAPI
 			=> CoreAPI.ModAPI.GetMod("users")
 				?.GetInstance<IUserAPI>();
+
+		static internal IControllerAPI ControllerAPI
+			=> CoreAPI.ModAPI.GetMod("controllers")
+				?.GetInstance<IControllerAPI>();
+
+		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 
 		private bool _isXRInitialized;
 
@@ -55,6 +66,11 @@ namespace Nox.XR {
 			CoreAPI  = api;
 			Instance = this;
 
+			_events = new[] {
+				CoreAPI.EventAPI.Subscribe("widget_request", OnWidgetRequest)
+			};
+			ControllerAPI?.OnCurrentChanged.AddListener(OnCurrentControllerChanged);
+
 			if (!Settings.EnableXRSetting.Value) {
 				Logger.LogWarning("VR disabled by setting or --no-vr flag.");
 				return;
@@ -65,9 +81,15 @@ namespace Nox.XR {
 		}
 
 		public async UniTask OnDisposeClientAsync() {
-			StopLoader();
-			if (await XRController.Remove())
-				Logger.Log("XR Controller has been removed.");
+			// Retirer le bouton avant de couper les évènements : la page peut être encore ouverte.
+			StandUpWidget.Hide();
+
+			ControllerAPI?.OnCurrentChanged.RemoveListener(OnCurrentControllerChanged);
+			foreach (var e in _events)
+				CoreAPI?.EventAPI.Unsubscribe(e);
+			_events = Array.Empty<EventSubscription>();
+
+			await QuitXR();
 			Instance = null;
 			CoreAPI  = null;
 		}
@@ -123,6 +145,31 @@ namespace Nox.XR {
 
 		private void OnDeviceConfigChanged(InputDevice device) {
 			Logger.Log($"XR Device config changed: {device.name} {device.characteristics}");
+		}
+
+		/// <summary>
+		/// Fournit les widgets du mod à la page qui les demande (voir <see cref="StandUpWidget"/>).
+		/// </summary>
+		private static void OnWidgetRequest(EventData context) {
+			if (!context.TryGet(0, out int menuId)) return;
+			if (!context.TryGet(1, out RectTransform parent)) return;
+
+			var menu = UiAPI?.Get<IMenu>(menuId);
+			if (menu == null) return;
+
+			if (StandUpWidget.TryMake(menu, parent, out var widget) && widget.Item2 != null)
+				context.Callback(widget.Item2, widget.Item1);
+		}
+
+		/// <summary>
+		/// Le bouton « Stand up » n'a de sens que si le proxy XR est le contrôleur courant :
+		/// on l'ajoute ou le retire à chaud quand le contrôleur courant change.
+		/// </summary>
+		private static void OnCurrentControllerChanged(IController controller) {
+			if (controller is IXRController)
+				StandUpWidget.Show();
+			else
+				StandUpWidget.Hide();
 		}
 
 
@@ -194,6 +241,36 @@ namespace Nox.XR {
 
 			OnHeadsetConnected.Invoke(false);
 			Logger.Log("XR stopped.");
+		}
+
+		/// <summary>
+		/// Entre en XR : initialise le loader (le proxy XR est créé par l'évènement de
+		/// connexion du casque).
+		/// </summary>
+		[NoxPublic(NoxAccess.Method)]
+		public async UniTask EnterXR() {
+			if (IsXRInitialized()) {
+				Logger.LogDebug("XR already initialized, nothing to enter.");
+				return;
+			}
+
+			await StartLoader();
+		}
+
+		/// <summary>
+		/// Quitte la XR : arrête le loader ET retire le proxy.
+		/// <para>
+		/// <see cref="StopLoader"/> seul ne suffit pas : le proxy XR reste le contrôleur
+		/// courant avec un tracking mort. Il faut le retirer pour retomber sur un autre
+		/// contrôleur (desktop/offline).
+		/// </para>
+		/// </summary>
+		[NoxPublic(NoxAccess.Method)]
+		public async UniTask QuitXR() {
+			StopLoader();
+
+			if (await XRController.Remove())
+				Logger.Log("XR Controller has been removed.");
 		}
 
 
