@@ -1164,7 +1164,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Nox.XR::Nox.XR.Connectors.AvatarLoaderConnector
   player: {fileID: 6788632155518835669}
-  handConnector: {fileID: 2839334501343782501}
+  connector: {fileID: 2839334501343782501}
 --- !u!114 &7903719579555557988
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12030,6 +12030,8 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   microphone: {fileID: 4157944591312504547}
+  autoFixViewHeight: 1
+  defaultViewHeight: 1.7
 --- !u!114 &7182633630765526731
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -20,6 +20,23 @@ namespace Nox.XR.Connectors
 				(Fallbacks[0], Fallbacks[1]) = (Fallbacks[1], Fallbacks[0]);
 		}
 
+		/// <summary>
+		/// Pose brute du contrôleur suivi pour un côté. Le <c>follow</c> d'une main de remplacement
+		/// AutoHand n'est pas la pose du contrôleur : il porte un offset de rotation propre au
+		/// prefab (85° en X pour les RobotHands). C'est donc au parent qu'il faut s'adresser pour
+		/// récupérer la pose réelle, sur laquelle on applique ensuite le pivot de l'avatar.
+		/// </summary>
+		public Transform GetTrackedController(bool left)
+		{
+			var fallback = left ? Fallbacks[0] : Fallbacks[1];
+			if (fallback == null) return null;
+
+			var follow = fallback.follow;
+			if (follow == null) return null;
+
+			return follow.parent != null ? follow.parent : follow;
+		}
+
 		public void Set(Hand h1, Hand h2)
 		{
 			var l = (h1?.left ?? false) ? h1 : h2;
@@ -38,8 +55,37 @@ namespace Nox.XR.Connectors
 			player.handLeft  = l ?? Fallbacks[0];
 			player.handRight = r ?? Fallbacks[1];
 
-			Fallbacks[0].gameObject.SetActive(player.handLeft  == Fallbacks[0]);
-			Fallbacks[1].gameObject.SetActive(player.handRight == Fallbacks[1]);
+			// Les mains de fallback ne doivent rester visibles QUE si l'avatar n'a pas
+			// fourni de main. Sinon on les désactive complètement : leur rôle de corps
+			// physique est repris par les duplicatas des mains de l'avatar.
+			ApplyFallbackVisibility(l, r);
+		}
+
+		/// <summary>
+		/// Active la main de fallback uniquement quand l'avatar ne fournit pas la main
+		/// correspondante, et coupe son rendu sinon.
+		/// </summary>
+		private void ApplyFallbackVisibility(Hand leftAvatar, Hand rightAvatar)
+		{
+			ApplyFallback(Fallbacks[0], leftAvatar != null);
+			ApplyFallback(Fallbacks[1], rightAvatar != null);
+		}
+
+		/// <summary>
+		/// La main de remplacement AutoHand ne sert QUE si l'avatar ne fournit pas la main
+		/// correspondante : dans ce cas on la désactive complètement. Le corps physique de la main
+		/// est alors un duplicata de la main de l'avatar, créé par <c>NoxAutoHandVRIK</c> dans le
+		/// dossier « Hands » (mêmes colliders, mêmes pokes, même échelle).
+		/// </summary>
+		private static void ApplyFallback(Hand fallback, bool hidden)
+		{
+			if (fallback == null) return;
+
+			if (fallback.gameObject.activeSelf == hidden)
+				fallback.gameObject.SetActive(!hidden);
+
+			foreach (var renderer in fallback.GetComponentsInChildren<Renderer>(true))
+				renderer.enabled = !hidden;
 		}
 
 		private void SetupFingers(Hand hand)

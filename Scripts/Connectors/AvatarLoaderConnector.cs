@@ -16,23 +16,35 @@ using Nox.CCK.Mods.Events;
 using Nox.CCK.Utils;
 using Nox.Users;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
 
 namespace Nox.XR.Connectors {
-    [RequireComponent(typeof(XRController))]
+    // Pas de [RequireComponent(typeof(XRController))] : dans le proxy XR ce loader vit sur
+    // le GameObject enfant "Avatar" (c'est son transform qui sert de parent à l'avatar
+    // chargé). L'attribut y ajoutait automatiquement un second XRController vide, qui
+    // loguait "XRController.player is null in StartupAutoHand" et faussait
+    // GetComponent<XRController>() — on résout donc le contrôleur via GetComponentInParent.
     public class AvatarLoaderConnector : MonoBehaviour {
 		public AutoHandPlayer player;
+
+		// Le prefab (et les bundles déjà construits) sérialise ce champ sous le nom
+		// "handConnector" : sans cet attribut, Unity ignore la valeur et `connector`
+		// reste null — ce qui désactive tout le rig des mains (fallbacks visibles,
+		// avatar en T-pose) sans le moindre message d'erreur.
+		[FormerlySerializedAs("handConnector")]
 		public PlayerHandConnector connector;
 
 		private IRuntimeAvatar _runtime;
 		private CancellationTokenSource _context;
 		private EventSubscription _onUserUpdate;
 		private Dictionary<string, object> _parameters;
+		private bool _settingUp;
 
 		private void Awake()
 			=> _parameters = new Dictionary<string, object> {
-				["source"] = GetComponent<XRController>(),
+				["source"] = GetComponentInParent<XRController>(),
 				["xr"]     = true,
 				["local"]  = true
 			};
@@ -49,6 +61,7 @@ namespace Nox.XR.Connectors {
 			_context?.Cancel();
 			_context?.Dispose();
 			_context = null;
+			_settingUp = false;
 			ClearRig();
 			_runtime?.Dispose();
 			_runtime = null;
@@ -58,15 +71,44 @@ namespace Nox.XR.Connectors {
 			=> _runtime;
 
 		private void ApplyRig(IRuntimeAvatar runtime) {
-			if (_runtime?.Descriptor == null || !connector)
+			if (_runtime?.Descriptor == null)
 				return;
 
-			var handModule = _runtime.Descriptor.GetModules<IHandModule>().FirstOrDefault();
-			if (handModule == null)
+			if (!connector) {
+				// Sans ce connecteur, aucune main n'est convertie en AutoHand, les mains de
+				// fallback ne sont jamais masquées et l'IK des bras n'est pas configuré
+				// (avatar en T-pose). On le signale plutôt que de retourner en silence.
+				Logger.LogError(
+					$"{nameof(AvatarLoaderConnector)}.connector is null: the avatar hand rig will not be applied "
+					+ "(fallback hands stay visible and the arms remain in T-pose). "
+					+ "Verify the 'connector' reference on the XR proxy prefab.",
+					this
+				);
 				return;
+			}
+
+			var handModule = _runtime.Descriptor.GetModules<IHandModule>().FirstOrDefault();
+			if (handModule == null) {
+				Logger.LogWarning(
+					$"{nameof(AvatarLoaderConnector)}: avatar '{runtime.Descriptor}' has no {nameof(IHandModule)}, "
+					+ "fallback hands will remain active.",
+					runtime.Descriptor.Anchor
+				);
+				return;
+			}
 
 			var leftData  = Array.Find(handModule.Hands, h => h.Type == NoxHandType.Left);
 			var rightData = Array.Find(handModule.Hands, h => h.Type == NoxHandType.Right);
+
+			if (leftData == null || rightData == null) {
+				Logger.LogWarning(
+					$"{nameof(AvatarLoaderConnector)}: avatar '{runtime.Descriptor}' exposes "
+					+ $"{handModule.Hands?.Length ?? 0} hand(s) but not both Left and Right "
+					+ $"({nameof(NoxHandType.Left)}={(leftData != null)}, {nameof(NoxHandType.Right)}={(rightData != null)}). "
+					+ "Fallback hands will remain active and the arms may stay in T-pose.",
+					runtime.Descriptor.Anchor
+				);
+			}
 
 			var left  = leftData != null ? HandToAutoHand.Convert(leftData) : null;
 			var right = rightData != null ? HandToAutoHand.Convert(rightData) : null;
@@ -78,12 +120,18 @@ namespace Nox.XR.Connectors {
 			if (vrik && left && right) {
 				var autovrik = vrik.GetOrAddComponent<NoxAutoHandVRIK>();
 
-				autovrik.leftHand             = left;
-				autovrik.leftTrackedController = connector.Fallbacks[0].follow;
-				autovrik.leftHandSource        = leftData;
-				autovrik.rightHand             = right;
-				autovrik.rightTrackedController = connector.Fallbacks[1].follow;
+				// Les contrôleurs suivis doivent être la POSE BRUTE des contrôleurs : le « follow » d'une
+				// main de remplacement porte l'offset de rotation du prefab AutoHand (85° en X), que le
+				// pivot de l'avatar (HandOffset) applique déjà de son côté.
+				autovrik.leftHandSource         = leftData;
+				autovrik.leftTrackedController  = connector.GetTrackedController(true);
 				autovrik.rightHandSource        = rightData;
+				autovrik.rightTrackedController = connector.GetTrackedController(false);
+
+				// Les mains physiques sont des duplicatas des mains de l'avatar (mêmes colliders, pokes
+				// et échelle), créés par NoxAutoHandVRIK dans le dossier « Hands » à côté des mains de
+				// remplacement. L'armature ne garde que ses os, écrits par VRIK.
+				autovrik.physicalHandsRoot = connector.Fallbacks[1] ? connector.Fallbacks[1].transform.parent : null;
 			}
 			#endif
 		}
@@ -192,7 +240,7 @@ namespace Nox.XR.Connectors {
 			if (this == null || gameObject == null)
 				return null;
 
-			var playerAvatar = GetComponent<XRController>()?.GetPlayer() as ILocalPlayerAvatar;
+			var playerAvatar = GetComponentInParent<XRController>()?.GetPlayer() as ILocalPlayerAvatar;
 
 			if (!identifier.IsValid()) {
 				if (playerAvatar != null)
@@ -200,7 +248,9 @@ namespace Nox.XR.Connectors {
 				return null;
 			}
 
-			if (!forceReload && _runtime.Arguments.ContainsKey("error") && identifier.Equals(_runtime.Identifier)) {
+			// _runtime est null tant qu'aucun avatar n'a été chargé (proxy XR fraîchement créé).
+			// Le chemin Restore() -> SetAvatar(identifier) arrive avant SetupAvatar().
+			if (!forceReload && _runtime != null && _runtime.Arguments.ContainsKey("error") && identifier.Equals(_runtime.Identifier)) {
 				if (playerAvatar != null)
 					await playerAvatar.OnAvatarReady();
 				return _runtime;
@@ -317,9 +367,18 @@ namespace Nox.XR.Connectors {
 				return;
 			}
 
-			Logger.LogDebug("Creating avatar");
+			// SetupAvatar est atteignable en parallèle (MakeInternal le déclenche, le flux
+			// user_update peut aussi le relancer). Deux passes concurrentes s'annulent via
+			// _context.Cancel() et laissent le loader sans avatar.
+			if (_settingUp) {
+				Logger.LogDebug("Avatar setup already in progress, skipping duplicate request.");
+				return;
+			}
 
+			_settingUp = true;
 			try {
+				Logger.LogDebug("Creating avatar");
+
 				if (Client.AvatarAPI == null) {
 					Logger.LogError("AvatarAPI is null, cannot setup avatar");
 					return;
@@ -336,6 +395,12 @@ namespace Nox.XR.Connectors {
 					return;
 				}
 
+				if (!this || !gameObject) {
+					Logger.LogWarning("AvatarLoaderConnector was destroyed while loading the loading avatar.");
+					await avatar.Dispose();
+					return;
+				}
+
 				if (!await SetAvatar(avatar)) {
 					await avatar.Dispose();
 					return;
@@ -348,6 +413,8 @@ namespace Nox.XR.Connectors {
 					Logger.LogWarning("No current user available for avatar loading");
 			} catch (Exception e) {
 				Logger.LogError($"Exception in SetupAvatar: {e}");
+			} finally {
+				_settingUp = false;
 			}
 		}
 
