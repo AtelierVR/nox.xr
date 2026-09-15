@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
 using UnityEngine;
@@ -39,8 +40,18 @@ namespace Nox.XR.Settings {
 
 		protected override void OnValueChanged(bool value) {
 			Value = value;
-			if (!value && Client.Instance != null && Client.Instance.IsXRInitialized())
-				Client.Instance.StopLoader();
+
+			if (Client.Instance == null)
+				return;
+
+			// Le toggle pilote la XR « au démarrage ET à l'exécution » (cf. résumé de la
+			// classe) : activer doit donc entrer en XR, désactiver doit la quitter.
+			if (value) {
+				if (!Client.Instance.IsXRInitialized())
+					Client.Instance.EnterXR().Forget();
+			} else if (Client.Instance.IsXRInitialized()) {
+				Client.Instance.QuitXR().Forget();
+			}
 		}
 	}
 }

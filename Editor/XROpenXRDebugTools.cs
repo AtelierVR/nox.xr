@@ -9,8 +9,6 @@ using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features;
 using UnityEngine.XR.OpenXR.Features.Interactions;
 
-using ISDevice = UnityEngine.InputSystem.InputDevice;
-
 namespace Nox.XR.Editor
 {
 	/// <summary>
@@ -22,9 +20,16 @@ namespace Nox.XR.Editor
 		private const string MenuRoot = "Nox/XR/";
 		private const string SubDevices = MenuRoot + "Devices/";
 
+		// Voir XRControllerEditor : toutes les priorités de "Nox/XR" doivent tenir dans
+		// [990, 1010], sinon le sous-menu sort du bloc "Nox/". Les infos/diagnostics
+		// occupent 991-996 ; les actions XR sont à 1007-1009, ce qui laisse un écart de
+		// 11 (> 10) et donc un séparateur entre les deux groupes.
+		private const int InfoPriority    = 992; // Runtime Info, List Features, Dump ALL, Check Tracker
+		private const int DevicesPriority = 994; // Devices/*
+
 		// ── OpenXR System Info ──────────────────────────────────────────────
 
-		[MenuItem(MenuRoot + "OpenXR Runtime Info")]
+		[MenuItem(MenuRoot + "OpenXR Runtime Info", false, InfoPriority)]
 		private static void DumpOpenXRInfo()
 		{
 			var sb = new StringBuilder();
@@ -69,7 +74,7 @@ namespace Nox.XR.Editor
 
 		// ── Enabled OpenXR Features ─────────────────────────────────────────
 
-		[MenuItem(MenuRoot + "List Enabled OpenXR Features")]
+		[MenuItem(MenuRoot + "List Enabled OpenXR Features", false, InfoPriority + 1)]
 		private static void ListEnabledFeatures()
 		{
 			var sb = new StringBuilder();
@@ -135,7 +140,7 @@ namespace Nox.XR.Editor
 
 		// ── All InputSystem Devices ─────────────────────────────────────────
 
-		[MenuItem(SubDevices + "Dump InputSystem Devices")]
+		[MenuItem(SubDevices + "Dump InputSystem Devices", false, DevicesPriority)]
 		private static void DumpInputSystemDevices()
 		{
 			var sb = new StringBuilder();
@@ -168,7 +173,7 @@ namespace Nox.XR.Editor
 
 		// ── All XR Devices (UnityEngine.XR) ─────────────────────────────────
 
-		[MenuItem(SubDevices + "Dump XR Devices (Detailed)")]
+		[MenuItem(SubDevices + "Dump XR Devices (Detailed)", false, DevicesPriority + 1)]
 		private static void DumpXRDevicesDetailed()
 		{
 			var sb = new StringBuilder();
@@ -221,7 +226,7 @@ namespace Nox.XR.Editor
 
 		// ── Trackers Only ───────────────────────────────────────────────────
 
-		[MenuItem(SubDevices + "Dump Trackers Only")]
+		[MenuItem(SubDevices + "Dump Trackers Only", false, DevicesPriority + 2)]
 		private static void DumpTrackersOnly()
 		{
 			var sb = new StringBuilder();
@@ -306,7 +311,7 @@ namespace Nox.XR.Editor
 
 		// ── All-in-One Dump ─────────────────────────────────────────────────
 
-		[MenuItem(MenuRoot + "Dump ALL XR Info")]
+		[MenuItem(MenuRoot + "Dump ALL XR Info", false, InfoPriority + 2)]
 		private static void DumpAllXRInfo()
 		{
 			DumpOpenXRInfo();
@@ -319,7 +324,7 @@ namespace Nox.XR.Editor
 
 		// ── Check HTCViveTrackerProfile Registration ────────────────────────
 
-		[MenuItem(MenuRoot + "Check Tracker Profile Registration")]
+		[MenuItem(MenuRoot + "Check Tracker Profile Registration", false, InfoPriority + 3)]
 		private static void CheckTrackerRegistration()
 		{
 			var sb = new StringBuilder();

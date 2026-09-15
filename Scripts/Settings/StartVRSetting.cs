@@ -46,10 +46,13 @@ namespace Nox.XR.Settings {
 		private async UniTask OnClickAsync() {
 			if (Client.Instance == null) return;
 
+			// Le même bouton entre et sort de la XR. La sortie doit réellement quitter la
+			// VR : arrêt du loader + retrait du proxy (StopLoader seul laisserait le proxy
+			// XR courant avec un tracking mort).
 			if (Client.Instance.IsXRInitialized())
-				Client.Instance.StopLoader();
+				await Client.Instance.QuitXR();
 			else
-				await Client.Instance.StartLoader();
+				await Client.Instance.EnterXR();
 
 			RefreshLabel();
 		}
