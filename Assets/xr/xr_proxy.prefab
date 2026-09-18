@@ -14892,6 +14892,14 @@ PrefabInstance:
       propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
       value: 1801810542
       objectReference: {fileID: 0}
+    - target: {fileID: 5418174295161456179, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.002
+      objectReference: {fileID: 0}
+    - target: {fileID: 5418174295161456179, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7008014334023792889, guid: 7a18c6c5c3e9b484abc3ad0579e19dd0, type: 3}
       propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
       value: 1801810542
