@@ -19,6 +19,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
+using RootMotion.FinalIK;
 
 namespace Nox.XR.Connectors {
     // Pas de [RequireComponent(typeof(XRController))] : dans le proxy XR ce loader vit sur
@@ -70,7 +71,7 @@ namespace Nox.XR.Connectors {
 		public IRuntimeAvatar GetAvatar()
 			=> _runtime;
 
-		private void ApplyRig(IRuntimeAvatar runtime) {
+		private async UniTask ApplyRig(IRuntimeAvatar runtime) {
 			if (_runtime?.Descriptor == null)
 				return;
 
@@ -104,34 +105,112 @@ namespace Nox.XR.Connectors {
 				Logger.LogWarning(
 					$"{nameof(AvatarLoaderConnector)}: avatar '{runtime.Descriptor}' exposes "
 					+ $"{handModule.Hands?.Length ?? 0} hand(s) but not both Left and Right "
-					+ $"({nameof(NoxHandType.Left)}={(leftData != null)}, {nameof(NoxHandType.Right)}={(rightData != null)}). "
+					+ $"({nameof(NoxHandType.Left)}={leftData != null}, {nameof(NoxHandType.Right)}={rightData != null}). "
 					+ "Fallback hands will remain active and the arms may stay in T-pose.",
 					runtime.Descriptor.Anchor
 				);
 			}
 
-			var left  = leftData != null ? HandToAutoHand.Convert(leftData) : null;
-			var right = rightData != null ? HandToAutoHand.Convert(rightData) : null;
+			var left  = leftData != null 
+				? HandToAutoHand.Convert(leftData) 
+				: null;
+			var right = rightData != null 
+				? HandToAutoHand.Convert(rightData) 
+				: null;
 
 			connector.Set(left, right);
 
 			#if HAS_FINALIK
-			var vrik = runtime.Descriptor.Anchor.GetComponentInChildren<RootMotion.FinalIK.VRIK>();
+			var vrik = runtime.Descriptor.Anchor.GetComponentInChildren<VRIK>();
 			if (vrik && left && right) {
 				var autovrik = vrik.GetOrAddComponent<NoxAutoHandVRIK>();
 
 				// Les contrôleurs suivis doivent être la POSE BRUTE des contrôleurs : le « follow » d'une
 				// main de remplacement porte l'offset de rotation du prefab AutoHand (85° en X), que le
 				// pivot de l'avatar (HandOffset) applique déjà de son côté.
-				autovrik.leftHandSource         = leftData;
+				autovrik.leftSource         = leftData;
 				autovrik.leftTrackedController  = connector.GetTrackedController(true);
-				autovrik.rightHandSource        = rightData;
+				autovrik.rightSource        = rightData;
 				autovrik.rightTrackedController = connector.GetTrackedController(false);
 
 				// Les mains physiques sont des duplicatas des mains de l'avatar (mêmes colliders, pokes
 				// et échelle), créés par NoxAutoHandVRIK dans le dossier « Hands » à côté des mains de
 				// remplacement. L'armature ne garde que ses os, écrits par VRIK.
 				autovrik.physicalHandsRoot = connector.Fallbacks[1] ? connector.Fallbacks[1].transform.parent : null;
+
+				// Wait for NoxAutoHandVRIK to be fully initialized so we have access to physical hands
+				await UniTask.WaitUntil(() => autovrik.rightPhysical != null && autovrik.leftPhysical != null);
+
+				// Load NearFarInteractor prefab asynchronously using GetAssetAsync
+				var near = await Client.CoreAPI.AssetAPI.GetAssetAsync<GameObject>("near_far_interactor.prefab");
+				if (near != null) {
+					static Transform EndBone(IFinger finger) {
+						if (finger.Tip)
+							return finger.Tip;
+						if (finger.Distal)
+							return finger.Distal;
+						if (finger.Intermediate)
+							return finger.Intermediate;
+						if (finger.Proximal)
+							return finger.Proximal;
+						return null;
+					}
+					
+					async UniTask<NearFarInteractor> SetupNearFar(Hand physical, IHand source) {
+						Transform parent;
+						Vector3 position;
+						Quaternion rotation;
+
+						if (source.NearFar == null) {
+    parent = source.Anchor;
+    var thumb = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Thumb);
+    var index = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Index);
+    
+    var endThumb = EndBone(thumb)
+        ?? (thumb is MonoBehaviour mb0 ? mb0.transform : null)
+        ?? parent;
+    var endIndex = EndBone(index)
+        ?? (index is MonoBehaviour mb1 ? mb1.transform : null)
+        ?? parent;
+    
+    var thumbLocal = parent.InverseTransformPoint(endThumb.position);
+    var indexLocal = parent.InverseTransformPoint(endIndex.position);
+
+    // 1. Calcul de la position :
+    // On prend un point situé entre le pouce et l'index sur les axes X et Y (ex: 50% ou 60%),
+    // mais on force impérativement l'axe Z à matcher celui du bout de l'index.
+    const float blendWeight = 0.75f; // Ajustez entre 0.0 (aligné sur l'index) et 1.0 (aligné sur le pouce)
+    
+    position = new Vector3(
+        Mathf.Lerp(indexLocal.x, thumbLocal.x, blendWeight),
+        Mathf.Lerp(indexLocal.y, thumbLocal.y, blendWeight),
+        indexLocal.z // Reste au même niveau (profondeur/hauteur Z) que l'index
+    );
+
+    // 2. Orientation basée sur l'orientation de l'index :
+    var indexLocalRotation = Quaternion.Inverse(parent.rotation) * endIndex.rotation;
+    var dir = indexLocalRotation * Vector3.up;
+    var pitch = Mathf.Atan2(-dir.y, -dir.x) * Mathf.Rad2Deg;
+    rotation = Quaternion.Euler(pitch, 270f, 0f);
+} else {
+							parent = source.NearFar;
+							position = Vector3.zero;
+							rotation = Quaternion.identity;
+						}
+
+						var instance = await near.InstantiateAsync<NearFarInteractor>(parent);
+						instance.Hand = source.Type == NoxHandType.Left
+							? UnityEngine.XR.Interaction.Toolkit.Interactors.InteractorHandedness.Left
+							: UnityEngine.XR.Interaction.Toolkit.Interactors.InteractorHandedness.Right;
+						instance.transform.SetLocalPositionAndRotation(position, rotation);
+						return instance;
+					}
+					
+					await SetupNearFar(autovrik.rightPhysical, autovrik.rightPhysicalSource);
+					await SetupNearFar(autovrik.leftPhysical,  autovrik.leftPhysicalSource);
+				} else {
+					Logger.LogError("NearFarInteractor prefab not found at prefabs/near_far_interactor.prefab", this);
+				}
 			}
 			#endif
 		}
@@ -227,7 +306,7 @@ namespace Nox.XR.Connectors {
 							break;
 					}
 
-			ApplyRig(_runtime);
+			ApplyRig(_runtime).Forget();
 			root.SetActive(true);
 
 			Client.CoreAPI.EventAPI.Emit("controller_avatar_changed", this, _runtime);

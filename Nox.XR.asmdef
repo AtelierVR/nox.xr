@@ -20,6 +20,7 @@
     "Nox.Users",
     "Nox.Avatars.Camera",
     "Nox.Avatars.Hand",
+    "Nox.CCK.Avatars.Hand",
     "Nox.Avatars.Rigging",
     "RootMotion",
     "Nox.CCK.Worlds",

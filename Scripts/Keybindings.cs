@@ -18,6 +18,13 @@ namespace Nox.XR {
 			("nox.ui", "menu.left", "<XRController>{LeftHand}/{SecondaryButton}", value => SetFloatValue("menu.left", value), 0f),
 			("nox.ui", "menu.right", "<XRController>{RightHand}/{SecondaryButton}", value => SetFloatValue("menu.right", value), 0f),
 			("nox.movement", "jump", "<XRController>{LeftHand}/{PrimaryButton}", value => SetFloatValue("jump", value), 0f),
+
+			("nox.hand", "select.left", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("select.left", value), 0f),
+			("nox.hand", "select.right", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("select.right", value), 0f),
+			("nox.hand", "activate.left", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("activate.left", value), 0f),
+			("nox.hand", "activate.right", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("activate.right", value), 0f),
+			("nox.ui", "press.left", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("press.left", value), 0f),
+			("nox.ui", "press.right", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("press.right", value), 0f),
 			
 			("nox.hand", "finger.left.thumb", "<XRController>{LeftHand}/{PrimaryTouch}", value => SetFloatValue("finger.left.thumb", value), 0f),
 			("nox.hand", "finger.left.index", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("finger.left.index", value), 0f),
@@ -35,6 +42,8 @@ namespace Nox.XR {
 		private static readonly (string, string, string, Action<Vector2>, Vector2)[] Vector2Keys = {
 			("nox.movement", "move", "<XRController>{LeftHand}/Primary2DAxis", value => SetVector2Value("move", value), Vector2.zero),
 			("nox.movement", "turn", "<XRController>{RightHand}/Primary2DAxis", value => SetVector2Value("turn", value), Vector2.zero),
+			("nox.ui", "scroll.left", "<XRController>{LeftHand}/Primary2DAxis", value => SetVector2Value("scroll.left", value), Vector2.zero),
+			("nox.ui", "scroll.right", "<XRController>{RightHand}/Primary2DAxis", value => SetVector2Value("scroll.right", value), Vector2.zero),
 		};
 
 		static readonly internal UnityEvent<string, float, float> KeyFloatEvent = new();
@@ -70,7 +79,7 @@ namespace Nox.XR {
 		/// </summary>
 		/// <param name="key"></param>
 		/// <returns></returns>
-		private static float GetFloatValue(string key) {
+		public static float GetFloatValue(string key) {
 			var index = Array.FindIndex(FloatKeys, k => k.Item2 == key);
 			return index == -1 ? 0f : FloatKeys[index].Item5;
 		}
