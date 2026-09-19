@@ -424,6 +424,7 @@ namespace Nox.XR.Connectors {
 			}
 
 			Logger.LogDebug($"Avatar loaded: {identifier.ToString()}");
+			avatar.Identifier = identifier;
 			await SetAvatar(avatar);
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();

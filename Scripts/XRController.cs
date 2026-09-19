@@ -473,6 +473,12 @@ namespace Nox.XR {
 					if (!player.useGrounding && !mayFly)
 						player.ToggleFlying();
 					break;
+				case "max_move_speed":
+					player.maxMoveSpeed = (float)value;
+					break;
+				case "move_acceleration":
+					player.moveAcceleration = (float)value;
+					break;
 			}
 		}
 
