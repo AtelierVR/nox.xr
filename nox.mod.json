@@ -31,7 +31,7 @@
       "register": "git+https://github.com/AtelierVR/nox.controllers.git"
     },
     {
-      "id": "avatars",
+      "id": "avatar",
       "type": "depends",
       "version": ">=1.0.0",
       "register": "git+https://github.com/AtelierVR/nox.avatars.git"
@@ -52,12 +52,22 @@
       "id": "settings",
       "type": "depends",
       "register": "git+https://github.com/AtelierVR/nox.settings.git"
+    },
+    {
+      "id": "ui",
+      "type": "depends",
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.ui.git"
     }
   ],
   "constraints": [
     {
       "type": "after",
-      "id": "avatars"
+      "id": "avatar"
+    },
+    {
+      "type": "after",
+      "id": "ui"
     },
     {
       "type": "after",
