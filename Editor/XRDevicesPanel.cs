@@ -4,6 +4,8 @@ using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.XR;
 using Nox.Editor.Panel;
+using Nox.XR.Runtime;
+using Nox.XR.Runtime.Settings;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -98,7 +100,7 @@ namespace Nox.XR.Editor {
 
 			// Update XR System Status
 			if (_noVrFlagLabel != null) {
-				var noVrFlag = !Settings.EnableXRSetting.Value;
+					var noVrFlag = !EnableXRSetting.Value;
 				_noVrFlagLabel.text = noVrFlag ? "Disabled (--no-vr)" : "Enabled";
 				_noVrFlagLabel.EnableInClassList("text-danger", noVrFlag);
 				_noVrFlagLabel.EnableInClassList("text-success", !noVrFlag);

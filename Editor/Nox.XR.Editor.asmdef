@@ -5,12 +5,12 @@
         "Nox.CCK",
         "UniTask",
         "Nox.XR",
+        "Nox.XR.Runtime",
         "Nox.Avatars",
         "Nox.Editor.Panel",
         "Nox.CCK.XR",
         "Unity.XR.Management",
         "Unity.XR.Management.Editor",
-        "Unity.XR.OpenXR",
         "Unity.InputSystem"
     ],
     "includePlatforms": [

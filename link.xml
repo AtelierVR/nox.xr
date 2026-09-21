@@ -2,4 +2,5 @@
 <linker>
 	<assembly fullname="Nox.CCK.XR" preserve="all" />
 	<assembly fullname="Nox.XR" preserve="all" />
+	<assembly fullname="Nox.XR.Runtime" preserve="all" />
 </linker>

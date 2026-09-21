@@ -2,6 +2,8 @@
 using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using Nox.XR.Runtime;
+using Nox.XR.Runtime.Settings;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Editor {
@@ -11,8 +13,8 @@ namespace Nox.XR.Editor {
 		// La position d'un sous-menu dans "Nox/" est dérivée des priorités de ses enfants.
 		// Pour rester collé aux autres sous-menus Nox (priorité par défaut 1000), TOUTES
 		// les priorités de "Nox/XR" doivent tenir dans [990, 1010] - y compris celles de
-		// XROpenXRDebugTools. Les infos/diagnostics occupent 991-996, l'écart de 11 (> 10)
-		// avec les actions (1007-1009) crée le séparateur.
+		// XROpenXRDebugTools, fourni par nox.xr.openxr. Les infos/diagnostics occupent
+		// 991-996, l'écart de 11 (> 10) avec les actions (1007-1009) crée le séparateur.
 		private const int XRSettingsPriority = 991;  // Open XR Settings
 		private const int XRActionPriority   = 1007; // Enable XR, Enter XR, Leave XR
 
@@ -29,12 +31,12 @@ namespace Nox.XR.Editor {
 		/// </summary>
 		[MenuItem(XRMenuPath, false, XRActionPriority)]
 		public static void ToggleVR() 
-			=> Settings.EnableXRSetting.Value = !Settings.EnableXRSetting.Value;
+			=> EnableXRSetting.Value = !EnableXRSetting.Value;
 		
 
 		[MenuItem(XRMenuPath, true)]
 		private static bool ToggleVRValidate() {
-			Menu.SetChecked(XRMenuPath, Settings.EnableXRSetting.Value);
+			Menu.SetChecked(XRMenuPath, EnableXRSetting.Value);
 			return true;
 		}
 
@@ -59,7 +61,7 @@ namespace Nox.XR.Editor {
 			// En jeu : seulement si on n'y est pas. Hors jeu : seulement si ce n'est pas déjà armé.
 			return Application.isPlaying
 				? !IsXRRunning()
-				: !Settings.EnableXRSetting.Value;
+				: !EnableXRSetting.Value;
 		}
 
 		[MenuItem(LeaveXRMenuPath, true)]
@@ -67,7 +69,7 @@ namespace Nox.XR.Editor {
 			// En jeu : seulement si on y est. Hors jeu : seulement si c'est armé.
 			return Application.isPlaying
 				? IsXRRunning()
-				: Settings.EnableXRSetting.Value;
+				: EnableXRSetting.Value;
 		}
 
 		private static bool IsXRRunning() {
@@ -79,7 +81,7 @@ namespace Nox.XR.Editor {
 			if (!Application.isPlaying) {
 				// Hors Play mode le loader ne peut pas être piloté : on arme/désarme le
 				// démarrage automatique pour le prochain lancement.
-				Settings.EnableXRSetting.Value = running;
+				EnableXRSetting.Value = running;
 				Logger.Log(running
 					? "XR will start on the next Play (startup flag armed)."
 					: "XR will not start on the next Play (startup flag cleared).");

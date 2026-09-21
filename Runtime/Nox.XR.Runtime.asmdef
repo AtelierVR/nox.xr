@@ -1,0 +1,59 @@
+{
+  "name": "Nox.XR.Runtime",
+  "rootNamespace": "",
+  "references": [
+    "Nox.CCK",
+    "UniTask",
+    "Nox.XR",
+    "Nox.CCK.Avatars",
+    "Nox.CCK.XR",
+    "Nox.Controllers",
+    "AutoHandAssembly",
+    "NaughtyAttributes.Core",
+    "Nox.Players",
+    "Nox.Entities",
+    "Unity.XR.Management",
+    "Unity.XR.Interaction.Toolkit",
+    "Nox.UI",
+    "Nox.Avatars",
+    "Nox.Avatars.AutoHand",
+    "Nox.Avatars.Parameters",
+    "Nox.Users",
+    "Nox.Avatars.Camera",
+    "Nox.Avatars.Hand",
+    "Nox.CCK.Avatars.Hand",
+    "Nox.Avatars.Rigging",
+    "RootMotion",
+    "Nox.CCK.Worlds",
+    "Nox.Avatars.Runtime",
+    "Nox.Avatars.Scale",
+    "Unity.XR.CoreUtils",
+    "Unity.InputSystem",
+    "Nox.KeyBinding",
+    "Nox.Settings",
+    "Nox.CCK.Settings",
+    "Nox.Audio",
+    "Nox.Sessions",
+    "Nox.CCK.Audio"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "rootmotion.finalik",
+      "expression": "",
+      "define": "HAS_FINALIK"
+    },
+    {
+      "name": "com.earnestrobot.autohand",
+      "expression": "",
+      "define": "HAS_AUTOHAND"
+    }
+  ],
+  "noEngineReferences": false
+}

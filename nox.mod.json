@@ -25,6 +25,16 @@
   ],
   "relations": [
     {
+      "id": "xr.openxr",
+      "type": "recommends",
+      "register": "git+https://github.com/AtelierVR/nox.xr.openxr.git"
+    },
+    {
+      "id": "xr.openvr",
+      "type": "recommends",
+      "register": "git+https://github.com/AtelierVR/nox.xr.openvr.git"
+    },
+    {
       "id": "controllers",
       "type": "depends",
       "version": ">=1.0.0",
@@ -84,14 +94,14 @@
   ],
   "entrypoints": {
     "main": [
-      "Nox.XR.Main"
+      "Nox.XR.Runtime.Main"
     ],
     "client": [
-      "Nox.XR.Client"
+      "Nox.XR.Runtime.Client"
     ],
     "editor": [
       "Nox.XR.Editor.XRDevicesPanel",
-      "Nox.XR.Editor.SetupSettings"
+      "Nox.XR.Editor.XRSettingsSetup"
     ]
   }
 }
