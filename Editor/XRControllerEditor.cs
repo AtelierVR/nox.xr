@@ -2,6 +2,10 @@
 using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using Nox.Avatars.Rigging;
+using Nox.CCK.Avatars.Rigging;
+using Nox.CCK.Players;
+using Nox.Controllers;
 using Nox.XR.Runtime;
 using Nox.XR.Runtime.Settings;
 using Logger = Nox.CCK.Utils.Logger;
@@ -74,7 +78,7 @@ namespace Nox.XR.Editor {
 
 		private static bool IsXRRunning() {
 			var client = Client.Instance;
-			return Application.isPlaying && client != null && client.IsXRInitialized();
+			return Application.isPlaying && client != null && client.IsRunning;
 		}
 
 		private static void SetXRRunning(bool running) {
@@ -95,9 +99,9 @@ namespace Nox.XR.Editor {
 			}
 
 			if (running)
-				client.EnterXR().Forget();
+				client.Enter().Forget();
 			else
-				client.QuitXR().Forget();
+				client.Quit().Forget();
 		}
 
 		public override void OnInspectorGUI() {
@@ -124,6 +128,50 @@ namespace Nox.XR.Editor {
 			EditorGUILayout.Space();
 
 			EditorGUILayout.ObjectField(controller.GetAvatar()?.Descriptor.Anchor, typeof(GameObject), true);
+
+			EditorGUILayout.Space();
+
+			DrawParts(controller);
+		}
+
+		/// <summary>
+		/// Tracked parts exposed by the controller - the very values the parts driver writes on the rig and
+		/// that are sent to the network - with, for each of them, the rig part receiving it and how far the
+		/// rig part currently is from that value. A delta that does not shrink on a live part means the rig
+		/// did not follow it (no rig, weight at 0, or another writer on the same transform).
+		/// </summary>
+		private static void DrawParts(XRController controller) {
+			var parts = ((IController)controller).GetParts();
+			if (parts == null || parts.Count == 0) {
+				EditorGUILayout.LabelField("No parts found");
+				return;
+			}
+
+			var rig = controller.GetAvatar()?.Descriptor?.Anchor
+				?.GetComponentInChildren<IRigProvider>(true)?.GetRig();
+
+			EditorGUILayout.LabelField($"Parts ({parts.Count})");
+			foreach (var (partId, part) in parts) {
+				var position = part.GetPosition();
+				var rotation = part.GetRotation();
+
+				EditorGUILayout.LabelField($"{partId.ToPlayerRig()} ({partId})");
+				EditorGUILayout.TextField(" - position", position.ToString("F3"));
+				EditorGUILayout.TextField(" - rotation", rotation.eulerAngles.ToString("F1"));
+
+				if (rig == null) {
+					EditorGUILayout.LabelField(" - rig", "none");
+					continue;
+				}
+
+				if (!RigPartDriver.TryGetPart(rig, partId, out var rigPart)) {
+					EditorGUILayout.LabelField(" - rig part", "not exposed by the rig");
+					continue;
+				}
+
+				EditorGUILayout.ObjectField(" - rig part", rigPart, typeof(Transform), true);
+				EditorGUILayout.TextField(" - rig delta (m)", Vector3.Distance(rigPart.position, position).ToString("F4"));
+			}
 		}
 
 		public override bool RequiresConstantRepaint() {

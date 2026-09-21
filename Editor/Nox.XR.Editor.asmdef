@@ -7,10 +7,14 @@
         "Nox.XR",
         "Nox.XR.Runtime",
         "Nox.Avatars",
+        "Nox.Avatars.Rigging",
+        "Nox.CCK.Avatars.Rigging",
+        "Nox.Controllers",
         "Nox.Editor.Panel",
         "Nox.CCK.XR",
         "Unity.XR.Management",
         "Unity.XR.Management.Editor",
+        "Unity.XR.CoreUtils",
         "Unity.InputSystem"
     ],
     "includePlatforms": [

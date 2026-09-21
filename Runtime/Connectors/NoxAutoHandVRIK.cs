@@ -47,8 +47,10 @@ namespace Nox.XR.Runtime.Connectors {
 
 		private Transform _rightHandOffset;
 		private Transform _leftHandOffset;
-		private Transform _rightIkTarget;
-		private Transform _leftIkTarget;
+
+		/// <summary>Arm IK targets: the rig parts (<c>VRIK_RightHand</c> / <c>VRIK_LeftHand</c>).</summary>
+		private Transform _rightArmTarget;
+		private Transform _leftArmTarget;
 
 		private Transform[] _rightVisualJoints   = System.Array.Empty<Transform>();
 		private Transform[] _rightPhysicalJoints = System.Array.Empty<Transform>();
@@ -80,7 +82,6 @@ namespace Nox.XR.Runtime.Connectors {
 		protected virtual void OnEnable() {
 			if (AutoHandPlayer.Instance != null) {
 				AutoHandPlayer.Instance.OnSnapTurn   += AutoPlayerResetIKEvent;
-				AutoHandPlayer.Instance.OnSmoothTurn += AutoPlayerResetIKEvent;
 				AutoHandPlayer.Instance.OnTeleported += AutoPlayerResetIKEvent;
 			}
 			_resetQueued = true;
@@ -89,7 +90,6 @@ namespace Nox.XR.Runtime.Connectors {
 		protected virtual void OnDisable() {
 			if (AutoHandPlayer.Instance != null) {
 				AutoHandPlayer.Instance.OnSnapTurn   -= AutoPlayerResetIKEvent;
-				AutoHandPlayer.Instance.OnSmoothTurn -= AutoPlayerResetIKEvent;
 				AutoHandPlayer.Instance.OnTeleported -= AutoPlayerResetIKEvent;
 			}
 			UnsubscribeGrabs();
@@ -97,33 +97,38 @@ namespace Nox.XR.Runtime.Connectors {
 
 		protected virtual void OnDestroy() {
 			// We spawned the duplicates, we destroy them.
-			if (rightPhysical != null) rightPhysical.gameObject.Destroy();
-			if (leftPhysical  != null) leftPhysical.gameObject.Destroy();
+			rightPhysical?.gameObject.Destroy();
+			leftPhysical?.gameObject.Destroy();
 
 			// The HandOffsets are children of the controllers.
-			if (_rightHandOffset != null) _rightHandOffset.gameObject.Destroy();
-			if (_leftHandOffset  != null) _leftHandOffset.gameObject.Destroy();
+			_rightHandOffset?.gameObject.Destroy();
+			_leftHandOffset?.gameObject.Destroy();
 		}
 
 		protected virtual void OnRightGrab(Hand hand, Grabbable grab)
 			=> vrik.solver.rightArm.target = hand.handGrabPoint;
 
 		protected virtual void OnRightRelease(Hand hand, Grabbable grab)
-			=> vrik.solver.rightArm.target = _rightIkTarget != null ? _rightIkTarget : _rightHandOffset;
+			=> vrik.solver.rightArm.target = _rightArmTarget != null ? _rightArmTarget : _rightHandOffset;
 
 		protected virtual void OnLeftGrab(Hand hand, Grabbable grab)
 			=> vrik.solver.leftArm.target = hand.handGrabPoint;
 
 		protected virtual void OnLeftRelease(Hand hand, Grabbable grab)
-			=> vrik.solver.leftArm.target = _leftIkTarget != null ? _leftIkTarget : _leftHandOffset;
+			=> vrik.solver.leftArm.target = _leftArmTarget != null ? _leftArmTarget : _leftHandOffset;
 
 		protected virtual void AutoPlayerResetIKEvent(AutoHandPlayer player)
 			=> _resetQueued = true;
 
+		// NOTE: `OnSmoothTurn` is deliberately NOT subscribed: AutoHandPlayer raises it from its
+		// LateUpdate on EVERY frame the turn axis is held (`UpdateTurn`, smooth branch), so it would
+		// call `solver.Reset()` - which resets the locomotion solver damping and spine.faceDirection -
+		// 90 times a second. VRIK re-reads the animated pose on its own every frame, so only the
+		// one-shot events (snap turn, teleport) really need the reset.
+
 		private void Update() {
 			// Must run before VRIK, which solves in LateUpdate.
-			RefreshHeadTargetRotation();
-			RefreshIkTargets();
+			ApplyHeadWeights();
 
 			if (!_resetQueued) return;
 			vrik.solver.Reset();
@@ -131,31 +136,24 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Aligns the head target's rotation on the headset's.
+		/// Keeps the head weights open, so the head target is actually applied.
 		/// <para>
-		/// VRIK does not look towards the target, it <i>assigns</i> its rotation:
-		/// <c>IKSolverVRSpine.PreSolve</c> does <c>IKRotationHead = headTarget.rotation</c>, then
-		/// <c>Bend()</c> rotates the head bone onto it. Any offset baked into the target therefore
-		/// ends up in full in the render.
+		/// The target itself is written by the rig parts driver (<c>AvatarSyncConnector.DriveRigParts</c>),
+		/// which is also what a remote client replays - the `PlayerRig.Head` part carries the headset pose
+		/// moved onto the head bone (see <c>XRController.GetParts</c>).
+		/// </para>
+		/// <para>
+		/// <c>IKSolverVRSpine.Bend()</c> returns early when a weight is 0: with <c>rotationWeight</c> at 0
+		/// the head keeps its animated rotation while its position still follows. An avatar can lower both
+		/// through <c>rig/ik/head/*_weight</c>.
 		/// </para>
 		/// </summary>
-		private void RefreshHeadTargetRotation() {
-			// The avatar rig can be generated after us: read the target every frame instead of caching it.
-			var target = vrik != null ? vrik.solver.spine.headTarget : null;
-			if (target == null)
+		private void ApplyHeadWeights() {
+			if (vrik == null)
 				return;
 
-			var player = AutoHandPlayer.Instance;
-			if (player == null || player.headCamera == null)
-				return;
-
-			// `Bend()` returns early when the weights are 0: with rotationWeight at 0 the head keeps its
-			// animated rotation while its position still follows. An avatar can lower the weight through
-			// `rig/ik/head/rotation_weight`.
 			vrik.solver.spine.positionWeight = 1f;
 			vrik.solver.spine.rotationWeight = 1f;
-
-			target.rotation = player.headCamera.transform.rotation;
 		}
 
 		protected virtual void LateUpdate() {
@@ -169,42 +167,13 @@ namespace Nox.XR.Runtime.Connectors {
 			transform.position = pos;
 		}
 
-		/// <summary>
-		/// Sets each arm IK anchor from the <c>HandOffset</c> (avatar pivot carried by the controller),
-		/// corrected by the rigid "target -> physical" offset
-		/// (<c>physical - physical.follow</c>).
-		/// <para>
-		/// The physical duplicate is the only hand affected by physics (walls, held objects, the
-		/// <see cref="HandFollow"/> spring): without the correction the visible hand went through the
-		/// geometry the physical one stops at, while the IK anchor only carried the ideal controller pose.
-		/// </para>
-		/// </summary>
-		private void RefreshIkTargets() {
-			RefreshIkTarget(_rightIkTarget, _rightHandOffset, rightPhysical);
-			RefreshIkTarget(_leftIkTarget,  _leftHandOffset,  leftPhysical);
-		}
-
-		private static void RefreshIkTarget(Transform ikTarget, Transform handOffset, Hand physical) {
-			if (ikTarget == null) return;
-
-			if (handOffset == null) {
-				if (physical != null)
-					ikTarget.SetPositionAndRotation(physical.transform.position, physical.transform.rotation);
-				return;
-			}
-
-			var position = handOffset.position;
-			var rotation = handOffset.rotation;
-
-			var follow = physical != null ? physical.follow : null;
-			if (follow != null) {
-				var body = physical.transform;
-				position += body.position - follow.position;
-				rotation = body.rotation * Quaternion.Inverse(follow.rotation) * rotation;
-			}
-
-			ikTarget.SetPositionAndRotation(position, rotation);
-		}
+		// NOTE: the arm IK targets are the rig parts (`VRIK_LeftHand` / `VRIK_RightHand`, registered by
+		// FinalIKRigGenerator) and they are written every frame by `AvatarSyncConnector.DriveRigParts` from
+		// the hand part the controller exposes - i.e. `AutoHandPlayer.handLeft/handRight`, the physical
+		// duplicate assigned in `SetupIK`, which is exactly what a remote client receives and replays.
+		// There used to be a second writer here, on a private "IK Target" object, computing
+		// `handOffset + (physical - follow)`: since `physical.follow` IS the hand offset, that expression
+		// collapses to the physical hand pose - the very value of the part - so it was removed.
 
 		/// <summary>Copies the duplicate's finger pose onto the armature bones.</summary>
 		private static void MirrorFingers(Transform[] visualJoints, Transform[] physicalJoints) {
@@ -245,16 +214,14 @@ namespace Nox.XR.Runtime.Connectors {
 			BuildFingerJoints(rightSource, rightPhysical, out _rightVisualJoints, out _rightPhysicalJoints);
 			BuildFingerJoints(leftSource,  leftPhysical,  out _leftVisualJoints,  out _leftPhysicalJoints);
 
-			// The arm IK anchor is a separate object (child of the avatar, not of the hand).
-			_rightIkTarget = CreateIkTarget();
-			_leftIkTarget  = CreateIkTarget();
-
-			// The head target is created by FinalIKRigGenerator and read every frame by
-			// RefreshHeadTargetRotation, so it is not cached here.
+			// The arm IK targets are the rig parts (`VRIK_RightHand` / `VRIK_LeftHand`, assigned by
+			// FinalIKRigGenerator) - the same objects a remote client writes and the parts driver feeds here.
+			_rightArmTarget = vrik.solver.rightArm.target;
+			_leftArmTarget  = vrik.solver.leftArm.target;
 
 			// Each arm is resolved independently: a side without controller or hand must not block the other.
-			vrik.solver.rightArm.target = ResolveArmTarget("right", rightSource, ref _rightHandOffset, _rightIkTarget);
-			vrik.solver.leftArm.target  = ResolveArmTarget("left",  leftSource,  ref _leftHandOffset,  _leftIkTarget);
+			vrik.solver.rightArm.target = ResolveArmTarget("right", rightSource, ref _rightHandOffset, _rightArmTarget);
+			vrik.solver.leftArm.target  = ResolveArmTarget("left",  leftSource,  ref _leftHandOffset,  _leftArmTarget);
 		}
 
 		private void SubscribeGrabs() {
@@ -364,6 +331,13 @@ namespace Nox.XR.Runtime.Connectors {
 			var body = ghost.GetOrAddComponent<Rigidbody>();
 			body.isKinematic = false;
 			body.useGravity  = false;
+			// `HandBase.Awake` leaves the body with `interpolation = None`, and `HandFollow` moves it by
+			// velocity in FixedUpdate: its transform therefore only changes on physics frames. We read that
+			// transform every rendered frame to correct the arm IK anchors, and VRIK feeds the result into
+			// the whole torso, so the physics stepping used to show up as a tremble of the arms and head.
+			// Interpolating it costs half a physics step of latency but makes those reads render-rate smooth;
+			// contacts and grabs keep using the non-interpolated simulation.
+			body.interpolation = RigidbodyInterpolation.Interpolate;
 
 			if (hand != null) {
 				hand.enableMovement = true;  // HandFollow only moves the hand if it is allowed to.
@@ -624,33 +598,20 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Resolves an arm's IK target. Without a tracked controller it falls back to the hand pivot so the
-		/// IK still runs (and reports the cause instead of leaving a T-pose).
+		/// Resolves an arm's IK target: the rig part (the parts driver writes it) when a controller follows
+		/// it, otherwise the hand pivot so the IK still runs - the cause is reported instead of a T-pose.
 		/// </summary>
-		private Transform ResolveArmTarget(string side, IHand hand, ref Transform handOffset, Transform ikTarget) {
+		private Transform ResolveArmTarget(string side, IHand hand, ref Transform handOffset, Transform rigTarget) {
 			if (handOffset == null) {
 				Logger.LogWarning(
 					$"{nameof(NoxAutoHandVRIK)}: no {side} tracked controller, {side} arm IK target falls back to the hand pivot"
 					+ $" - the {side} arm will not follow the controller.",
 					this
 				);
-				handOffset = hand != null ? hand.Palm : null;
+				return hand != null ? hand.Palm : rigTarget;
 			}
 
-			if (ikTarget == null)
-				Logger.LogError(
-					$"{nameof(NoxAutoHandVRIK)}: no IK anchor for the {side} arm, VRIK will leave it in T-pose.",
-					this
-				);
-
-			return ikTarget != null ? ikTarget : handOffset;
-		}
-
-		/// <summary>Arm IK anchor: a separate object, replaced every frame by <see cref="RefreshIkTargets"/>.</summary>
-		private Transform CreateIkTarget() {
-			var go = new GameObject("IK Target");
-			go.transform.SetParent(transform, false);
-			return go.transform;
+			return rigTarget != null ? rigTarget : handOffset;
 		}
 
 		private static Transform CreateHandOffset(Transform parent, IHand source) {

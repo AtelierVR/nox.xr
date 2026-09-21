@@ -23,6 +23,7 @@
     "Nox.Avatars.Hand",
     "Nox.CCK.Avatars.Hand",
     "Nox.Avatars.Rigging",
+    "Nox.CCK.Avatars.Rigging",
     "RootMotion",
     "Nox.CCK.Worlds",
     "Nox.Avatars.Runtime",

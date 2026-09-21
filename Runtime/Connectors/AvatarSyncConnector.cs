@@ -3,9 +3,13 @@ using Autohand;
 using Nox.Avatars.Camera;
 using Nox.Avatars.Hand;
 using Nox.Avatars.Parameters;
+using Nox.Avatars.Rigging;
 using Nox.CCK;
+using Nox.CCK.Players;
 using Nox.CCK.XR;
+using Nox.Controllers;
 using UnityEngine;
+using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
 
 namespace Nox.XR.Runtime.Connectors {
@@ -13,9 +17,71 @@ namespace Nox.XR.Runtime.Connectors {
 		public AutoHandPlayer player;
 		public AvatarLoaderConnector avatarLoader;
 
+		private IController _controller;
+		private bool _controllerSearched;
+		private IRigProvider _rigProvider;
+
 		// ReSharper disable Unity.PerformanceAnalysis
 		private void Update() {
 			SynchronizeParametersAvatar();
+			DriveRigParts();
+		}
+
+		/// <summary>
+		/// Local counterpart of <c>RemotePhysical.Update</c>: writes the tracked parts exposed by the
+		/// controller onto the avatar rig every frame, with no interpolation and no threshold.
+		/// <para>
+		/// The parts read here are the very values that are sent to the network, so a remote client replays
+		/// exactly what this writes (theirs interpolated between packets). <c>PlayerRig.Base</c> is skipped:
+		/// the local avatar's body is already driven by the rig and the player's physics, the part is only
+		/// sent so remote clients know where the body is. Parts the rig does not expose (fingers on a rig
+		/// limited to humanoid bones) are ignored by <see cref="RigPartDriver.Write"/>. Arms are written too:
+		/// the rig parts are the arm IK targets, so grabbing only swaps the target for the grab point and
+		/// the write stays harmlessly behind it.
+		/// </para>
+		/// </summary>
+		private void DriveRigParts() {
+			var rig = RigProvider?.GetRig();
+			if (rig == null)
+				return;
+
+			var controller = Controller;
+			if (controller == null)
+				return;
+
+			foreach (var (partId, part) in controller.GetParts()) {
+				if (partId == PlayerRig.Base.ToIndex())
+					continue;
+				RigPartDriver.Write(rig, partId, part.GetPosition(), part.GetRotation());
+			}
+		}
+
+		/// <summary>Controller exposing this rig's tracked parts.</summary>
+		private IController Controller {
+			get {
+				if (_controllerSearched) return _controller;
+				_controllerSearched = true;
+				_controller = GetComponent<IController>() ?? GetComponentInParent<IController>();
+				if (_controller == null)
+					Logger.LogWarning(
+						$"{nameof(AvatarSyncConnector)}: no {nameof(IController)} found, the rig parts are not driven.",
+						this
+					);
+				return _controller;
+			}
+		}
+
+		/// <summary>
+		/// Rig provider of the current avatar, resolved on demand and re-resolved when the avatar is loaded
+		/// or swapped after us (the provider is a MonoBehaviour that can be destroyed).
+		/// </summary>
+		private IRigProvider RigProvider {
+			get {
+				if (!(_rigProvider is Object known) || !known)
+					_rigProvider = avatarLoader?.GetAvatar()?.Descriptor?.Anchor
+						?.GetComponentInChildren<IRigProvider>(true);
+				return _rigProvider;
+			}
 		}
 
 		private void LateUpdate() {
@@ -54,9 +120,6 @@ namespace Nox.XR.Runtime.Connectors {
 			var avatar = avatarLoader?.GetAvatar();
 			var parameterModule = avatar?.Descriptor
 				?.GetModules<IParameterModule>()
-				.FirstOrDefault();
-			var cameraModule = avatar?.Descriptor
-				?.GetModules<ICameraModule>()
 				.FirstOrDefault();
 			var handModule = avatar?.Descriptor
 				?.GetModules<IHandModule>()
@@ -126,27 +189,15 @@ namespace Nox.XR.Runtime.Connectors {
 						param.Set(active);
 						break;
 					}
-					case "tracking/head/position": {
-						var cPos = player.headCamera.transform.position;
-						if (cameraModule != null) {
-							var camAnchor = cameraModule.GetAnchor();
-							if (camAnchor != null)
-								cPos -= camAnchor.TransformDirection(cameraModule.GetOffset());
-						}
-						var value = param.Get().ToVector3();
-						if (Vector3.Distance(value, cPos) < 0.001f)
-							continue;
-						param.Set(cPos);
+					case "tracking/head/position":
+					case "tracking/head/rotation":
+						// Deliberately not written: the head pose travels as the `PlayerRig.Head` part (see
+						// `XRController.GetParts`), which is exactly what remote clients replay through
+						// `RemotePhysical.Update`, and the local rig target is written by `DriveRigParts`.
+						// Writing it a second time through these parameters only added a second writer, with a
+						// different cadence, a different formula (this one used to apply the eye offset) and a
+						// 1 mm threshold that held the head target in place.
 						break;
-					}
-					case "tracking/head/rotation": {
-						var cRot  = player.headCamera.transform.rotation;
-						var value = param.Get().ToQuaternion();
-						if (Quaternion.Angle(value, cRot) < 0.001f)
-							continue;
-						param.Set(cRot);
-						break;
-					}
 					case "tracking/left_hand/active": {
 						var active = XRInputs.HasHandLeft;
 						var value  = param.Get().ToBool();
