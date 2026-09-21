@@ -2,6 +2,7 @@ using Cysharp.Threading.Tasks;
 using Nox.CCK.Settings;
 using Nox.Settings;
 using Nox.UI;
+using Nox.XR.Runtime.Loaders;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -30,12 +31,10 @@ namespace Nox.XR.Runtime.Settings {
 			RefreshLabel();
 		}
 
-		private void RefreshLabel() {
-			var isInit = Client.Instance?.IsXRInitialized() ?? false;
-			SetButtonText(isInit
+		private void RefreshLabel() 
+			=> SetButtonText(XRLoaderManager.IsRunning
 				? "settings.entry.xr.general.start_vr.stop"
 				: "settings.entry.xr.general.start_vr.start");
-		}
 
 		protected override GameObject GetPrefab()
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/button.prefab");
@@ -49,10 +48,10 @@ namespace Nox.XR.Runtime.Settings {
 			// Le même bouton entre et sort de la XR. La sortie doit réellement quitter la
 			// VR : arrêt du loader + retrait du proxy (StopLoader seul laisserait le proxy
 			// XR courant avec un tracking mort).
-			if (Client.Instance.IsXRInitialized())
-				await Client.Instance.QuitXR();
+			if (XRLoaderManager.IsRunning)
+				await Client.Instance.Quit();
 			else
-				await Client.Instance.EnterXR();
+				await Client.Instance.Enter();
 
 			RefreshLabel();
 		}
