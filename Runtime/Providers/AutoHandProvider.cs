@@ -8,17 +8,35 @@ using UnityEngine.XR;
 
 namespace Nox.XR.Runtime.Providers {
 	public class AutoHandProvider : IXRInputProvider {
+		private static readonly List<InputDevice> _devices = new();
+
 		public static AutoHandPlayer Player
 			=> AutoHandPlayer.Instance;
 
 		public bool HasDevice(XRNode node)
 			=> node switch {
-				XRNode.Head            => Player?.headCamera,
-				XRNode.LeftHand        => Player?.handLeft,
-				XRNode.RightHand       => Player?.handRight,
+				XRNode.Head            => HasTracked(XRNode.Head),
+				XRNode.LeftHand        => HasTracked(XRNode.LeftHand),
+				XRNode.RightHand       => HasTracked(XRNode.RightHand),
 				XRNode.HardwareTracker => GetTrackers().Count > 0,
 				_                      => false
 			};
+
+		/// <summary>
+		/// Présence <b>réelle</b> d'un device suivi sur ce node.
+		/// <para>
+		/// AutoHand expose toujours ses mains (<c>Player.handLeft/handRight</c>) et sa caméra :
+		/// s'en servir comme test de présence rendait <c>XRInputs.HasHandLeft/HasHandRight</c>
+		/// toujours vrais. L'avatar gardait donc <c>tracking/*_hand/active</c> actif, les bras
+		/// suivaient les contrôleurs non-trackés — posés à l'origine du rig — au lieu de jouer
+		/// l'animation de locomotion.
+		/// </para>
+		/// </summary>
+		private static bool HasTracked(XRNode node) {
+			_devices.Clear();
+			InputDevices.GetDevicesAtXRNode(node, _devices);
+			return _devices.Count > 0;
+		}
 
 		public bool TryGetDevicePose(XRNode node, out Vector3 position, out Quaternion rotation) {
 			position = Vector3.zero;

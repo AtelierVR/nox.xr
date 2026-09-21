@@ -13,42 +13,36 @@ using NHand = Nox.CCK.Avatars.Hand.Hand;
 
 namespace Nox.XR.Runtime.Connectors {
 	/// <summary>
-	/// Fait suivre le squelette de l'avatar (VRIK) par la main AutoHand du rig.
+	/// Drives the avatar skeleton (VRIK) from the rig's AutoHand hands.
 	/// <para>
-	/// La main AutoHand « réelle » n'est <b>pas</b> celle de l'armature : c'est un
-	/// <b>duplicata</b> de la main de l'avatar, créé dans le dossier « Hands » du rig XR — mêmes
-	/// colliders, mêmes pokes, même échelle. C'est lui que <see cref="AutoHandPlayer"/> pilote, qui
-	/// attrape et qui collisionne ; l'armature, elle, ne garde que ses os, que VRIK écrit en
-	/// suivant le duplicata (position, rotation <i>et</i> doigts). La main du rig contrôle donc
-	/// l'armature, jamais l'inverse.
+	/// The <b>physical</b> hand is not the armature one: it is a <b>duplicate</b> of the avatar hand,
+	/// created in the XR rig "Hands" folder with the same colliders, pokes and scale. It is the one
+	/// <see cref="AutoHandPlayer"/> drives, grabs with and collides with; the armature only keeps its
+	/// bones, which VRIK writes from the duplicate (position, rotation <i>and</i> fingers).
 	/// </para>
 	/// </summary>
 	[DefaultExecutionOrder(12), RequireComponent(typeof(VRIK))]
 	public class NoxAutoHandVRIK : MonoBehaviour {
-		[Tooltip("Transform du contrôleur VR suivi (droite) : sa POSE BRUTE, pas le « follow » "
-		         + "d'une main de remplacement (celui-ci porte l'offset de rotation du prefab AutoHand).")]
+		[Tooltip("Tracked VR controller (right): its RAW pose, not the follow transform of a "
+		         + "replacement hand (that one carries the AutoHand prefab's rotation offset).")]
 		public Transform rightTrackedController;
-		[Tooltip("Transform du contrôleur VR suivi (gauche) : voir rightTrackedController.")]
+		[Tooltip("Tracked VR controller (left): see rightTrackedController.")]
 		public Transform leftTrackedController;
-		[Tooltip("Données IHand de la main droite de l'avatar (pivot, os, doigts).")]
+		[Tooltip("IHand of the avatar's right hand (pivot, bones, fingers).")]
 		public IHand rightSource;
-		[Tooltip("Données IHand de la main gauche de l'avatar (pivot, os, doigts).")]
+		[Tooltip("IHand of the avatar's left hand (pivot, bones, fingers).")]
 		public IHand leftSource;
-		[Tooltip("Dossier « Hands » du rig XR : c'est là que sont créés les duplicatas physiques "
-		         + "des mains de l'avatar (à côté des mains de remplacement AutoHand).")]
+		[Tooltip("XR rig 'Hands' folder: the physical hand duplicates are created there.")]
 		public Transform physicalHandsRoot;
 
-		/// <summary>Main AutoHand (duplicata) du côté droit : c'est le corps physique.</summary>
+		/// <summary>Physical AutoHand duplicate, right side.</summary>
 		public Hand rightPhysical { get; private set; }
-		/// <summary>Main AutoHand (duplicata) du côté gauche : c'est le corps physique.</summary>
+		/// <summary>Physical AutoHand duplicate, left side.</summary>
 		public Hand leftPhysical { get; private set; }
 
-		/// <summary>
-		/// <see cref="IHand"/> décrivant le duplicata droit (ses propres os) : c'est lui qui a été
-		/// converti en <see cref="rightPhysical"/>.
-		/// </summary>
+		/// <summary>IHand describing the right duplicate (its own bones); the one converted into <see cref="rightPhysical"/>.</summary>
 		public IHand rightPhysicalSource { get; private set; }
-		/// <summary>Voir <see cref="rightPhysicalSource"/>.</summary>
+		/// <summary>See <see cref="rightPhysicalSource"/>.</summary>
 		public IHand leftPhysicalSource { get; private set; }
 
 		private Transform _rightHandOffset;
@@ -102,11 +96,11 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		protected virtual void OnDestroy() {
-			// Les duplicatas des mains ont été créés par nous : c'est à nous de les jeter.
+			// We spawned the duplicates, we destroy them.
 			if (rightPhysical != null) rightPhysical.gameObject.Destroy();
 			if (leftPhysical  != null) leftPhysical.gameObject.Destroy();
 
-			// Les HandOffset sont enfants des contrôleurs.
+			// The HandOffsets are children of the controllers.
 			if (_rightHandOffset != null) _rightHandOffset.gameObject.Destroy();
 			if (_leftHandOffset  != null) _leftHandOffset.gameObject.Destroy();
 		}
@@ -127,7 +121,8 @@ namespace Nox.XR.Runtime.Connectors {
 			=> _resetQueued = true;
 
 		private void Update() {
-			// Doit passer avant VRIK, qui résout en LateUpdate.
+			// Must run before VRIK, which solves in LateUpdate.
+			RefreshHeadTargetRotation();
 			RefreshIkTargets();
 
 			if (!_resetQueued) return;
@@ -135,8 +130,36 @@ namespace Nox.XR.Runtime.Connectors {
 			_resetQueued = false;
 		}
 
+		/// <summary>
+		/// Aligns the head target's rotation on the headset's.
+		/// <para>
+		/// VRIK does not look towards the target, it <i>assigns</i> its rotation:
+		/// <c>IKSolverVRSpine.PreSolve</c> does <c>IKRotationHead = headTarget.rotation</c>, then
+		/// <c>Bend()</c> rotates the head bone onto it. Any offset baked into the target therefore
+		/// ends up in full in the render.
+		/// </para>
+		/// </summary>
+		private void RefreshHeadTargetRotation() {
+			// The avatar rig can be generated after us: read the target every frame instead of caching it.
+			var target = vrik != null ? vrik.solver.spine.headTarget : null;
+			if (target == null)
+				return;
+
+			var player = AutoHandPlayer.Instance;
+			if (player == null || player.headCamera == null)
+				return;
+
+			// `Bend()` returns early when the weights are 0: with rotationWeight at 0 the head keeps its
+			// animated rotation while its position still follows. An avatar can lower the weight through
+			// `rig/ik/head/rotation_weight`.
+			vrik.solver.spine.positionWeight = 1f;
+			vrik.solver.spine.rotationWeight = 1f;
+
+			target.rotation = player.headCamera.transform.rotation;
+		}
+
 		protected virtual void LateUpdate() {
-			// Après VRIK : la main du rig pilote l'armature jusqu'au bout des doigts.
+			// After VRIK: the rig hand drives the armature down to the fingertips.
 			MirrorFingers(_rightVisualJoints, _rightPhysicalJoints);
 			MirrorFingers(_leftVisualJoints,  _leftPhysicalJoints);
 
@@ -147,19 +170,13 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Positionne chaque ancre IK du bras sur le <c>HandOffset</c> (pivot de l'avatar, porté par le
-		/// contrôleur), <b>corrigé de l'écart de la main physique à sa cible</b>.
+		/// Sets each arm IK anchor from the <c>HandOffset</c> (avatar pivot carried by the controller),
+		/// corrected by the rigid "target -> physical" offset
+		/// (<c>physical - physical.follow</c>).
 		/// <para>
-		/// La main physique (le duplicata, dynamique) est la seule à subir la physique : poussée par les
-		/// murs, retenue par un objet, spring de <see cref="HandFollow"/>. Sans cette correction, l'ancre
-		/// ne portait que la pose « idéale » du contrôleur et la main <b>visible</b> traversait la
-		/// géométrie que la main physique, elle, ne traverse pas (c'est le seul défaut : le contact,
-		/// lui, est bien calculé sur la main physique).
-		/// </para>
-		/// <para>
-		/// L'écart est calculé comme le décalage rigide « cible → physique »
-		/// (<c>physical − physical.follow</c>) et appliqué à la pose du HandOffset. Il est posé sur un
-		/// objet à part (enfant de l'avatar, <b>jamais</b> de la main) : y toucher serait écrasé par VRIK.
+		/// The physical duplicate is the only hand affected by physics (walls, held objects, the
+		/// <see cref="HandFollow"/> spring): without the correction the visible hand went through the
+		/// geometry the physical one stops at, while the IK anchor only carried the ideal controller pose.
 		/// </para>
 		/// </summary>
 		private void RefreshIkTargets() {
@@ -189,7 +206,7 @@ namespace Nox.XR.Runtime.Connectors {
 			ikTarget.SetPositionAndRotation(position, rotation);
 		}
 
-		/// <summary>Recopie la pose des doigts du duplicata sur les os de l'armature.</summary>
+		/// <summary>Copies the duplicate's finger pose onto the armature bones.</summary>
 		private static void MirrorFingers(Transform[] visualJoints, Transform[] physicalJoints) {
 			if (visualJoints == null || physicalJoints == null || visualJoints.Length != physicalJoints.Length)
 				return;
@@ -203,9 +220,9 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		protected virtual void SetupIK() {
-			// HandOffset = pivot de l'avatar (PositionOffset/RotationOffset du IHand) porté par le
-			// CONTRÔLEUR. Sa pose monde est exactement celle que doit avoir l'os de main : c'est
-			// donc à la fois la cible de suivi de la main physique et l'orientation de l'ancre IK.
+			// HandOffset = avatar pivot (IHand PositionOffset/RotationOffset) carried by the CONTROLLER. Its
+			// world pose is exactly the one the hand bone must have: both the physical hand's follow target
+			// and the IK anchor orientation.
 			_rightHandOffset = CreateHandOffset(rightTrackedController, rightSource);
 			_leftHandOffset  = CreateHandOffset(leftTrackedController,  leftSource);
 
@@ -215,8 +232,8 @@ namespace Nox.XR.Runtime.Connectors {
 			rightPhysicalSource = rgs;
 			leftPhysicalSource  = lgs;
 
-			// AutoHandPlayer doit piloter les mains de l'avatar (les duplicatas), pas les mains de
-			// remplacement : ce sont elles qui portent les colliders, les pokes et les doigts.
+			// AutoHandPlayer must drive the avatar hands (the duplicates), the ones carrying the colliders,
+			// pokes and fingers, not the replacement hands.
 			if (AutoHandPlayer.Instance != null) {
 				if (rightPhysical != null) AutoHandPlayer.Instance.handRight = rightPhysical;
 				if (leftPhysical  != null) AutoHandPlayer.Instance.handLeft  = leftPhysical;
@@ -224,29 +241,20 @@ namespace Nox.XR.Runtime.Connectors {
 
 			SubscribeGrabs();
 
-			// Doigts : os de l'armature ← os du duplicata (même hiérarchie, mêmes index).
+			// Fingers: armature bones <- duplicate bones (same hierarchy, same indexes).
 			BuildFingerJoints(rightSource, rightPhysical, out _rightVisualJoints, out _rightPhysicalJoints);
 			BuildFingerJoints(leftSource,  leftPhysical,  out _leftVisualJoints,  out _leftPhysicalJoints);
 
-			// L'ancre IK du bras est un objet à part (enfant de l'avatar, pas de la main).
+			// The arm IK anchor is a separate object (child of the avatar, not of the hand).
 			_rightIkTarget = CreateIkTarget();
 			_leftIkTarget  = CreateIkTarget();
 
-			// Chaque bras est résolu INDÉPENDAMMENT : un côté sans contrôleur (ou sans main) ne doit
-			// pas empêcher l'autre d'être configuré.
+			// The head target is created by FinalIKRigGenerator and read every frame by
+			// RefreshHeadTargetRotation, so it is not cached here.
+
+			// Each arm is resolved independently: a side without controller or hand must not block the other.
 			vrik.solver.rightArm.target = ResolveArmTarget("right", rightSource, ref _rightHandOffset, _rightIkTarget);
 			vrik.solver.leftArm.target  = ResolveArmTarget("left",  leftSource,  ref _leftHandOffset,  _leftIkTarget);
-
-			Logger.LogDebug(
-				$"{nameof(NoxAutoHandVRIK)}: rig ready."
-				+ $" right[cible={(rightTrackedController ? rightTrackedController.name : "NULL")}"
-				+ $" pivot={(_rightHandOffset ? _rightHandOffset.name : "NULL")}"
-				+ $" hand={(rightPhysical ? rightPhysical.name : "NULL")}]"
-				+ $" left[cible={(leftTrackedController ? leftTrackedController.name : "NULL")}"
-				+ $" pivot={(_leftHandOffset ? _leftHandOffset.name : "NULL")}"
-				+ $" hand={(leftPhysical ? leftPhysical.name : "NULL")}]",
-				this
-			);
 		}
 
 		private void SubscribeGrabs() {
@@ -276,17 +284,16 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Crée la <b>vraie</b> main AutoHand : un duplicata complet de la main de l'avatar (os,
-		/// colliders, pokes, échelle) posé dans le dossier « Hands » du rig, rendu dynamique et
-		/// piloté par <see cref="HandFollow"/> sur le pivot de l'avatar. Il est invisible (c'est la
-		/// main de l'avatar qui est rendue) et c'est lui qui collisionne, avec la géométrie réelle
-		/// de la main de l'avatar.
+		/// Creates the <b>real</b> AutoHand hand: a full duplicate of the avatar hand (bones, colliders,
+		/// pokes, scale) placed in the rig's "Hands" folder, made dynamic and driven by
+		/// <see cref="HandFollow"/> on the avatar pivot. It is invisible (the avatar hand is what gets
+		/// rendered) and it is the one that collides, with the avatar hand's real geometry.
 		/// <para>
-		/// La main de l'avatar est décrite par un <see cref="IHand"/> qui vit <b>à côté</b> de
-		/// l'armature : dupliquer l'ancre (un os) ne le copie donc pas. On en crée un pour le
-		/// duplicata (<see cref="CreateGhostHand"/>) et c'est <b>lui</b> qui est converti, car
-		/// <see cref="HandToAutoHand.Convert(IHand)"/> installe l'Autohand sur <c>IHand.Anchor</c> —
-		/// un os du duplicata, jamais de l'armature.
+		/// The avatar hand is described by an <see cref="IHand"/> living <b>next to</b> the armature, so
+		/// duplicating the anchor (a bone) does not copy it: one is built for the duplicate
+		/// (<see cref="CreateGhostHand"/>) and it is that one which gets converted, since
+		/// <see cref="HandToAutoHand.Convert(IHand)"/> equips <c>IHand.Anchor</c> - a duplicate bone, never
+		/// an armature one.
 		/// </para>
 		/// </summary>
 		private Hand CreatePhysicalHand(IHand source, Transform follow, string side, out IHand ghostSource) {
@@ -307,19 +314,19 @@ namespace Nox.XR.Runtime.Connectors {
 			var worldRotation = anchor.rotation;
 			var worldScale    = anchor.lossyScale;
 
-			// Duplicata de l'ancre de la main : on copie la hiérarchie d'os, avec tout l'Autohand que
-			// la conversion faite sur la main de l'avatar y a laissé (composants, colliders, pokes).
-			// La source est reposée INACTIVE le temps de la copie : sans ça l'Autohand copié
-			// s'éveillerait sur le duplicata (HandBase.Awake ajoute un HandStabilizer à la caméra, crée
-			// la paume, la boîte d'encapsulation...) alors qu'on va le retirer.
+			// Duplicate of the hand anchor: copies the bone hierarchy together with whatever AutoHand the
+			// avatar hand's conversion left on it (components, colliders, pokes). The source is set INACTIVE
+			// for the copy: otherwise the copied AutoHand would wake up on the duplicate (HandBase.Awake adds
+			// a HandStabilizer to the camera, creates the palm, the encapsulation box...) even though we are
+			// about to strip it.
 			var sourceWasActive = anchor.gameObject.activeSelf;
 			anchor.gameObject.SetActive(false);
 			var ghost = anchor.gameObject.Instantiate(root);
 			anchor.gameObject.SetActive(sourceWasActive);
 			ghost.name = $"Physical Hand ({side})";
 
-			// Reposé exactement sur la main de l'avatar, à l'échelle monde : le dossier « Hands »
-			// n'a pas forcément la même échelle que l'armature.
+			// Placed exactly on the avatar hand, in world scale: the "Hands" folder does not necessarily have
+			// the same scale as the armature.
 			var ghostTransform = ghost.transform;
 			ghostTransform.SetPositionAndRotation(worldPosition, worldRotation);
 			var rootScale = root.lossyScale;
@@ -329,14 +336,12 @@ namespace Nox.XR.Runtime.Connectors {
 				rootScale.z != 0f ? worldScale.z / rootScale.z : worldScale.z
 			);
 
-			// Le duplicata ne garde que ses os et ses descripteurs : tout l'Autohand hérité de la main de
-			// l'avatar (composants, colliders, rigidbody, animation, rendu) part maintenant, c'est
-			// Convert() qui ré-équipera le duplicata.
+			// The duplicate keeps only its bones and descriptors: everything inherited from the avatar hand
+			// (components, colliders, rigidbody, animation, renderers) goes now, Convert() re-equips it.
 			StripToBones(ghost);
 
-			// La main DU DUPLICATA : mêmes descripteurs que celle de l'avatar, références re-pointées
-			// sur les os du duplicata. On la valide avant de la convertir — Convert() lève une
-			// exception sur une main invalide.
+			// The DUPLICATE's hand: same descriptors as the avatar's, references re-pointed on the duplicate
+			// bones. Validated before converting it - Convert() throws on an invalid hand.
 			ghostSource = CreateGhostHand(source, ghost, side);
 			if (ghostSource != null && !Nox.CCK.Avatars.Hand.HandExtensions.IsValid(ghostSource, out var ghostError)) {
 				Logger.LogError(
@@ -347,11 +352,10 @@ namespace Nox.XR.Runtime.Connectors {
 				ghostSource = null;
 			}
 
-			// Le duplicata doit être ACTIF au moment de la conversion : Convert() le repose dans l'état
-			// où il le trouve (SetActive(wasActive) à la fin) et c'est ce SetActive(true) qui déclenche
-			// les Awake déjà configurés (HandBase : rigidbody, colliders, boîte d'encapsulation...).
-			// Laissé inactif — il naît ainsi pour ne pas réveiller l'Autohand copié — la main physique
-			// ne serait jamais initialisée.
+			// The duplicate must be ACTIVE during the conversion: Convert() restores the state it found
+			// (SetActive(wasActive) at the end) and that SetActive(true) is what triggers the configured
+			// Awakes (HandBase: rigidbody, colliders, encapsulation box...). Left inactive - it is born that
+			// way to avoid waking the copied AutoHand - the physical hand would never be initialized.
 			ghost.SetActive(true);
 
 			var hand = ghostSource != null 
@@ -362,14 +366,14 @@ namespace Nox.XR.Runtime.Connectors {
 			body.useGravity  = false;
 
 			if (hand != null) {
-				hand.enableMovement = true;  // HandFollow n'avance la main que si elle peut bouger.
-				hand.follow         = follow; // pivot de l'avatar, pas l'offset du prefab RobotHand.
-				// AlignEncapsulationBox n'a pas pu se faire sur la main inactive de l'avatar : la
-				// boîte d'encapsulation du duplicata ne couvrirait pas les doigts.
+				hand.enableMovement = true;  // HandFollow only moves the hand if it is allowed to.
+				hand.follow         = follow; // avatar pivot, not the RobotHand prefab offset.
+				// AlignEncapsulationBox could not run on the avatar's inactive hand, so the duplicate's
+				// encapsulation box would not cover the fingers.
 				HandToAutoHand.AlignEncapsulationBox(hand);
 			} else {
 				Logger.LogError(
-					$"{nameof(NoxAutoHandVRIK)}: the duplicata of the {side} hand has no Autohand.Hand component.",
+					$"{nameof(NoxAutoHandVRIK)}: the duplicate of the {side} hand has no Autohand.Hand component.",
 					this
 				);
 			}
@@ -377,7 +381,7 @@ namespace Nox.XR.Runtime.Connectors {
 			return hand;
 		}
 
-		/// <summary>Os et descripteurs de la main : c'est tout ce que le duplicata garde.</summary>
+		/// <summary>Hand bones and descriptors: all that the duplicate keeps.</summary>
 		private static readonly System.Type[] AllowedHandComponents = {
 			typeof(Transform),
 			typeof(IHand),
@@ -393,20 +397,20 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Ne laisse que les os et les descripteurs du duplicata : tout l'Autohand que la copie a hérité
-		/// de la main de l'avatar (composants, colliders, rigidbody, animation, rendu) est retiré, et
-		/// c'est <see cref="HandToAutoHand"/> qui ré-équipera le duplicata ensuite.
+		/// Keeps only the duplicate's bones and descriptors: everything the copy inherited from the avatar
+		/// hand (components, colliders, rigidbody, animation, renderers) is removed, then
+		/// <see cref="HandToAutoHand"/> re-equips the duplicate.
 		/// <para>
-		/// Deux précautions, sans lesquelles le dépouillage échoue en partie :
+		/// Two precautions, without which the strip partly fails:
 		/// <list type="bullet">
-		/// <item>la suppression est <b>immédiate</b>. Avec un <c>Destroy</c> différé, le composant
-		/// requis est encore là quand on retire ce qui dépend de lui : Unity refuse (« Can't remove
-		/// Rigidbody because Hand depends on it ») et le laisse en place. Pire, le <c>Hand</c>
-		/// « condamné » mais toujours vivant est retrouvé par la conversion qui suit
-		/// (<c>GetOrAddComponent</c>), laquelle installe alors une main réellement détruite en fin de
-		/// frame — d'où la <c>MissingReferenceException</c> dans AutoHandPlayer.UpdateTrackedObjects ;</item>
-		/// <item>l'ordre suit les <c>RequireComponent</c> : un composant n'est retiré que lorsque plus
-		/// personne ne le requiert, sinon Unity refuse aussi.</item>
+		/// <item>removal is <b>immediate</b>. With a deferred <c>Destroy</c> the required component is
+		/// still there when its dependants go: Unity refuses ("Can't remove Rigidbody because Hand
+		/// depends on it") and leaves it in place. Worse, the doomed but still alive <c>Hand</c> is picked
+		/// up by the following conversion (<c>GetOrAddComponent</c>), which then installs a hand actually
+		/// destroyed at the end of the frame - hence the <c>MissingReferenceException</c> in
+		/// AutoHandPlayer.UpdateTrackedObjects;</item>
+		/// <item>the order follows <c>RequireComponent</c>: a component is only removed once nothing
+		/// requires it anymore, otherwise Unity refuses too.</item>
 		/// </list>
 		/// </para>
 		/// </summary>
@@ -416,8 +420,8 @@ namespace Nox.XR.Runtime.Connectors {
 				if (component != null && !IsAllowed(component))
 					doomed.Add(component);
 
-			// Par passes : ce qui ne peut pas encore partir (requis par un autre composant) est retenté
-			// à la passe suivante, une fois son requérant parti.
+			// In passes: what cannot leave yet (still required by another component) is retried on the next
+			// pass, once its requirer is gone.
 			bool removed;
 			do {
 				removed = false;
@@ -435,7 +439,7 @@ namespace Nox.XR.Runtime.Connectors {
 				}
 			} while (removed && doomed.Count > 0);
 
-			// Ne doit pas arriver : il reste un cycle de RequireComponent entre composants.
+			// Should not happen: a RequireComponent cycle remains between components.
 			if (doomed.Count > 0)
 				Logger.LogWarning(
 					$"{nameof(NoxAutoHandVRIK)}: {doomed.Count} component(s) could not be stripped from "
@@ -445,8 +449,8 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Un des composants en attente de suppression requiert-il encore <paramref name="component"/>
-		/// (<c>RequireComponent</c>, forcément sur le même GameObject) ?
+		/// Does one of the doomed components still require <paramref name="component"/> (<c>RequireComponent</c>
+		/// is necessarily on the same GameObject)?
 		/// </summary>
 		private static bool IsStillRequired(List<Component> doomed, Component component) {
 			foreach (var other in doomed) {
@@ -459,9 +463,9 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// <paramref name="type"/> déclare-t-il <c>RequireComponent</c> sur <paramref name="required"/> ?
-		/// Les attributs sont hérités (<c>HandBase</c> les déclare pour <c>Hand</c>) et leurs champs sont
-		/// lus sans dépendre de leurs noms (<c>m_Type0</c>...).
+		/// Does <paramref name="type"/> declare <c>RequireComponent</c> on <paramref name="required"/>?
+		/// Attributes are inherited (<c>HandBase</c> declares them for <c>Hand</c>) and their fields are read
+		/// without relying on their names (<c>m_Type0</c>...).
 		/// </summary>
 		private static bool Requires(System.Type type, System.Type required) {
 			const BindingFlags fields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -473,14 +477,14 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Donne au duplicata <b>sa</b> main : un <see cref="IHand"/> qui décrit la copie — même type,
-		/// même pivot, même paume et mêmes doigts que la main de l'avatar, mais toutes ses références
-		/// re-pointées sur les os du duplicata.
+		/// Gives the duplicate <b>its own</b> hand: an <see cref="IHand"/> describing the copy - same type,
+		/// pivot, palm and fingers as the avatar hand, but every reference re-pointed on the duplicate
+		/// bones.
 		/// <para>
-		/// Les descripteurs de la main de l'avatar (composants <c>Hand</c>/<c>Finger</c> du CCK)
-		/// vivent dans un dossier à part, hors de l'ancre : dupliquer l'ancre ne les copie donc pas.
-		/// Sans cette main, le duplicata n'a que des os et <see cref="HandToAutoHand.Convert(IHand)"/>
-		/// — qui équipe <c>IHand.Anchor</c> — irait équiper l'armature de l'avatar.
+		/// The avatar hand's descriptors (CCK <c>Hand</c>/<c>Finger</c> components) live in a separate
+		/// folder outside the anchor, so duplicating the anchor does not copy them. Without this hand the
+		/// duplicate only has bones, and <see cref="HandToAutoHand.Convert(IHand)"/> - which equips
+		/// <c>IHand.Anchor</c> - would equip the avatar armature instead.
 		/// </para>
 		/// </summary>
 		private static IHand CreateGhostHand(IHand source, GameObject ghost, string side) {
@@ -515,9 +519,9 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Recopie un doigt de la main de l'avatar sur le duplicata : le descripteur se pose sur la
-		/// copie de sa première phalange — comme le fait la conversion inverse
-		/// (<see cref="AutoHandToHand.Convert(Autohand.Hand)"/>) — et ses jointures pointent les copies.
+		/// Copies one finger of the avatar hand onto the duplicate: the descriptor is added to the copy of
+		/// its proximal bone - as the reverse conversion (<see cref="AutoHandToHand.Convert(Autohand.Hand)"/>
+		/// ) does - and its joints point at the copies.
 		/// </summary>
 		private static NFinger CreateGhostFinger(Transform sourceAnchor, IFinger source, Transform ghostAnchor) {
 			if (source == null)
@@ -535,8 +539,8 @@ namespace Nox.XR.Runtime.Connectors {
 			finger.tip          = ResolveGhost(sourceAnchor, source.Tip,          ghostAnchor);
 			finger.tipRadius    = source.TipRadius;
 
-			// Les poses sont les rotations locales des os : les os du duplicata étant les copies de
-			// ceux de l'avatar (mêmes repères locaux), elles se rejouent telles quelles.
+			// Poses are the bones' local rotations: the duplicate bones are copies of the avatar ones (same
+			// local frames), so they replay as is.
 			var poses = source.Poses;
 			if (poses == null)
 				return finger;
@@ -552,9 +556,9 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Retrouve, dans le duplicata, la copie d'une référence de la main de l'avatar : le duplicata
-		/// étant une copie de l'ancre de la main, la copie se retrouve par son chemin relatif à
-		/// l'ancre. Renvoie <c>null</c> quand la référence est hors de la main dupliquée (ou absente).
+		/// Finds the duplicate's copy of an avatar hand reference: the duplicate being a copy of the hand
+		/// anchor, the copy is found by its path relative to the anchor. Returns <c>null</c> when the
+		/// reference lies outside the duplicated hand (or is missing).
 		/// </summary>
 		private static Transform ResolveGhost(Transform anchor, Transform reference, Transform ghostAnchor) {
 			if (reference == null || anchor == null)
@@ -569,7 +573,7 @@ namespace Nox.XR.Runtime.Connectors {
 				current = current.parent;
 			}
 
-			// Remontée qui n'atteint pas l'ancre : la référence n'a pas été dupliquée.
+			// Walk-up that never reached the anchor: the reference was not duplicated.
 			if (current != anchor)
 				return null;
 
@@ -579,8 +583,8 @@ namespace Nox.XR.Runtime.Connectors {
 
 
 		/// <summary>
-		/// Apparie les os de doigts de l'armature avec ceux du duplicata (même ordre : le duplicata
-		/// est une copie de l'armature).
+		/// Pairs the armature's finger bones with the duplicate's (same order: the duplicate is a copy of
+		/// the armature).
 		/// </summary>
 		private static void BuildFingerJoints(
 			IHand             source,
@@ -620,14 +624,14 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Résout la cible IK d'un bras. Sans contrôleur suivi, on retombe sur le pivot de la main
-		/// pour que l'IK tourne quand même (et on signale la cause au lieu de laisser une T-pose).
+		/// Resolves an arm's IK target. Without a tracked controller it falls back to the hand pivot so the
+		/// IK still runs (and reports the cause instead of leaving a T-pose).
 		/// </summary>
 		private Transform ResolveArmTarget(string side, IHand hand, ref Transform handOffset, Transform ikTarget) {
 			if (handOffset == null) {
 				Logger.LogWarning(
 					$"{nameof(NoxAutoHandVRIK)}: no {side} tracked controller, {side} arm IK target falls back to the hand pivot"
-					+ $" — the {side} arm will not follow the controller.",
+					+ $" - the {side} arm will not follow the controller.",
 					this
 				);
 				handOffset = hand != null ? hand.Palm : null;
@@ -642,9 +646,7 @@ namespace Nox.XR.Runtime.Connectors {
 			return ikTarget != null ? ikTarget : handOffset;
 		}
 
-		/// <summary>
-		/// Ancre IK du bras : un objet à part, reposé chaque frame par <see cref="RefreshIkTargets"/>.
-		/// </summary>
+		/// <summary>Arm IK anchor: a separate object, replaced every frame by <see cref="RefreshIkTargets"/>.</summary>
 		private Transform CreateIkTarget() {
 			var go = new GameObject("IK Target");
 			go.transform.SetParent(transform, false);
