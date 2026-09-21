@@ -1,88 +1,66 @@
-using System;
-using System.Linq;
-using Nox.KeyBindings;
+using Nox.XR.Bindings;
+using Nox.XR.Runtime.Loaders;
 using UnityEngine;
-using UnityEngine.Events;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime {
 	/// <summary>
-	/// A static class that manages key bindings for the player system.
+	/// Accès aux bindings XR pour les consommateur du proxy XR (connecteurs du prefab).
+	///
+	/// <para>
+	/// Façade uniquement : les bindings appartiennent au mod de loader actif, qui les enregistre
+	/// et répond aux lectures (<see cref="IXRLoaderProvider.Binding"/>). nox.xr ne déclenche que
+	/// leur (re)liaison, et relaie les valeurs.
+	/// </para>
+	///
+	/// <para>
+	/// Les valeurs sont lues à la demande (<see cref="IBinding.Get{T}"/>), donc toujours à jour :
+	/// aucun cache ni abonnement à maintenir ici.
+	/// </para>
 	/// </summary>
 	public static class Keybindings {
+		private static bool _hooked;
+		private static bool _rebinding;
+
 		/// <summary>
-		/// A collection of key bindings used by the player system.
+		/// Bindings du runtime XR actif, ou <c>null</c> si aucun loader n'est démarré.
 		/// </summary>
-		private static readonly (string, string, string, Action<float>, float)[] FloatKeys = {
-			("nox.ui", "menu", "<Keyboard>/tab", value => SetFloatValue("menu", value), 0f),
-			("nox.ui", "menu.left", "<XRController>{LeftHand}/{SecondaryButton}", value => SetFloatValue("menu.left", value), 0f),
-			("nox.ui", "menu.right", "<XRController>{RightHand}/{SecondaryButton}", value => SetFloatValue("menu.right", value), 0f),
-			("nox.movement", "jump", "<XRController>{LeftHand}/{PrimaryButton}", value => SetFloatValue("jump", value), 0f),
-
-			("nox.hand", "select.left", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("select.left", value), 0f),
-			("nox.hand", "select.right", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("select.right", value), 0f),
-			("nox.hand", "activate.left", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("activate.left", value), 0f),
-			("nox.hand", "activate.right", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("activate.right", value), 0f),
-			("nox.ui", "press.left", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("press.left", value), 0f),
-			("nox.ui", "press.right", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("press.right", value), 0f),
-			
-			("nox.hand", "finger.left.thumb", "<XRController>{LeftHand}/{PrimaryTouch}", value => SetFloatValue("finger.left.thumb", value), 0f),
-			("nox.hand", "finger.left.index", "<XRController>{LeftHand}/{Trigger}", value => SetFloatValue("finger.left.index", value), 0f),
-			("nox.hand", "finger.left.middle", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.middle", value), 0f),
-			("nox.hand", "finger.left.ring", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.ring", value), 0f),
-			("nox.hand", "finger.left.pinky", "<XRController>{LeftHand}/{Grip}", value => SetFloatValue("finger.left.pinky", value), 0f),
-			
-			("nox.hand", "finger.right.thumb", "<XRController>{RightHand}/{PrimaryTouch}", value => SetFloatValue("finger.right.thumb", value), 0f),
-			("nox.hand", "finger.right.index", "<XRController>{RightHand}/{Trigger}", value => SetFloatValue("finger.right.index", value), 0f),
-			("nox.hand", "finger.right.middle", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.middle", value), 0f),
-			("nox.hand", "finger.right.ring", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.ring", value), 0f),
-			("nox.hand", "finger.right.pinky", "<XRController>{RightHand}/{Grip}", value => SetFloatValue("finger.right.pinky", value), 0f),
-		};
-
-		private static readonly (string, string, string, Action<Vector2>, Vector2)[] Vector2Keys = {
-			("nox.movement", "move", "<XRController>{LeftHand}/Primary2DAxis", value => SetVector2Value("move", value), Vector2.zero),
-			("nox.movement", "turn", "<XRController>{RightHand}/Primary2DAxis", value => SetVector2Value("turn", value), Vector2.zero),
-			("nox.ui", "scroll.left", "<XRController>{LeftHand}/Primary2DAxis", value => SetVector2Value("scroll.left", value), Vector2.zero),
-			("nox.ui", "scroll.right", "<XRController>{RightHand}/Primary2DAxis", value => SetVector2Value("scroll.right", value), Vector2.zero),
-		};
-
-		static readonly internal UnityEvent<string, float, float> KeyFloatEvent = new();
-		static readonly internal UnityEvent<string, Vector2, Vector2> KeyVector2Event = new();
+		private static IBinding Binding
+			=> XRLoaderManager.Current?.Binding;
 
 		/// <summary>
-		/// Gets the Vector2 value of a specific key binding.
+		/// Gets the value of a specific key binding, read live from the running XR runtime.
 		/// </summary>
 		/// <param name="key"></param>
 		/// <returns></returns>
-		public static Vector2 GetVector2Value(string key) {
-			var index = Array.FindIndex(Vector2Keys, k => k.Item2 == key);
-			return index == -1 ? Vector2.zero : Vector2Keys[index].Item5;
-		}
-
-		/// <summary>
-		/// Sets the Vector2 value of a specific key binding.
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		private static void SetVector2Value(string key, Vector2 value) {
-			var index = Array.FindIndex(Vector2Keys, k => k.Item2 == key);
-			if (index == -1) return;
-			var keyTuple = Vector2Keys[index];
-			var oldValue = keyTuple.Item5;
-			keyTuple.Item5 = value;
-			Vector2Keys[index] = keyTuple;
-			KeyVector2Event.Invoke(key, value, oldValue);
-		}
+		public static float GetFloatValue(string key)
+			=> Binding?.Get<float>(key) ?? 0f;
 
 		/// <summary>
 		/// Gets the value of a specific key binding.
 		/// </summary>
+		/// <param name="binding"></param>
+		/// <returns></returns>
+		public static float GetFloatValue(XRBinding binding)
+			=> GetFloatValue(binding.GetKey());
+
+		/// <summary>
+		/// Gets the Vector2 value of a specific key binding, read live from the running XR runtime.
+		/// </summary>
 		/// <param name="key"></param>
 		/// <returns></returns>
-		public static float GetFloatValue(string key) {
-			var index = Array.FindIndex(FloatKeys, k => k.Item2 == key);
-			return index == -1 ? 0f : FloatKeys[index].Item5;
-		}
+		public static Vector2 GetVector2Value(string key)
+			=> Binding?.Get<Vector2>(key) ?? Vector2.zero;
+
+		/// <summary>
+		/// Gets the Vector2 value of a specific key binding.
+		/// </summary>
+		/// <param name="binding"></param>
+		/// <returns></returns>
+		public static Vector2 GetVector2Value(XRBinding binding)
+			=> GetVector2Value(binding.GetKey());
 
 		/// <summary>
 		/// Checks if a specific key binding is pressed.
@@ -93,86 +71,81 @@ namespace Nox.XR.Runtime {
 			=> GetFloatValue(key) > 0.1f;
 
 		/// <summary>
-		/// Sets the value of a specific key binding.
+		/// Checks if a specific key binding is pressed.
 		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		private static void SetFloatValue(string key, float value) {
-			var index = Array.FindIndex(FloatKeys, k => k.Item2 == key);
-			if (index == -1)
-				return;
-			var keyTuple = FloatKeys[index];
-			var oldValue = keyTuple.Item5;
-			keyTuple.Item5 = value;
-			FloatKeys[index]    = keyTuple;
-			KeyFloatEvent.Invoke(key, value, oldValue);
-		}
+		/// <param name="binding"></param>
+		/// <returns></returns>
+		public static bool IsPressed(XRBinding binding)
+			=> GetFloatValue(binding) > 0.1f;
 
 		/// <summary>
-		/// Gets the key binding manager instance from the player system.
-		/// </summary>
-		private static IKeyBindingManager Keybinding
-			=> Client
-				.CoreAPI.ModAPI
-				.GetMod("keybinding")
-				?.GetInstance<IKeyBindingManager>();
-
-		/// <summary>
-		/// Rebinds all key bindings defined in the Keys array.
+		/// Demande au runtime XR actif de (re)lier ses bindings aux devices connectés.
+		///
+		/// <para>
+		/// Appelé à la création du proxy XR, puis à chaque changement de device : une manette peut
+		/// apparaître après le casque, ou être remplacée par un autre modèle en cours de session.
+		/// </para>
 		/// </summary>
 		public static void Rebind() {
-			foreach (var key in FloatKeys)
-				RebindFloat(key.Item2);
-			foreach (var key in Vector2Keys)
-				RebindVector2(key.Item2);
-		}
-
-		/// <summary>
-		/// Rebinds a specific key binding by its ID.
-		/// </summary>
-		/// <param name="id"></param>
-		private static void RebindFloat(string id) {
-			var key        = FloatKeys.FirstOrDefault(k => k.Item2 == id);
-			var keybinding = Keybinding.AddKeyBinding(key.Item2, key.Item3, key.Item1);
-			if (keybinding == null) {
-				Logger.LogError($"Failed to add or get key binding for {id}");
+			if (_rebinding)
 				return;
-			}
 
-			keybinding.AddListener(key.Item4);
+			_rebinding = true;
+			try {
+				HookInputSystem();
+
+				var binding = Binding;
+				if (binding == null) {
+					Logger.LogDebug("No XR binding runtime, XR inputs are left unbound.");
+					return;
+				}
+
+				Logger.LogDebug($"Refreshing XR bindings with '{XRLoaderManager.Current?.Id}'.");
+				binding.Refresh();
+			} finally {
+				_rebinding = false;
+			}
 		}
 
 		/// <summary>
-		/// Rebinds a specific Vector2 key binding by its ID.
+		/// Délie les bindings XR (arrêt du proxy XR) : le runtime libère ses actions et sauvegarde
+		/// les overrides du joueur.
 		/// </summary>
-		/// <param name="id"></param>
-		private static void RebindVector2(string id) {
-			var key        = Vector2Keys.FirstOrDefault(k => k.Item2 == id);
-			var keybinding = Keybinding.AddKeyBinding(key.Item2, key.Item3, key.Item1);
-			if (keybinding == null) {
-				Logger.LogError($"Failed to add or get key binding for {id}");
+		public static void Clear()
+			=> Binding?.Clear();
+
+		/// <summary>
+		/// Re-lie les bindings quand un device suivi apparaît ou disparaît.
+		/// Clavier, souris et autres périphériques non XR sont ignorés : ils ne peuvent pas
+		/// changer les contrôles disponibles.
+		/// </summary>
+		private static void HookInputSystem() {
+			if (_hooked)
 				return;
-			}
 
-			keybinding.AddListener(key.Item4);
+			_hooked = true;
+			InputSystem.onDeviceChange += OnDeviceChange;
 		}
 
-		/// <summary>
-		/// Clears all key bindings defined in the Keys array.
-		/// </summary>
-		public static void Clear() {
-			foreach (var key in FloatKeys) {
-				var keybinding = Keybinding.GetKeyBinding(key.Item2, key.Item1);
-				keybinding.RemoveListener(key.Item4);
-				if (keybinding.GetListenerCount() == 0)
-					Keybinding.RemoveKeyBinding(keybinding.GetId(), keybinding.GetCategory());
+		private static void OnDeviceChange(InputDevice device, InputDeviceChange change) {
+			if (device is not TrackedDevice)
+				return;
+
+			switch (change) {
+				case InputDeviceChange.Added:
+				case InputDeviceChange.Removed:
+				case InputDeviceChange.Reconnected:
+				case InputDeviceChange.UsageChanged:
+					break;
+				default:
+					return;
 			}
-			foreach (var key in Vector2Keys) {
-				var keybinding = Keybinding.GetKeyBinding(key.Item2, key.Item1);
-				keybinding.RemoveListener(key.Item4);
-				if (keybinding.GetListenerCount() == 0)
-					Keybinding.RemoveKeyBinding(keybinding.GetId(), keybinding.GetCategory());
-			}
+
+			if (!XRLoaderManager.IsRunning)
+				return;
+
+			Logger.LogDebug($"XR device change ({change}): {device.name}");
+			Rebind();
 		}
 	}
 }

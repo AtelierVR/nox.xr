@@ -25,6 +25,13 @@ namespace Nox.XR.Runtime.Connectors {
 			set => gameObject.SetActive(value);
 		}
 
+		/// <summary>
+		/// Dernières valeurs des touches de menu, pour ne basculer qu'au front montant : un binding
+		/// XR est un axe, pas un bouton.
+		/// </summary>
+		private float _menuLeft;
+		private float _menuRight;
+
 		public async UniTask<bool> Generate() {
 			Menu = await Client.UiAPI.Make(this);
 
@@ -35,23 +42,26 @@ namespace Nox.XR.Runtime.Connectors {
 
 			Menu.Active = false;
 
-			Keybindings.KeyFloatEvent.AddListener(OnKey);
-
 			return true;
 		}
 
-		private void OnKey(string key, float @new, float old) {
-			switch (key) {
-				case "menu" when @new > 0 && old == 0:
-					ToggleMenu(LastUsedHand);
-					break;
-				case "menu.left" when @new > 0 && old == 0:
-					ToggleMenu(XRNode.LeftHand);
-					break;
-				case "menu.right" when @new > 0 && old == 0:
-					ToggleMenu(XRNode.RightHand);
-					break;
-			}
+		/// <summary>
+		/// Ouvre/ferme le menu sur le front montant des bindings de menu, relus auprès du runtime
+		/// XR actif.
+		/// </summary>
+		private void Update() {
+			if (Menu == null)
+				return;
+
+			var left = Keybindings.GetFloatValue("menu.left");
+			if (left > 0.1f && _menuLeft <= 0.1f)
+				ToggleMenu(XRNode.LeftHand);
+			_menuLeft = left;
+
+			var right = Keybindings.GetFloatValue("menu.right");
+			if (right > 0.1f && _menuRight <= 0.1f)
+				ToggleMenu(XRNode.RightHand);
+			_menuRight = right;
 		}
 
 		private void ToggleMenu(XRNode node) {
@@ -131,7 +141,6 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		public void Dispose() {
-			Keybindings.KeyFloatEvent.RemoveListener(OnKey);
 			Menu?.Dispose();
 			Menu = null;
 		}

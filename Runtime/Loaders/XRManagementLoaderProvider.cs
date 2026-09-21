@@ -1,6 +1,7 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.XR;
+using Nox.XR.Bindings;
 using Nox.XR.Loaders;
 using UnityEngine.XR.Management;
 
@@ -23,6 +24,14 @@ namespace Nox.XR.Runtime.Loaders {
 
 		public int Priority
 			=> DefaultPriority;
+
+		/// <summary>
+		/// Aucun binding : ce repli démarre ce que XR Plug-in Management a configuré sans savoir
+		/// quel runtime répond, donc sans connaître les contrôles disponibles. Installer
+		/// <c>nox.xr.openxr</c> ou <c>nox.xr.openvr</c> pour avoir des bindings XR.
+		/// </summary>
+		public IBinding Binding
+			=> null;
 
 		public bool IsValid {
 			get {

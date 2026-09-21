@@ -4,7 +4,8 @@
   "references": [
     "Nox.CCK",
     "UniTask",
-    "Unity.XR.Management"
+    "Unity.XR.Management",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

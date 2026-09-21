@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using Nox.XR.Bindings;
 
 namespace Nox.XR.Loaders {
 	/// <summary>
@@ -37,6 +38,23 @@ namespace Nox.XR.Loaders {
 		/// nox.xr n'appelle <see cref="Initialize"/> que si cette propriété est vraie.
 		/// </summary>
 		bool IsValid { get; }
+
+		/// <summary>
+		/// Bindings de ce runtime, lus par clé (<c>"move"</c>, <c>"jump"</c>, ...).
+		///
+		/// <para>
+		/// C'est le mod de loader qui les possède : il sait quels contrôles existent sur les
+		/// devices qu'il pilote. nox.xr se contente de déclencher <see cref="IBinding.Refresh"/> à
+		/// la création du proxy XR et à chaque changement de device, puis de relayer les valeurs
+		/// aux consommateurs.
+		/// </para>
+		///
+		/// <para>
+		/// <c>null</c> tant que le loader n'a pas été initialisé (ou pour un loader qui ne
+		/// fournit pas de bindings, comme le repli générique de XR Plug-in Management).
+		/// </para>
+		/// </summary>
+		IBinding Binding { get; }
 
 		/// <summary>
 		/// Démarre le loader et ses sous-systèmes.

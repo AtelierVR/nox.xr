@@ -17,14 +17,12 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		private void OnEnable() {
-			Keybindings.KeyFloatEvent.AddListener(OnFloatKey);
 			PokeSettings.Changed.AddListener(OnGlobalPokeChanged);
 			PokeSettings.DisablePercentChanged.AddListener(OnDisablePercentChanged);
 			RefreshAllPokes();
 		}
 
 		private void OnDisable() {
-			Keybindings.KeyFloatEvent.RemoveListener(OnFloatKey);
 			PokeSettings.Changed.RemoveListener(OnGlobalPokeChanged);
 			PokeSettings.DisablePercentChanged.RemoveListener(OnDisablePercentChanged);
 		}
@@ -35,15 +33,22 @@ namespace Nox.XR.Runtime.Connectors {
 		private void OnDisablePercentChanged(float _) 
 			=> RefreshAllPokes();
 
-		private void OnFloatKey(string key, float value, float oldValue) {
-			if (_hand == null) return;
-
-			var side = _hand.left ? "left" : "right";
-			if (!key.StartsWith($"finger.{side}.", StringComparison.Ordinal))
+		/// <summary>
+		/// Relit les bindings des doigts de cette main et ne rafraîchit que ceux qui ont changé :
+		/// les valeurs sont lues auprès du runtime XR actif, il n'y a plus d'événement à écouter.
+		/// </summary>
+		private void Update() {
+			if (_hand == null)
 				return;
 
-			_fingerValues[key] = value;
-			RefreshPoke(key);
+			foreach (var (key, _) in _pokes) {
+				var value = Keybindings.GetFloatValue(key);
+				if (_fingerValues.TryGetValue(key, out var last) && Mathf.Approximately(last, value))
+					continue;
+
+				_fingerValues[key] = value;
+				RefreshPoke(key);
+			}
 		}
 
 		private void RefreshAllPokes() {
