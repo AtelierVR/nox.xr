@@ -1,6 +1,5 @@
 using System.Linq;
 using Autohand;
-using Nox.Avatars.Camera;
 using Nox.Avatars.Hand;
 using Nox.Avatars.Parameters;
 using Nox.Avatars.Rigging;
@@ -11,6 +10,7 @@ using Nox.Controllers;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
+using Nox.CCK.Avatars.Rigging;
 
 namespace Nox.XR.Runtime.Connectors {
 	public class AvatarSyncConnector : MonoBehaviour {
