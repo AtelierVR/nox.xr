@@ -4,7 +4,7 @@ using Nox.CCK.Events;
 using Nox.XR.Loaders;
 using Logger = Nox.CCK.Utils.Logger;
 
-namespace Nox.XR.Runtime.Loaders {
+namespace Nox.CCK.XR {
 	/// <summary>
 	/// Registre des <see cref="IXRLoaderEditorProvider"/> disponibles.
 	///
@@ -15,18 +15,12 @@ namespace Nox.XR.Runtime.Loaders {
 	/// </para>
 	/// </summary>
 	public static class XRLoaderEditorRegistry {
-		private static readonly List<IXRLoaderEditorProvider> Registered = new();
+		public static readonly List<IXRLoaderEditorProvider> Registered = new();
 
 		/// <summary>
 		/// Déclenché après chaque enregistrement ou retrait de provider.
 		/// </summary>
 		public static readonly NoxEvent Changed = new();
-
-		/// <summary>
-		/// Providers enregistrés, dans leur ordre d'arrivée.
-		/// </summary>
-		public static IReadOnlyList<IXRLoaderEditorProvider> Providers
-			=> Registered;
 
 		/// <summary>
 		/// Enregistre un provider. Sans effet s'il l'est déjà (même <see cref="IXRLoaderProvider.Id"/>).

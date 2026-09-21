@@ -4,7 +4,9 @@
   "references": [
     "Nox.CCK",
     "UniTask",
-    "Unity.XR.CoreUtils"
+    "Nox.XR",
+    "Unity.XR.CoreUtils",
+    "Unity.XR.Management"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

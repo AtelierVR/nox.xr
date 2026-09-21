@@ -4,7 +4,7 @@ using UnityEditor;
 #endif
 using UnityEngine.XR.Management;
 
-namespace Nox.XR.Runtime.Loaders {
+namespace Nox.CCK.XR {
 	/// <summary>
 	/// Accès aux assets <see cref="XRLoader"/> du projet.
 	///

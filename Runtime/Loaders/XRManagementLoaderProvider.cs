@@ -1,5 +1,6 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.XR;
 using Nox.XR.Loaders;
 using UnityEngine.XR.Management;
 
@@ -30,10 +31,11 @@ namespace Nox.XR.Runtime.Loaders {
 			}
 		}
 
-		public UniTask<bool> InitializeAsync()
+		public UniTask<bool> Initialize()
 			=> XRManagementLoader.StartAsync();
 
-		public void Deinitialize()
+		public UniTask Deinitialize()
 			=> XRManagementLoader.Stop();
-	}
+
+    }
 }

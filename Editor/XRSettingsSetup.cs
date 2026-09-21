@@ -5,7 +5,7 @@ using System.Linq;
 using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
-using Nox.XR.Runtime.Loaders;
+using Nox.CCK.XR;
 using UnityEditor;
 using UnityEditor.XR.Management;
 using UnityEngine.XR.Management;
@@ -91,7 +91,7 @@ namespace Nox.XR.Editor {
 			var platform = PlatformExtensions.CurrentPlatform;
 			var loaders = new List<XRLoader>();
 
-			foreach (var provider in XRLoaderEditorRegistry.Providers
+			foreach (var provider in XRLoaderEditorRegistry.Registered
 					.Where(p => p.IsSupported(platform))
 					.OrderByDescending(p => p.Priority)) {
 				var loader = provider.Loader;

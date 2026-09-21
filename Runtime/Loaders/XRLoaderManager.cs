@@ -29,13 +29,13 @@ namespace Nox.XR.Runtime.Loaders {
 		/// <summary>Loader en cours d'utilisation, ou <c>null</c>.</summary>
 		public static IXRLoaderProvider Current { get; private set; }
 
-		/// <summary>Vrai entre <see cref="StartAsync"/> réussi et <see cref="Stop"/>.</summary>
-		public static bool IsRunning { get; private set; }
+		public static bool IsRunning 
+			=> Current != null;
 
 		/// <summary>
 		/// Fournisseurs connus, triés par priorité décroissante (repli inclus).
 		/// </summary>
-		public static IReadOnlyList<IXRLoaderProvider> GetProviders()
+		public static IReadOnlyList<IXRLoaderProvider> Providers
 			=> Discovered
 				.Append(Fallback)
 				.OrderByDescending(p => p.Priority)
@@ -58,7 +58,7 @@ namespace Nox.XR.Runtime.Loaders {
 				try {
 					found = mod.GetInstances<IXRLoaderProvider>();
 				} catch (Exception e) {
-					Logger.LogDebug($"Mod '{(mod.GetMetadata()?.GetId() ?? "?")}' does not provide XR loaders: {e.Message}");
+					Logger.LogDebug($"Mod '{mod.GetMetadata()?.GetId() ?? "?"}' does not provide XR loaders: {e.Message}");
 					continue;
 				}
 
@@ -78,7 +78,7 @@ namespace Nox.XR.Runtime.Loaders {
 		/// Démarre le premier loader valide, par ordre de priorité.
 		/// </summary>
 		/// <returns><c>false</c> si aucun loader n'a pu démarrer.</returns>
-		public static async UniTask<bool> StartAsync(IModAPI modAPI) {
+		public static async UniTask<bool> Start(IModAPI modAPI) {
 			if (IsRunning) {
 				Logger.LogWarning("XR already initialized.");
 				return true;
@@ -86,18 +86,17 @@ namespace Nox.XR.Runtime.Loaders {
 
 			Discover(modAPI);
 
-			foreach (var provider in GetProviders()) {
+			foreach (var provider in Providers) {
 				if (!provider.IsValid)
 					continue;
 
 				Logger.Log($"Starting XR loader '{provider.Id}' (priority {provider.Priority})...");
-				if (!await provider.InitializeAsync()) {
+				if (!await provider.Initialize()) {
 					Logger.LogWarning($"XR loader '{provider.Id}' failed to initialize; trying the next one.");
 					continue;
 				}
 
 				Current = provider;
-				IsRunning = true;
 				return true;
 			}
 
@@ -108,15 +107,14 @@ namespace Nox.XR.Runtime.Loaders {
 		/// <summary>
 		/// Arrête le loader courant. Sans effet si XR n'est pas démarré.
 		/// </summary>
-		public static void Stop() {
+		public static async UniTask Stop() {
 			if (!IsRunning) {
 				Logger.LogWarning("XR not initialized.");
 				return;
 			}
 
-			Current?.Deinitialize();
+			await Current.Deinitialize();
 			Current = null;
-			IsRunning = false;
 		}
 	}
 }

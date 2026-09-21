@@ -34,7 +34,7 @@ namespace Nox.XR.Loaders {
 		/// <summary>
 		/// Indique si ce loader peut réellement être utilisé sur l'OS et le build courants
 		/// (ex. OpenXR renvoie faux sur Linux, où Unity ne fournit pas de loader).
-		/// nox.xr n'appelle <see cref="InitializeAsync"/> que si cette propriété est vraie.
+		/// nox.xr n'appelle <see cref="Initialize"/> que si cette propriété est vraie.
 		/// </summary>
 		bool IsValid { get; }
 
@@ -44,11 +44,11 @@ namespace Nox.XR.Loaders {
 		/// <returns>
 		/// <c>false</c> si le démarrage a échoué : nox.xr essaie alors le loader valide suivant.
 		/// </returns>
-		UniTask<bool> InitializeAsync();
+		UniTask<bool> Initialize();
 
 		/// <summary>
 		/// Arrête le loader et libère ses sous-systèmes.
 		/// </summary>
-		void Deinitialize();
+		UniTask Deinitialize();
 	}
 }
