@@ -1,0 +1,32 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
+    <Style src="project://database/Packages/nox.editor/Assets/nox.editor/panels.uss?fileID=7433441132597879392&amp;guid=714eb72dda480a944a65e84bce8547a4&amp;type=3#panels" />
+    <ui:ScrollView style="flex-grow: 1;">
+        <ui:Foldout name="sec-status" text="XR Status" value="true" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-status" class="pt-8" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-input" text="Input &amp; Tracking" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-input" class="pt-8" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-devices" text="Devices" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-devices" class="pt-8" />
+            <ui:VisualElement name="devices-list" />
+            <ui:Label name="no-devices" text="No XR device detected" class="text-center opacity-75 mt-8" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-trackers" text="Trackers &amp; Full-Body" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-trackers" class="pt-8" />
+            <ui:VisualElement name="trackers-list" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-management" text="XR Plug-in Management" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-management" class="pt-8" />
+            <ui:VisualElement name="loaders-list" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-settings" text="Settings &amp; Actions" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-settings" class="pt-8" />
+            <ui:VisualElement name="action-buttons" class="flex-row flex-wrap pt-8" />
+        </ui:Foldout>
+        <ui:Foldout name="sec-raw" text="Raw Devices (Unity)" class="p-8 border rounded-md">
+            <ui:VisualElement name="rows-raw" class="pt-8" />
+        </ui:Foldout>
+    </ui:ScrollView>
+</ui:UXML>

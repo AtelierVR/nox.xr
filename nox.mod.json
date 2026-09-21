@@ -100,7 +100,7 @@
       "Nox.XR.Runtime.Client"
     ],
     "editor": [
-      "Nox.XR.Editor.XRDevicesPanel",
+      "Nox.XR.Editor.XRPanel",
       "Nox.XR.Editor.XRSettingsSetup"
     ]
   }
