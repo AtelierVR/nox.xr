@@ -13,6 +13,22 @@ namespace Nox.CCK.XR {
 		public static IXRInputProvider Provider;
 
 		/// <summary>
+		/// Provider de repli, installé par nox.xr au démarrage.
+		/// <para>
+		/// Sans lui, <see cref="Provider"/> reste <c>null</c> tant qu'un provider spécifique
+		/// (AutoHand, ...) n'a pas démarré, et <see cref="HasHeadset"/> répondait donc
+		/// "pas de casque" même avec un casque connecté.
+		/// </para>
+		/// </summary>
+		public static IXRInputProvider DefaultProvider;
+
+		/// <summary>
+		/// Provider effectivement interrogé : le provider courant s'il existe, sinon le repli.
+		/// </summary>
+		public static IXRInputProvider ActiveProvider
+			=> Provider ?? DefaultProvider;
+
+		/// <summary>
 		/// Checks if a headset device is currently connected.
 		/// </summary>
 		public static bool HasHeadset
@@ -42,7 +58,7 @@ namespace Nox.CCK.XR {
 		/// <param name="node"></param>
 		/// <returns></returns>
 		public static bool HasDevice(XRNode node)
-			=> Provider?.HasDevice(node) ?? false;
+			=> ActiveProvider?.HasDevice(node) ?? false;
 
 		/// <summary>
 		/// Tries to get the current position and rotation of the headset.
@@ -88,8 +104,8 @@ namespace Nox.CCK.XR {
 		/// <param name="rotation"></param>
 		/// <returns></returns>
 		public static bool GetDevicePose(XRNode node, out Vector3 position, out Quaternion rotation) {
-			if (Provider != null)
-				return Provider.TryGetDevicePose(node, out position, out rotation);
+			if (ActiveProvider != null)
+				return ActiveProvider.TryGetDevicePose(node, out position, out rotation);
 			position = Vector3.zero;
 			rotation = Quaternion.identity;
 			return false;

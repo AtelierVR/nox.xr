@@ -105,7 +105,7 @@ namespace Nox.XR.Runtime.Panels {
 		/// </summary>
 		public static string GetDebugInfo() {
 			string info = $"XR Hand Tracking Debug:\n";
-			info += $"- XRInputs Provider: {(XRInputs.Provider != null ? XRInputs.Provider.GetType().Name : "NULL")}\n";
+			info += $"- XRInputs Provider: {XRInputs.ActiveProvider?.GetType().Name ?? "NULL"}\n";
 			info += $"- Has Headset: {XRInputs.HasHeadset}\n";
 
 			// Main gauche
