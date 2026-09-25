@@ -257,7 +257,7 @@ namespace Nox.XR.Runtime {
 			}
 		}
 
-		private Dictionary<ushort, Transform> GetParts() {
+		public Dictionary<ushort, Transform> GetParts() {
 			if (!player) return new Dictionary<ushort, Transform>();
 
 			var parts = new Dictionary<ushort, Transform> {

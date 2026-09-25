@@ -141,7 +141,7 @@ namespace Nox.XR.Editor {
 		/// did not follow it (no rig, weight at 0, or another writer on the same transform).
 		/// </summary>
 		private static void DrawParts(XRController controller) {
-			var parts = ((IController)controller).GetParts();
+			var parts = controller.GetParts();
 			if (parts == null || parts.Count == 0) {
 				EditorGUILayout.LabelField("No parts found");
 				return;
@@ -152,8 +152,7 @@ namespace Nox.XR.Editor {
 
 			EditorGUILayout.LabelField($"Parts ({parts.Count})");
 			foreach (var (partId, part) in parts) {
-				var position = part.GetPosition();
-				var rotation = part.GetRotation();
+				part.GetPositionAndRotation(out var position, out var rotation);
 
 				EditorGUILayout.LabelField($"{partId.ToPlayerRig()} ({partId})");
 				EditorGUILayout.TextField(" - position", position.ToString("F3"));
