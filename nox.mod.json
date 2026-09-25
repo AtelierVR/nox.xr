@@ -68,6 +68,12 @@
       "type": "depends",
       "version": ">=1.0.0",
       "register": "git+https://github.com/AtelierVR/nox.ui.git"
+    },
+    {
+      "id": "nameplate",
+      "type": "depends",
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.nameplate.git"
     }
   ],
   "constraints": [
@@ -90,6 +96,10 @@
     {
       "type": "after",
       "id": "keybinding"
+    },
+    {
+      "type": "after",
+      "id": "nameplate"
     }
   ],
   "entrypoints": {

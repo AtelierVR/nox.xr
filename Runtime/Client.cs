@@ -9,6 +9,7 @@ using Nox.Avatars;
 using Nox.Controllers;
 using Nox.UI;
 using Nox.CCK.XR;
+using Nox.Nameplate;
 using Nox.Users;
 using UnityEngine;
 using Nox.XR.Runtime.Loaders;
@@ -36,6 +37,13 @@ namespace Nox.XR.Runtime {
 		static internal IControllerAPI ControllerAPI
 			=> CoreAPI.ModAPI.GetMod("controllers")
 				?.GetInstance<IControllerAPI>();
+
+		/// <summary>
+		/// API of the optional <c>nox.nameplate</c> mod: null when the mod is not loaded.
+		/// </summary>
+		static internal INameplateAPI NameplateAPI
+			=> CoreAPI?.ModAPI?.GetMod("nameplate")
+				?.GetInstance<INameplateAPI>();
 
 		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 

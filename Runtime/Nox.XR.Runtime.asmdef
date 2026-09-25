@@ -8,6 +8,8 @@
     "Nox.CCK.Avatars",
     "Nox.CCK.XR",
     "Nox.Controllers",
+    "Nox.Nameplate",
+    "Nox.CCK.Nameplate",
     "AutoHandAssembly",
     "NaughtyAttributes.Core",
     "Nox.Players",

@@ -4,6 +4,7 @@ using Autohand;
 using Nox.CCK.XR;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars.Controllers;
+using Nox.CCK.Nameplate;
 using Nox.CCK.Utils;
 using Nox.Audio.Players;
 using Nox.Sessions;
@@ -20,7 +21,7 @@ using Nox.XR.Runtime.Loaders;
 
 namespace Nox.XR.Runtime {
 	[DefaultExecutionOrder(15)]
-	public partial class XRController : MonoBehaviour, IController, IControllerAvatar, IXRController, INoxObject {
+public partial class XRController : MonoBehaviour, IController, IControllerAvatar, IXRController, INoxObject, INameplateHolder {
 
 		private static int DefaultPriority
 			=> XRLoaderManager.IsRunning && XRInputs.HasHeadset
@@ -171,18 +172,21 @@ namespace Nox.XR.Runtime {
 
 
 		public void Dispose() {
+			DisposeNameplate();
+
 			_sessionApi?.OnCurrentChanged.RemoveListener(OnSessionChanged);
 			microphone?.Unbind();
 			if (XRInputs.Provider is AutoHandProvider)
 				XRInputs.Provider = null;
 			avatarLoader?.ClearRig();
 			avatarLoader?.Dispose();
-			Keybindings.Clear();
 			Menu.Dispose();
 			Destroy(gameObject);
 		}
 
 		private void Awake() {
+			SetupNameplate();
+
 			_sessionApi = SessionAPI;
 			if (_sessionApi == null) return;
 			_sessionApi.OnCurrentChanged.AddListener(OnSessionChanged);

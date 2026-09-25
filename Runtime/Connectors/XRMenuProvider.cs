@@ -5,13 +5,15 @@ using Nox.UI;
 using UnityEngine;
 using UnityEngine.XR;
 using Hand = Autohand.Hand;
+using Nox.CCK.Nameplate;
 using Logger = Nox.CCK.Utils.Logger;
+using Keys = Nox.CCK.Nameplate.Constants;
 
 namespace Nox.XR.Runtime.Connectors {
 	public class XRMenuProvider : MonoBehaviour, IMenuProvider, IDisposable {
 		public RectTransform Container;
 		public Grabbable Grabbable;
-		public AutoHandPlayer AutoHandPlayer;
+		public XRController Controller;
 
 		public XRNode LastUsedHand = XRNode.LeftHand;
 
@@ -68,8 +70,8 @@ namespace Nox.XR.Runtime.Connectors {
 			LastUsedHand = node;
 
 			var hand = XRNode.LeftHand == node
-				? AutoHandPlayer.handLeft
-				: AutoHandPlayer.handRight;
+				? Controller.player.handLeft
+				: Controller.player.handRight;
 
 			if (Menu.Active)
 				Close();
@@ -84,6 +86,10 @@ namespace Nox.XR.Runtime.Connectors {
 			}
 
 			Menu.Active = true;
+
+			// Nameplates are only shown while a menu is open.
+			if (Controller.Nameplate.IsAlive())
+				Controller.Nameplate.Set(Keys.VISIBLE, true);
 
 			// Position the menu in front of the main camera (head level),
 			// NOT attached to the hand. This avoids the menu inheriting
@@ -138,6 +144,10 @@ namespace Nox.XR.Runtime.Connectors {
 
 			Menu.Active = false;
 			Grabbable.HandsRelease();
+
+			// Nameplates are only shown while a menu is open.
+			if (Controller.Nameplate.IsAlive())
+				Controller.Nameplate.Set(Keys.VISIBLE, false);
 		}
 
 		public void Dispose() {
