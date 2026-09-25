@@ -283,26 +283,30 @@ namespace Nox.XR.Runtime.Connectors {
 
 			var parameters = parameterModule.GetParameters();
 				foreach (var param in parameters)
-					switch (param.GetName()) {
+					switch (param.Name) {
 						case "tracking/head/active":
-							param.Set(XRInputs.HasHeadset);
+							param.Value = XRInputs.HasHeadset;
 							break;
+
 						case "tracking/left_hand/active":
-							param.Set(XRInputs.HasHandLeft);
+							param.Value = XRInputs.HasHandLeft;
 							break;
+
 						case "tracking/right_hand/active":
-							param.Set(XRInputs.HasHandRight);
+							param.Value = XRInputs.HasHandRight;
 							break;
+
 						case "tracking/left_foot/active":
 						case "tracking/right_foot/active":
 						case "tracking/left_toes/active":
 						case "tracking/right_toes/active":
-							param.Set(false);
+							param.Value = false;
 							break;
+
 						case "VRMode" or "in_vr":
 						case "IsLocal" or "local":
 						case "rig/ik/head/target":
-							param.Set(true);
+							param.Value = true;
 							break;
 					}
 

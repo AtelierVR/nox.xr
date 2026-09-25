@@ -131,62 +131,62 @@ namespace Nox.XR.Runtime.Connectors {
 			var parameters = parameterModule.GetParameters();
 			Vector3? localVelocity = null;
 			foreach (var param in parameters) {
-				var n = param.GetName();
+				var n = param.Name;
 				switch (n) {
 					case "Grounded": {
 						var grounded = player.IsGrounded();
-						var value    = (bool)param.Get();
+						var value    = (bool)param.Value;
 						if (value == grounded)
 							continue;
-						param.Set(grounded);
+						param.Value = grounded;
 						break;
 					}
 					case "VelocityX": {
 						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
-						var value    = param.Get().ToFloat();
+						var value    = param.Value.ToFloat();
 						if (Mathf.Approximately(value, velocity.x))
 							continue;
-						param.Set(velocity.x);
+						param.Value = velocity.x;
 						break;
 					}
 					case "VelocityY": {
 						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
-						var value    = param.Get().ToFloat();
+						var value    = param.Value.ToFloat();
 						if (Mathf.Approximately(value, velocity.y))
 							continue;
-						param.Set(velocity.y);
+						param.Value = velocity.y;
 						break;
 					}
 					case "VelocityZ": {
 						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
-						var value    = param.Get().ToFloat();
+						var value    = param.Value.ToFloat();
 						if (Mathf.Approximately(value, velocity.z))
 							continue;
-						param.Set(velocity.z);
+						param.Value = velocity.z;
 						break;
 					}
 					case "Velocity": {
 						var velocity = localVelocity ?? (localVelocity = GetLookVelocity()).Value;
-						var value    = param.Get().ToVector3();
+						var value    = param.Value.ToVector3();
 						if (value == velocity)
 							continue;
-						param.Set(velocity);
+						param.Value = velocity;
 						break;
 					}
 					case "VelocityMagnitude": {
 						var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
-						var value         = param.Get().ToFloat();
+						var value         = param.Value.ToFloat();
 						if (Mathf.Approximately(value, worldVelocity.magnitude))
 							continue;
-						param.Set(worldVelocity.magnitude);
+						param.Value = worldVelocity.magnitude;
 						break;
 					}
 					case "tracking/head/active": {
 						var active = XRInputs.HasHeadset;
-						var value  = param.Get().ToBool();
+						var value  = param.Value.ToBool();
 						if (value == active)
 							continue;
-						param.Set(active);
+						param.Value = active;
 						break;
 					}
 					case "tracking/head/position":
@@ -200,10 +200,10 @@ namespace Nox.XR.Runtime.Connectors {
 						break;
 					case "tracking/left_hand/active": {
 						var active = XRInputs.HasHandLeft;
-						var value  = param.Get().ToBool();
+						var value  = param.Value.ToBool();
 						if (value == active)
 							continue;
-						param.Set(active);
+						param.Value = active;
 						break;
 					}
 					case "tracking/left_hand/position":
@@ -213,10 +213,10 @@ namespace Nox.XR.Runtime.Connectors {
 						break;
 					case "tracking/right_hand/active": {
 						var active = XRInputs.HasHandRight;
-						var value  = param.Get().ToBool();
+						var value  = param.Value.ToBool();
 						if (value == active)
 							continue;
-						param.Set(active);
+						param.Value = active;
 						break;
 					}
 				}
@@ -226,7 +226,7 @@ namespace Nox.XR.Runtime.Connectors {
 				?? parameterModule.GetParameter("EyeHeight");
 			float maxHeight;
 			if (heightP != null)
-				maxHeight = heightP.Get().ToFloat();
+				maxHeight = heightP.Value.ToFloat();
 			else if (player.headCamera)
 				maxHeight = player.headCamera.transform.position.y - player.transform.position.y;
 			else
