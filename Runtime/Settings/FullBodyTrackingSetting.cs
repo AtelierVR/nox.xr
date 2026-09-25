@@ -26,7 +26,7 @@ namespace Nox.XR.Runtime.Settings {
 		protected override GameObject GetPrefab()
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/toggle.prefab");
 
-		public static bool Value {
+		public static new bool Value {
 			get => Config.Load().Get(ConfigKey, false);
 			set {
 				var config = Config.Load();
