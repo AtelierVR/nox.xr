@@ -4,6 +4,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Mods.Mods;
 using Nox.XR.Loaders;
+using Nox.XR.Runtime.Settings;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Loaders {
@@ -34,11 +35,18 @@ namespace Nox.XR.Runtime.Loaders {
 
 		/// <summary>
 		/// Fournisseurs connus, triés par priorité décroissante (repli inclus).
+		///
+		/// <para>
+		/// Le loader choisi à la main (<see cref="XRLoaderPreference"/>) passe devant, quelle que soit
+		/// sa priorité — c'est tout l'intérêt du réglage. Il ne dispense pas d'être valide :
+		/// <see cref="Start"/> l'ignore si ce n'est pas le cas et poursuit la chaîne.
+		/// </para>
 		/// </summary>
 		public static IReadOnlyList<IXRLoaderProvider> Providers
 			=> Discovered
 				.Append(Fallback)
-				.OrderByDescending(p => p.Priority)
+				.OrderByDescending(p => XRLoaderPreference.IsPreferred(p.Id))
+				.ThenByDescending(p => p.Priority)
 				.ToList();
 
 		/// <summary>

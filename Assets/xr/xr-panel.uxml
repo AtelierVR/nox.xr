@@ -8,6 +8,11 @@
         <ui:Foldout name="sec-input" text="Input &amp; Tracking" class="p-8 mb-8 border rounded-md">
             <ui:VisualElement name="rows-input" class="pt-8" />
         </ui:Foldout>
+        <ui:Foldout name="sec-loaders" text="Loaders" value="true" class="p-8 mb-8 border rounded-md">
+            <ui:VisualElement name="rows-loaders" class="pt-8" />
+            <ui:VisualElement name="loader-actions" class="flex-row flex-wrap pt-8" />
+            <ui:VisualElement name="loaders-list" />
+        </ui:Foldout>
         <ui:Foldout name="sec-devices" text="Devices" class="p-8 mb-8 border rounded-md">
             <ui:VisualElement name="rows-devices" class="pt-8" />
             <ui:VisualElement name="devices-list" />
@@ -19,7 +24,7 @@
         </ui:Foldout>
         <ui:Foldout name="sec-management" text="XR Plug-in Management" class="p-8 mb-8 border rounded-md">
             <ui:VisualElement name="rows-management" class="pt-8" />
-            <ui:VisualElement name="loaders-list" />
+            <ui:VisualElement name="management-list" />
         </ui:Foldout>
         <ui:Foldout name="sec-settings" text="Settings &amp; Actions" class="p-8 mb-8 border rounded-md">
             <ui:VisualElement name="rows-settings" class="pt-8" />
