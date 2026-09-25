@@ -101,18 +101,10 @@ namespace Nox.XR.Runtime {
 				}
 
 				Logger.LogDebug($"Refreshing XR bindings with '{XRLoaderManager.Current?.Id}'.");
-				binding.Refresh();
 			} finally {
 				_rebinding = false;
 			}
 		}
-
-		/// <summary>
-		/// Délie les bindings XR (arrêt du proxy XR) : le runtime libère ses actions et sauvegarde
-		/// les overrides du joueur.
-		/// </summary>
-		public static void Clear()
-			=> Binding?.Clear();
 
 		/// <summary>
 		/// Re-lie les bindings quand un device suivi apparaît ou disparaît.
