@@ -88,25 +88,47 @@ namespace Nox.XR.Runtime.Connectors
 				renderer.enabled = !hidden;
 		}
 
+		/// <summary>
+		/// Clé du binding XR d'un doigt : <c>finger.&lt;côté&gt;.&lt;type&gt;</c> (ex.
+		/// <c>finger.left.index</c>), telle que <c>XRBinding</c> la déclare.
+		/// </summary>
+		public static string GetBindKey(Hand hand, Finger finger)
+			=> $"finger.{(hand.left ? "left" : "right")}.{finger.fingerType.ToString().ToLower()}";
+
+		/// <summary>
+		/// Pose le pilote de flexion (<see cref="FingerKeybindConnector"/>) sur chaque doigt d'une main
+		/// AutoHand et lui donne sa clé de binding.
+		///
+		/// <para>
+		/// À rejouer sur toute main qui devient le corps physique : <c>NoxAutoHandVRIK</c> recopie les
+		/// rotations des doigts du duplicata sur ceux de l'armature à chaque frame
+		/// (<c>MirrorFingers</c>), donc un pilote posé seulement sur l'armature est écrasé aussitôt, et
+		/// un duplicata strippé puis reconverti repart sans pilote du tout.
+		/// </para>
+		/// </summary>
+		public static void SetupFingerBindings(Hand hand)
+		{
+			if (hand == null) return;
+
+			// Retrieve all AutoHand.Finger components in the hand's hierarchy
+			foreach (var finger in hand.GetComponentsInChildren<Finger>(true))
+				finger.gameObject.GetOrAddComponent<FingerKeybindConnector>().BindKey = GetBindKey(hand, finger);
+		}
+
 		private void SetupFingers(Hand hand)
 		{
 			if (hand == null) return;
-			// Retrieve all AutoHand.Finger components in the hand's hierarchy
+
+			SetupFingerBindings(hand);
+
 			var fingers = hand.GetComponentsInChildren<Finger>(true);
 			var pokes = new List<(string key, PokeInteractor poke)>(fingers.Length);
 			foreach (var finger in fingers) {
-				var connector = finger.gameObject.GetOrAddComponent<FingerKeybindConnector>();
+				if (finger.tip == null) continue;
 
-				string handSide = hand.left ? "left" : "right";
-				string typeName = finger.fingerType.ToString().ToLower();
-				var bindKey = $"finger.{handSide}.{typeName}";
-				connector.BindKey = bindKey;
-
-				if (finger.tip != null) {
-					var poke = finger.tip.gameObject.GetOrAddComponent<PokeInteractor>();
-					poke.Radius = finger.tipRadius;
-					pokes.Add((bindKey, poke));
-				}
+				var poke = finger.tip.gameObject.GetOrAddComponent<PokeInteractor>();
+				poke.Radius = finger.tipRadius;
+				pokes.Add((GetBindKey(hand, finger), poke));
 			}
 
 			var handPoke = hand.gameObject.GetOrAddComponent<HandPokeConnector>();

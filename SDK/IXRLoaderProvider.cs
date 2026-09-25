@@ -43,10 +43,10 @@ namespace Nox.XR.Loaders {
 		/// Bindings de ce runtime, lus par clé (<c>"move"</c>, <c>"jump"</c>, ...).
 		///
 		/// <para>
-		/// C'est le mod de loader qui les possède : il sait quels contrôles existent sur les
-		/// devices qu'il pilote. nox.xr se contente de déclencher <see cref="IBinding.Refresh"/> à
-		/// la création du proxy XR et à chaque changement de device, puis de relayer les valeurs
-		/// aux consommateurs.
+		/// C'est le mod de loader qui les possède : il sait quels contrôles existent sur les devices
+		/// qu'il pilote, c'est donc lui qui les enregistre et qui les met à jour quand sa
+		/// configuration change (manette qui apparaît, modèle remplacé...). nox.xr ne fait que lire
+		/// les valeurs et les relayer aux consommateurs.
 		/// </para>
 		///
 		/// <para>

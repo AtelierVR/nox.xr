@@ -122,7 +122,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 				xr.eventSystem.enabled = true;
 
 			xr.avatarLoader.SetupAvatar().Forget();
-			Keybindings.Rebind();
 
 			return true;
 		}

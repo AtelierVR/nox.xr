@@ -23,8 +23,8 @@ namespace Nox.XR.Runtime.Connectors {
 			=> Container;
 
 		public bool Active {
-			get => gameObject.activeSelf;
-			set => gameObject.SetActive(value);
+			get => Grabbable.gameObject.activeSelf;
+			set => Grabbable.gameObject.SetActive(value);
 		}
 
 		/// <summary>

@@ -345,6 +345,11 @@ namespace Nox.XR.Runtime.Connectors {
 				// AlignEncapsulationBox could not run on the avatar's inactive hand, so the duplicate's
 				// encapsulation box would not cover the fingers.
 				HandToAutoHand.AlignEncapsulationBox(hand);
+
+				// The duplicate is the physical body, and `MirrorFingers` copies ITS finger rotations onto
+				// the armature every frame: the finger drivers must live here, not only on the armature hand
+				// (whose copies were stripped by `StripToBones`). Without this the fingers never bend.
+				PlayerHandConnector.SetupFingerBindings(hand);
 			} else {
 				Logger.LogError(
 					$"{nameof(NoxAutoHandVRIK)}: the duplicate of the {side} hand has no Autohand.Hand component.",
