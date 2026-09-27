@@ -83,10 +83,10 @@ namespace Nox.XR.Runtime {
 				// Sans aucune référence configurée, ce n'est pas le proxy : c'est le
 				// XRController vide ajouté automatiquement par un [RequireComponent] sur un
 				// GameObject enfant du proxy. On le neutralise sans bruit.
-				if (avatarLoader == null && Menu == null && microphone == null) {
+				if (avatarLoader == null && Menu == null) {
 					Logger.LogWarning(
-						$"{nameof(XRController)} on '{name}' is not configured (no player, avatarLoader, Menu "
-						+ "or microphone): redundant component, likely auto-added by [RequireComponent] on a "
+						$"{nameof(XRController)} on '{name}' is not configured (no player, avatarLoader "
+						+ "or Menu): redundant component, likely auto-added by [RequireComponent] on a "
 						+ "child of the proxy. It is disabled — remove it from the prefab.",
 						this
 					);

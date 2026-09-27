@@ -6,8 +6,6 @@ using Cysharp.Threading.Tasks;
 using Nox.Avatars.Controllers;
 using Nox.CCK.Nameplate;
 using Nox.CCK.Utils;
-using Nox.Audio.Players;
-using Nox.Sessions;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 using Nox.Controllers;
@@ -37,11 +35,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 			=> Client.CoreAPI.ModAPI
 				.GetMod("controllers")
 				?.GetInstance<IControllerAPI>();
-
-		private static ISessionAPI SessionAPI
-			=> Client.CoreAPI.ModAPI
-				.GetMod("session")
-				?.GetInstance<ISessionAPI>();
 
 		/// <summary>
 		/// Check if the current proxy is better than XR proxy.
@@ -136,7 +129,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		public EventSystem eventSystem;
 		private IPlayer _attachedPlayer;
 		public XRInteractionGroup[] interactions;
-		[SerializeField] public MicrophoneConnector microphone;
 
 		[Header("View")]
 		[Tooltip("Replace automatiquement la vue à la hauteur recommandée si elle démarre sous le sol "
@@ -167,14 +159,10 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 
 		private XROrigin _xrOrigin;
 
-		private ISessionAPI _sessionApi;
-
 
 		public void Dispose() {
 			DisposeNameplate();
 
-			_sessionApi?.OnCurrentChanged.RemoveListener(OnSessionChanged);
-			microphone?.Unbind();
 			if (XRInputs.Provider is AutoHandProvider)
 				XRInputs.Provider = null;
 			avatarLoader?.ClearRig();
@@ -183,22 +171,7 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 			Destroy(gameObject);
 		}
 
-		private void Awake() {
-			SetupNameplate();
-
-			_sessionApi = SessionAPI;
-			if (_sessionApi == null) return;
-			_sessionApi.OnCurrentChanged.AddListener(OnSessionChanged);
-			if (_sessionApi.Current != null && _sessionApi.TryGet(_sessionApi.Current, out var current))
-				OnSessionChanged(null, current);
-		}
-
-		private void OnSessionChanged(ISession old, ISession next) {
-			if (microphone == null) return;
-			microphone.Unbind();
-			if (next?.LocalPlayer is ILocalPlayerVoice voice)
-				microphone.Bind(voice);
-		}
+		private void Awake() => SetupNameplate();
 
 		private void Start() {
 			StartupAutoHand().Forget();
