@@ -99,7 +99,23 @@ namespace Nox.XR.Runtime.Loaders {
 					continue;
 
 				Logger.Log($"Starting XR loader '{provider.Id}' (priority {provider.Priority})...");
-				if (!await provider.Initialize()) {
+
+				bool started;
+				try {
+					started = await provider.Initialize();
+				} catch (Exception e) {
+					Logger.LogError(
+						new Exception($"XR loader '{provider.Id}' threw while initializing; trying the next one.", e)
+					);
+					try {
+						await provider.Deinitialize();
+					} catch {
+						// Le provider n'a jamais démarré : son démontage peut lui aussi échouer.
+					}
+					continue;
+				}
+
+				if (!started) {
 					Logger.LogWarning($"XR loader '{provider.Id}' failed to initialize; trying the next one.");
 					continue;
 				}

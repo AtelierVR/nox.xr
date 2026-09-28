@@ -1,27 +1,18 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Autohand;
 using Nox.CCK.XR;
 using Cysharp.Threading.Tasks;
-using Nox.Avatars;
 using Nox.Avatars.Camera;
 using Nox.Avatars.Controllers;
 using Nox.CCK.Players;
 using Nox.CCK.Utils;
-using Nox.Audio.Players;
-using Nox.Sessions;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 using Transform = UnityEngine.Transform;
 using Nox.Controllers;
 using Nox.Players;
-using Nox.XR.Runtime.Connectors;
-using Nox.XR.Runtime.Providers;
 using UnityEngine.EventSystems;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
-using UnityEngine.XR;
 using Unity.XR.CoreUtils;
 
 namespace Nox.XR.Runtime {
@@ -173,7 +164,44 @@ namespace Nox.XR.Runtime {
 			return UniTask.CompletedTask;
 		}
 
+		/// <summary>
+		/// <c>PlayerRig.Base</c> part of this controller: the pose of the avatar's root.
+		/// <para>
+		/// The loaded avatar is parented to the tracking container (<c>AutoHandPlayer.trackingContainer</c>,
+		/// "TrackerOffsets"), which is the <b>only</b> transform a snap/smooth turn rotates. The
+		/// <c>AutoHandPlayer</c> transform is the body capsule and keeps its yaw, so carrying it as the base
+		/// made the replayed body hold its old orientation while the head and hands (written in world space)
+		/// followed - the avatar's back ended up facing its own look direction after any turn.
+		/// </para>
+		/// <para>
+		/// The height is taken from the body capsule so the played-back root matches the local one, which
+		/// <c>AvatarSyncConnector.LateUpdate</c> clamps the same way (the tracking container's own Y carries
+		/// <c>AutoHandPlayer.heightOffset</c>, used to raise the view, not the body).
+		/// </para>
+		/// </summary>
+		private TransformObject GetBasePart() {
+			if (!player)
+				return new TransformObject(transform, transform.TryGetComponent<Rigidbody>(out var own) ? own : null);
+
+			// Body transform supplies the scale and the body's velocity/angular velocity; the pose is then
+			// overridden with the tracking container's (avatar root).
+			var tr = new TransformObject(player.transform, player.body);
+
+			var container = player.trackingContainer;
+			if (container) {
+				tr.SetPosition(new Vector3(container.position.x, player.transform.position.y, container.position.z));
+				tr.SetRotation(container.rotation);
+			}
+
+			return tr;
+		}
+
 		public bool TryGetPart(ushort index, out TransformObject tr) {
+			if (index == PlayerRig.Base.ToIndex()) {
+				tr = GetBasePart();
+				return true;
+			}
+
 			var parts = GetParts();
 			if (parts.TryGetValue(index, out var t)) {
 				var rb = t.TryGetComponent<Rigidbody>(out var r) ? r : null;
@@ -260,8 +288,12 @@ namespace Nox.XR.Runtime {
 		public Dictionary<ushort, Transform> GetParts() {
 			if (!player) return new Dictionary<ushort, Transform>();
 
+			// `PlayerRig.Base` is the avatar ROOT, i.e. the tracking container ("TrackerOffsets") the loaded
+			// avatar is parented to - the only transform a snap/smooth turn rotates. `player.transform` is the
+			// AutoHandPlayer (body capsule) and keeps its yaw, so using it as the base desynced the replayed
+			// body from the head/hands (cf. <see cref="GetBasePart"/>).
 			var parts = new Dictionary<ushort, Transform> {
-				{ PlayerRig.Base.ToIndex(), player.transform },
+				{ PlayerRig.Base.ToIndex(), player.trackingContainer ? player.trackingContainer : player.transform },
 				{ PlayerRig.Head.ToIndex(), player.headCamera.transform }
 			};
 
@@ -283,6 +315,10 @@ namespace Nox.XR.Runtime {
 				kv => kv.Key,
 				kv => new TransformObject(kv.Value, kv.Value.GetComponent<Rigidbody>())
 			);
+
+			// `PlayerRig.Base` is the avatar root pose (tracking container), NOT the AutoHandPlayer body:
+			// replace the raw entry so the sent values carry the container pose and the body velocity.
+			parts[PlayerRig.Base.ToIndex()] = GetBasePart();
 
 			// `PlayerRig.Head` carries the head TARGET pose, not the eye pose: it is written on the rig's
 			// head IK target (`VRIK_Head`), which expects the head bone position - the avatar's eye → head
