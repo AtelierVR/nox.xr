@@ -34,6 +34,12 @@ namespace Nox.XR.Runtime.Connectors {
 		private float _menuLeft;
 		private float _menuRight;
 
+		/// <summary>
+		/// Dernière visibilité de nameplates poussée (réessayée tant que la plaque du contrôleur
+		/// n'existe pas encore).
+		/// </summary>
+		private bool? _nameplateVisible;
+
 		public async UniTask<bool> Generate() {
 			Menu = await Client.UiAPI.Make(this);
 
@@ -52,6 +58,10 @@ namespace Nox.XR.Runtime.Connectors {
 		/// XR actif.
 		/// </summary>
 		private void Update() {
+			// Les nameplates ne s'affichent que menu ouvert : on synchronise dès la première frame
+			// (le menu démarre fermé) et tant que la plaque du contrôleur n'est pas créée.
+			SyncNameplate(Menu != null && Menu.Active);
+
 			if (Menu == null)
 				return;
 
@@ -88,8 +98,7 @@ namespace Nox.XR.Runtime.Connectors {
 			Menu.Active = true;
 
 			// Nameplates are only shown while a menu is open.
-			if (Controller.Nameplate.IsAlive())
-				Controller.Nameplate.Set(Keys.VISIBLE, true);
+			SyncNameplate(true);
 
 			// Position the menu in front of the main camera (head level),
 			// NOT attached to the hand. This avoids the menu inheriting
@@ -146,8 +155,24 @@ namespace Nox.XR.Runtime.Connectors {
 			Grabbable.HandsRelease();
 
 			// Nameplates are only shown while a menu is open.
-			if (Controller.Nameplate.IsAlive())
-				Controller.Nameplate.Set(Keys.VISIBLE, false);
+			SyncNameplate(false);
+		}
+
+		/// <summary>
+		/// Aligne la visibilité de la plaque du client local sur l'état du menu : elle ne s'affiche que
+		/// lorsque le menu est ouvert. Les plaques des joueurs distants ne sont pas concernées (elles
+		/// sont pilotées par les scripts).
+		/// </summary>
+		private void SyncNameplate(bool visible) {
+			if (_nameplateVisible == visible)
+				return;
+
+			var plate = Controller != null ? Controller.Nameplate : null;
+			if (plate == null || !plate.IsAlive())
+				return;
+
+			_nameplateVisible = visible;
+			plate.Set(Keys.VISIBLE, visible);
 		}
 
 		public void Dispose() {
