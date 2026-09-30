@@ -206,6 +206,13 @@ namespace Nox.XR.Runtime {
 			if (parts.TryGetValue(index, out var t)) {
 				var rb = t.TryGetComponent<Rigidbody>(out var r) ? r : null;
 				tr = new TransformObject(t, rb);
+
+				if (index == PlayerRig.Head.ToIndex()
+				    && TryGetHeadTargetPose(out var headPosition, out var headRotation)) {
+					tr.SetPosition(headPosition);
+					tr.SetRotation(headRotation);
+				}
+
 				return true;
 			}
 
