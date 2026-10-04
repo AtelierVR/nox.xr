@@ -497,6 +497,12 @@ namespace Nox.XR.Runtime.Connectors {
 		private void LoadAvatarFromUser(ICurrentUser user) {
 			if (user?.Avatar.IsValid() != true)
 				return;
+
+			// A user update (presence, display, ...) must not reload the avatar when the announced
+			// identifier is already the one loaded.
+			if (_runtime != null && user.Avatar.Equals(_runtime.Identifier))
+				return;
+
 			SetAvatar(user.Avatar).Forget();
 		}
 	}
