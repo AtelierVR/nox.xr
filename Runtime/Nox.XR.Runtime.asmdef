@@ -37,7 +37,9 @@
     "Nox.CCK.Settings",
     "Nox.Audio",
     "Nox.Sessions",
-    "Nox.CCK.Audio"
+    "Nox.CCK.Audio",
+    "Nox.CCK.Network",
+    "Nox.Network"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
