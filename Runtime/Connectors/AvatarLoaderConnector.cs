@@ -138,79 +138,9 @@ namespace Nox.XR.Runtime.Connectors {
 				// remplacement. L'armature ne garde que ses os, écrits par VRIK.
 				autovrik.physicalHandsRoot = connector.Fallbacks[1] ? connector.Fallbacks[1].transform.parent : null;
 
-				// Wait for NoxAutoHandVRIK to be fully initialized so we have access to physical hands
-				await UniTask.WaitUntil(() => autovrik.rightPhysical != null && autovrik.leftPhysical != null);
-
-				// Load NearFarInteractor prefab asynchronously using GetAssetAsync
-				var near = await Client.CoreAPI.AssetAPI.GetAssetAsync<GameObject>("near_far_interactor.prefab");
-				if (near != null) {
-					static Transform EndBone(IFinger finger) {
-						if (finger.Tip)
-							return finger.Tip;
-						if (finger.Distal)
-							return finger.Distal;
-						if (finger.Intermediate)
-							return finger.Intermediate;
-						if (finger.Proximal)
-							return finger.Proximal;
-						return null;
-					}
-					
-					async UniTask<NearFarInteractor> SetupNearFar(Hand physical, IHand source) {
-						Transform parent;
-						Vector3 position;
-						Quaternion rotation;
-
-						if (source.NearFar == null) {
-    parent = source.Anchor;
-    var thumb = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Thumb);
-    var index = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Index);
-    
-    var endThumb = EndBone(thumb)
-        ?? (thumb is MonoBehaviour mb0 ? mb0.transform : null)
-        ?? parent;
-    var endIndex = EndBone(index)
-        ?? (index is MonoBehaviour mb1 ? mb1.transform : null)
-        ?? parent;
-    
-    var thumbLocal = parent.InverseTransformPoint(endThumb.position);
-    var indexLocal = parent.InverseTransformPoint(endIndex.position);
-
-    // 1. Calcul de la position :
-    // On prend un point situé entre le pouce et l'index sur les axes X et Y (ex: 50% ou 60%),
-    // mais on force impérativement l'axe Z à matcher celui du bout de l'index.
-    const float blendWeight = 0.75f; // Ajustez entre 0.0 (aligné sur l'index) et 1.0 (aligné sur le pouce)
-    
-    position = new Vector3(
-        Mathf.Lerp(indexLocal.x, thumbLocal.x, blendWeight),
-        Mathf.Lerp(indexLocal.y, thumbLocal.y, blendWeight),
-        indexLocal.z // Reste au même niveau (profondeur/hauteur Z) que l'index
-    );
-
-    // 2. Orientation basée sur l'orientation de l'index :
-    var indexLocalRotation = Quaternion.Inverse(parent.rotation) * endIndex.rotation;
-    var dir = indexLocalRotation * Vector3.up;
-    var pitch = Mathf.Atan2(-dir.y, -dir.x) * Mathf.Rad2Deg;
-    rotation = Quaternion.Euler(pitch, 270f, 0f);
-} else {
-							parent = source.NearFar;
-							position = Vector3.zero;
-							rotation = Quaternion.identity;
-						}
-
-						var instance = await near.InstantiateAsync<NearFarInteractor>(parent);
-						instance.Hand = source.Type == NoxHandType.Left
-							? UnityEngine.XR.Interaction.Toolkit.Interactors.InteractorHandedness.Left
-							: UnityEngine.XR.Interaction.Toolkit.Interactors.InteractorHandedness.Right;
-						instance.transform.SetLocalPositionAndRotation(position, rotation);
-						return instance;
-					}
-					
-					await SetupNearFar(autovrik.rightPhysical, autovrik.rightPhysicalSource);
-					await SetupNearFar(autovrik.leftPhysical,  autovrik.leftPhysicalSource);
-				} else {
-					Logger.LogError("NearFarInteractor prefab not found at prefabs/near_far_interactor.prefab", this);
-				}
+				// The near/far interactor is now created by NoxAutoHandVRIK, right when it builds each
+				// physical hand (see NoxAutoHandVRIK.SetupNearFarInteractors), so it survives an avatar
+				// reload instead of depending on this async chain completing on the new hands.
 			}
 			#endif
 		}

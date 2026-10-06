@@ -1,15 +1,19 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Autohand;
 using Nox.Avatars.AutoHand;
 using Nox.Avatars.Hand;
+using Nox.Avatars.Rigging;
 using Nox.CCK.Utils;
 using RootMotion.FinalIK;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using Logger = Nox.CCK.Utils.Logger;
 using NFinger = Nox.CCK.Avatars.Hand.Finger;
 using NHand = Nox.CCK.Avatars.Hand.Hand;
+using NoxHandType = Nox.Avatars.Hand.HandType;
 
 namespace Nox.XR.Runtime.Connectors {
 	/// <summary>
@@ -34,6 +38,13 @@ namespace Nox.XR.Runtime.Connectors {
 		public IHand leftSource;
 		[Tooltip("XR rig 'Hands' folder: the physical hand duplicates are created there.")]
 		public Transform physicalHandsRoot;
+
+		/// <summary>Prefab (owned by nox.xr) cloned on each physical hand to drive the near/far interaction ray.</summary>
+		private const string NearFarPrefabAddress = "near_far_interactor.prefab";
+
+		/// <summary>Near/far interactors created on the physical hands, one per side (rebuilt with the hands).</summary>
+		private NearFarInteractor _rightNearFar;
+		private NearFarInteractor _leftNearFar;
 
 		/// <summary>Physical AutoHand duplicate, right side.</summary>
 		public Hand rightPhysical { get; private set; }
@@ -96,7 +107,10 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		protected virtual void OnDestroy() {
-			// We spawned the duplicates, we destroy them.
+			// We spawned the duplicates, we destroy them. The near/far interactors are their children, so
+			// they go with them; we still destroy them explicitly in case their parent ever changes.
+			if (_rightNearFar) _rightNearFar.gameObject.Destroy();
+			if (_leftNearFar)  _leftNearFar.gameObject.Destroy();
 			rightPhysical?.gameObject.Destroy();
 			leftPhysical?.gameObject.Destroy();
 
@@ -152,9 +166,20 @@ namespace Nox.XR.Runtime.Connectors {
 			if (vrik == null)
 				return;
 
-			vrik.solver.spine.positionWeight = 1f;
-			vrik.solver.spine.rotationWeight = 1f;
+			// The avatar's own tracking choice wins: when its pose state cuts the head (TrackingControl →
+			// Animation), the VRIK spine weights must stay at 0 — forcing them back to 1 here kept the head
+			// IK on over the T-pose. With no override (Normal) or an explicit Tracking, keep the head open.
+			var cut    = GetRigProvider()?.GetRig()?.GetTracking(HumanBodyBones.Head) == RiggingTrackingMode.Animation;
+			var weight = cut ? 0f : 1f;
+
+			vrik.solver.spine.positionWeight = weight;
+			vrik.solver.spine.rotationWeight = weight;
 		}
+
+		private IRigProvider _rigProvider;
+
+		private IRigProvider GetRigProvider()
+			=> _rigProvider ??= GetComponentInParent<IRigProvider>(true);
 
 		protected virtual void LateUpdate() {
 			// After VRIK: the rig hand drives the armature down to the fingertips.
@@ -222,6 +247,89 @@ namespace Nox.XR.Runtime.Connectors {
 			// Each arm is resolved independently: a side without controller or hand must not block the other.
 			vrik.solver.rightArm.target = ResolveArmTarget("right", rightSource, ref _rightHandOffset, _rightArmTarget);
 			vrik.solver.leftArm.target  = ResolveArmTarget("left",  leftSource,  ref _leftHandOffset,  _leftArmTarget);
+
+			// The near/far interactors belong to the physical hands: (re)create them here, so they are
+			// rebuilt exactly when the hands are and never lost by an avatar reload (the loader used to
+			// create them on a fire-and-forget async chain that a reload could interrupt).
+			SetupNearFarInteractors();
+		}
+
+		/// <summary>
+		/// (Re)creates the near/far interactor on each physical hand, destroying any previous one first.
+		/// </summary>
+		private void SetupNearFarInteractors() {
+			_rightNearFar = SetupNearFarInteractor(rightPhysical, rightPhysicalSource, _rightNearFar);
+			_leftNearFar  = SetupNearFarInteractor(leftPhysical,  leftPhysicalSource,  _leftNearFar);
+		}
+
+		/// <summary>
+		/// Clones <c>near_far_interactor.prefab</c> on a physical hand and places it on the hand's 
+		/// <see cref="IHand.NearFar"/> transform, or on a point between the thumb and index ends when the
+		/// hand has none. Replacing <paramref name="previous"/> avoids stacking interactors on a reload.
+		/// </summary>
+		private NearFarInteractor SetupNearFarInteractor(Hand physical, IHand source, NearFarInteractor previous) {
+			if (previous)
+				previous.gameObject.Destroy();
+
+			if (physical == null || source == null)
+				return null;
+
+			var prefab = Client.CoreAPI?.AssetAPI?.GetAsset<GameObject>(NearFarPrefabAddress);
+			if (!prefab) {
+				Logger.LogWarning($"Near/far interactor prefab not found: {NearFarPrefabAddress}", this, tag: nameof(NoxAutoHandVRIK));
+				return null;
+			}
+
+			Transform  parent;
+			Vector3    position;
+			Quaternion rotation;
+
+			if (source.NearFar) {
+				parent   = source.NearFar;
+				position = Vector3.zero;
+				rotation = Quaternion.identity;
+			} else {
+				parent = source.Anchor;
+
+				var thumb = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Thumb);
+				var index = source.Fingers.FirstOrDefault(f => f.Type == FingerType.Index);
+
+				var endThumb = EndBone(thumb) ?? (thumb as MonoBehaviour)?.transform ?? parent;
+				var endIndex = EndBone(index) ?? (index as MonoBehaviour)?.transform ?? parent;
+
+				var thumbLocal = parent.InverseTransformPoint(endThumb.position);
+				var indexLocal = parent.InverseTransformPoint(endIndex.position);
+
+				// Position : un point entre le pouce et l'index sur X/Y, aligné sur Z avec l'extrémité de l'index.
+				const float blendWeight = 0.75f;
+				position = new Vector3(
+					Mathf.Lerp(indexLocal.x, thumbLocal.x, blendWeight),
+					Mathf.Lerp(indexLocal.y, thumbLocal.y, blendWeight),
+					indexLocal.z
+				);
+
+				// Orientation : dérivée de l'orientation de l'extrémité de l'index.
+				var indexLocalRotation = Quaternion.Inverse(parent.rotation) * endIndex.rotation;
+				var dir   = indexLocalRotation * Vector3.up;
+				var pitch = Mathf.Atan2(-dir.y, -dir.x) * Mathf.Rad2Deg;
+				rotation = Quaternion.Euler(pitch, 270f, 0f);
+			}
+
+			var instance = prefab.Instantiate<NearFarInteractor>(parent);
+			instance.Hand = source.Type == NoxHandType.Left ? InteractorHandedness.Left : InteractorHandedness.Right;
+			instance.transform.SetLocalPositionAndRotation(position, rotation);
+			return instance;
+		}
+
+		/// <summary>End bone of a finger (tip, else distal/intermediate/proximal), or null.</summary>
+		private static Transform EndBone(IFinger finger) {
+			if (finger == null)
+				return null;
+			if (finger.Tip)          return finger.Tip;
+			if (finger.Distal)       return finger.Distal;
+			if (finger.Intermediate) return finger.Intermediate;
+			if (finger.Proximal)     return finger.Proximal;
+			return null;
 		}
 
 		private void SubscribeGrabs() {

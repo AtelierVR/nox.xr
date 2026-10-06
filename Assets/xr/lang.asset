@@ -35,6 +35,26 @@ MonoBehaviour:
       value: "IPD (Inter-Pupillary Distance)"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Poke Disable Threshold"
+    - key: settings.entry.xr.general.full_body_tracking.label
+      value: "Full-Body Tracking"
+    - key: settings.entry.xr.general.full_body_calibration.label
+      value: "Full-Body Calibration"
+    - key: settings.entry.xr.general.full_body_calibration.start
+      value: "Calibrate"
+    - key: settings.entry.xr.general.full_body_calibration.confirm
+      value: "Save Calibration"
+    - key: settings.entry.xr.general.full_body_calibration_range.label
+      value: "Calibration Range"
+    - key: settings.entry.xr.general.one_hand_validation.label
+      value: "One-Hand Validation"
+    - key: settings.entry.xr.general.trackers_include_controller.label
+      value: "Trackers Flagged as Controllers"
+    - key: terminal.command.xr.description
+      value: "XR diagnostics: loaders, devices, trackers and full-body calibration."
+    - key: terminal.command.xr.short
+      value: "XR diagnostics"
+    - key: terminal.command.xr.usage
+      value: "xr <help|state|devices|trackers|fbt|diagnose|calibrate> [start|confirm|cancel|clear|status]"
   - IETF: fr-FR
     entries:
     - key: settings.page.xr.label
@@ -57,3 +77,23 @@ MonoBehaviour:
       value: "IPD (Distance Inter-Pupillaire)"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Seuil de désactivation du poke"
+    - key: settings.entry.xr.general.full_body_tracking.label
+      value: "Suivi du corps entier"
+    - key: settings.entry.xr.general.full_body_calibration.label
+      value: "Calibration du corps entier"
+    - key: settings.entry.xr.general.full_body_calibration.start
+      value: "Calibrer"
+    - key: settings.entry.xr.general.full_body_calibration.confirm
+      value: "Enregistrer la calibration"
+    - key: settings.entry.xr.general.full_body_calibration_range.label
+      value: "Portée de calibration"
+    - key: settings.entry.xr.general.one_hand_validation.label
+      value: "Validation à une main"
+    - key: settings.entry.xr.general.trackers_include_controller.label
+      value: "Trackers signalés comme manettes"
+    - key: terminal.command.xr.description
+      value: "Diagnostic XR : loaders, périphériques, trackers et calibration du corps entier."
+    - key: terminal.command.xr.short
+      value: "Diagnostic XR"
+    - key: terminal.command.xr.usage
+      value: "xr <help|state|devices|trackers|fbt|diagnose|calibrate> [start|confirm|cancel|clear|status]"

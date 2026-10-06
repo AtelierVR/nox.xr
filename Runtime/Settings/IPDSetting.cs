@@ -20,11 +20,13 @@ namespace Nox.XR.Runtime.Settings {
 			=> Client.Instance?.IsReady() ?? false;
 
 		public IPDSetting() {
+			// La valeur est stockée en mètres (l'unité de l'API XR) mais réglée/affichée en centimètres
+			// décimaux : un IPD en millimètres entiers n'a pas assez de résolution.
 			SetRange(0.050f, 0.080f);
-			SetStep(0.0005f);
+			SetStep(0.001f);
 			SetValue(Value);
 			SetLabelKey("settings.entry.xr.general.ipd.label");
-			SetValueKey("settings.range.value.meters");
+			SetValueKey("settings.range.value.float_centimeters");
 		}
 
 		protected override GameObject GetPrefab()

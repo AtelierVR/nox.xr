@@ -1,37 +1,71 @@
 <ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.loader/Resources/nox.cck.style.uss?fileID=7433441132597879392&amp;guid=ee18ab989d89a1a479332bd224e51c94&amp;type=3#nox.cck.style" />
     <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
-    <Style src="project://database/Packages/nox.editor/Assets/nox.editor/panels.uss?fileID=7433441132597879392&amp;guid=714eb72dda480a944a65e84bce8547a4&amp;type=3#panels" />
-    <ui:ScrollView style="flex-grow: 1;">
-        <ui:Foldout name="sec-status" text="XR Status" value="true" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-status" class="pt-8" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-input" text="Input &amp; Tracking" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-input" class="pt-8" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-loaders" text="Loaders" value="true" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-loaders" class="pt-8" />
-            <ui:VisualElement name="loader-actions" class="flex-row flex-wrap pt-8" />
-            <ui:VisualElement name="loaders-list" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-devices" text="Devices" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-devices" class="pt-8" />
-            <ui:VisualElement name="devices-list" />
-            <ui:Label name="no-devices" text="No XR device detected" class="text-center opacity-75 mt-8" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-trackers" text="Trackers &amp; Full-Body" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-trackers" class="pt-8" />
-            <ui:VisualElement name="trackers-list" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-management" text="XR Plug-in Management" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-management" class="pt-8" />
-            <ui:VisualElement name="management-list" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-settings" text="Settings &amp; Actions" class="p-8 mb-8 border rounded-md">
-            <ui:VisualElement name="rows-settings" class="pt-8" />
-            <ui:VisualElement name="action-buttons" class="flex-row flex-wrap pt-8" />
-        </ui:Foldout>
-        <ui:Foldout name="sec-raw" text="Raw Devices (Unity)" class="p-8 border rounded-md">
-            <ui:VisualElement name="rows-raw" class="pt-8" />
-        </ui:Foldout>
-    </ui:ScrollView>
+
+    <ui:VisualElement style="flex-grow: 1;">
+        <ui:GroupBox class="m-0 p-8 border-b">
+            <ui:VisualElement class="flex-row align-center">
+                <ui:Label text="XR" class="title text-ellipsis" style="flex-grow: 1;" />
+                <ui:Button name="vr" text="Start VR" class="large me-8" tooltip="Start or stop the XR session (same action as XR/General/Start VR)." />
+                <ui:Button name="openxr" text="OpenXR" class="large" tooltip="Open the OpenXR settings (Project Settings &gt; XR Plug-in Management &gt; OpenXR), where the tracker features live." />
+            </ui:VisualElement>
+        </ui:GroupBox>
+
+        <ui:ScrollView style="flex-grow: 1;">
+            <!-- Status: what is running. Per-loader details live in Loaders and per-device ones in
+                 Devices, so nothing is repeated here. -->
+            <ui:Foldout name="sec-status" text="Status" value="true" class="section border-b">
+                <ui:VisualElement name="rows-status" />
+                <ui:VisualElement name="play-mode" class="notification info hidden mt-8">
+                    <ui:Label class="flex-grow text-wrap" text="Device data only exists while the game runs: enter Play mode to see the headset and the trackers." />
+                </ui:VisualElement>
+            </ui:Foldout>
+
+            <!-- Diagnosis first: it answers "why is my tracker not used?" in a single place. -->
+            <ui:Foldout name="sec-diagnosis" text="Diagnosis" value="true" class="section border-b">
+                <ui:VisualElement name="hints" />
+                <ui:Label name="no-hints" class="text-success hidden" text="Nothing to report: every device is either used or expected to be idle." />
+            </ui:Foldout>
+
+            <!-- Tracking: input provider and poses. -->
+            <ui:Foldout name="sec-tracking" text="Tracking" class="section border-b">
+                <ui:VisualElement name="rows-tracking" />
+            </ui:Foldout>
+
+            <!-- Devices: one row per InputDevice, with the exact verdict of the tracker filter. -->
+            <ui:Foldout name="sec-devices" text="Devices" value="true" class="section border-b">
+                <ui:VisualElement name="rows-devices" />
+                <ui:VisualElement name="devices" class="list" />
+                <ui:Label name="no-devices" class="text-center opacity-75 mt-8 hidden" text="No XR device reported by Unity." />
+            </ui:Foldout>
+
+            <!-- Trackers: what full-body uses, then the calibration that drives the rig. -->
+            <ui:Foldout name="sec-trackers" text="Trackers &amp; Full-Body" class="section border-b">
+                <ui:VisualElement name="rows-trackers" />
+                <ui:VisualElement name="trackers" class="list" />
+                <ui:Label name="no-trackers" class="text-center opacity-75 mt-8 hidden" text="No tracker is used by full-body tracking." />
+                <ui:VisualElement name="rows-full-body" class="mt-8" />
+                <ui:VisualElement name="bones" class="list" />
+            </ui:Foldout>
+
+            <!-- Loaders: the nox.xr chain, what XR Plug-in Management has, and how to switch. -->
+            <ui:Foldout name="sec-loaders" text="Loaders" class="section border-b">
+                <ui:VisualElement name="rows-loaders" />
+                <ui:VisualElement name="loaders" class="list" />
+                <ui:Label name="no-loaders" class="text-center opacity-75 mt-8 hidden" text="No XR loader registered." />
+            </ui:Foldout>
+
+            <ui:Foldout name="sec-settings" text="Settings" class="section border-b">
+                <ui:VisualElement name="rows-settings" />
+                <ui:VisualElement name="settings" />
+            </ui:Foldout>
+
+            <ui:VisualElement class="section">
+                <ui:VisualElement class="flex-row align-center">
+                    <ui:Label name="product" class="subtitle" style="flex-grow: 1;" />
+                    <ui:Button name="report" text="Copy report" class="large" tooltip="Copy the whole XR report (state, diagnosis, devices, trackers, full-body) to the clipboard." />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
 </ui:UXML>

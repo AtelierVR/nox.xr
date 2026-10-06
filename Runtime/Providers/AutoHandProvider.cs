@@ -4,11 +4,24 @@ using System.Collections.Generic;
 using Autohand;
 using Nox.CCK.XR;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.XR;
 
 namespace Nox.XR.Runtime.Providers {
 	public class AutoHandProvider : IXRInputProvider {
 		private static readonly List<InputDevice> _devices = new();
+
+		/// <summary>Événements de devices du runtime XR (le provider les relaie à nox.xr).</summary>
+		public readonly XRDeviceEvents Devices = new();
+
+		public UnityEvent<InputDevice> DeviceConnected
+			=> Devices.Connected;
+
+		public UnityEvent<InputDevice> DeviceDisconnected
+			=> Devices.Disconnected;
+
+		public UnityEvent<InputDevice> DeviceConfigChanged
+			=> Devices.ConfigChanged;
 
 		public static AutoHandPlayer Player
 			=> AutoHandPlayer.Instance;

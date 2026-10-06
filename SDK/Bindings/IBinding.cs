@@ -1,9 +1,6 @@
-using System.Threading.Tasks;
-using Cysharp.Threading.Tasks;
-
 namespace Nox.XR.Bindings {
 	/// <summary>
-	/// Bindings d'un runtime XR (OpenXR, OpenVR/SteamVR, ...), lus par clé.
+	/// Bindings d'un runtime XR (OpenXR, OpenVR, ...), lus par clé.
 	///
 	/// <para>
 	/// C'est l'objet que le loader actif rend via <c>IXRLoaderProvider.Binding</c>. Le <b>mod de

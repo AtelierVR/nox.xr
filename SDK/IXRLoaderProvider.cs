@@ -1,9 +1,10 @@
 using Cysharp.Threading.Tasks;
 using Nox.XR.Bindings;
+using Nox.XR.Trackers;
 
 namespace Nox.XR.Loaders {
 	/// <summary>
-	/// Fournisseur d'un loader XR (OpenXR, OpenVR/SteamVR, ...).
+	/// Fournisseur d'un loader XR (OpenXR, OpenVR, ...).
 	///
 	/// <para>
 	/// nox.xr ne connaît aucun loader : il expose cette interface et laisse les paquets
@@ -55,6 +56,22 @@ namespace Nox.XR.Loaders {
 		/// </para>
 		/// </summary>
 		IBinding Binding { get; }
+
+		/// <summary>
+		/// Trackers (suivi du corps entier) de ce runtime, ou <c>null</c> quand il n'en fournit pas.
+		///
+		/// <para>
+		/// Même principe que <see cref="Binding"/> : c'est le mod de loader qui sait lire les trackers
+		/// de son runtime, c'est donc lui qui les expose. nox.xr interroge <b>tous</b> les loaders
+		/// chargés (pas seulement celui qui pilote la XR) et déduplique par numéro de série, ce qui
+		/// permet à un runtime de compléter les trackers qu'un autre ne voit pas.
+		/// </para>
+		///
+		/// <para>
+		/// <c>null</c> pour un loader qui n'apporte rien de plus que les devices du runtime XR actif.
+		/// </para>
+		/// </summary>
+		ITrackerProvider Trackers { get; }
 
 		/// <summary>
 		/// Démarre le loader et ses sous-systèmes.

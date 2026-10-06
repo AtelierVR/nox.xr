@@ -11,6 +11,7 @@ using Logger = Nox.CCK.Utils.Logger;
 using Nox.Controllers;
 using Nox.Players;
 using Nox.XR.Runtime.Connectors;
+using Nox.XR.Runtime.FullBody;
 using Nox.XR.Runtime.Providers;
 using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -68,6 +69,13 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		}
 
 		public static async UniTask<bool> Make() {
+			// Idempotent : le proxy est déjà le contrôleur courant (le casque est déjà là, un appel
+			// concurrent suit une rafale d'événements de devices) — le recréer rechargerait l'avatar.
+			if (IsCurrent()) {
+				Logger.LogDebug("XR proxy already current, nothing to create.", tag: nameof(XRController));
+				return true;
+			}
+
 			if (!IsBetterThanCurrent()) {
 				Logger.LogError("XR is not better than the current.");
 				return false;

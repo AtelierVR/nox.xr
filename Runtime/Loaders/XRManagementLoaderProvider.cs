@@ -1,8 +1,10 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.XR.Bindings;
 using Nox.XR.Loaders;
+using Nox.XR.Trackers;
 using UnityEngine.XR.Management;
 
 namespace Nox.XR.Runtime.Loaders {
@@ -13,6 +15,12 @@ namespace Nox.XR.Runtime.Loaders {
 	/// <para>
 	/// Priorité 0 : il n'est retenu que si aucun mod de loader (<c>nox.xr.openxr</c>,
 	/// <c>nox.xr.openvr</c>) n'est installé, ce qui préserve le comportement historique.
+	/// </para>
+	///
+	/// <para>
+	/// <b>Refusé sous Windows</b> : une session Windows tourne exclusivement sous OpenXR
+	/// (<c>nox.xr.openxr</c>), alors que ce repli démarre n'importe quel loader configuré — exactement
+	/// ce que la règle veut empêcher. Il reste le dernier recours sur les autres plateformes.
 	/// </para>
 	/// </summary>
 	public sealed class XRManagementLoaderProvider : IXRLoaderProvider {
@@ -33,8 +41,21 @@ namespace Nox.XR.Runtime.Loaders {
 		public IBinding Binding
 			=> null;
 
+		/// <summary>
+		/// Aucun tracker propre : ce repli laisse XR Plug-in Management démarrer un loader inconnu de
+		/// nox.xr, donc ses trackers ne sont lisibles que comme devices XR communs (le repli générique
+		/// du suivi du corps entier, <c>FullBodyTrackers</c>).
+		/// </summary>
+		public ITrackerProvider Trackers
+			=> null;
+
 		public bool IsValid {
 			get {
+				// Windows est réservé à OpenXR : ce repli démarre ce que XR Plug-in Management a
+				// configuré, donc il ne doit jamais pouvoir être retenu là-bas.
+				if (PlatformExtensions.CurrentPlatform == Platform.Windows)
+					return false;
+
 				var manager = XRGeneralSettings.Instance?.Manager;
 				return manager?.activeLoaders?.Any(l => l != null) ?? false;
 			}

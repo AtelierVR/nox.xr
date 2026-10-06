@@ -2,7 +2,6 @@
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars;
@@ -96,14 +95,12 @@ namespace Nox.XR.Runtime {
 				return;
 			}
 
-			InputDevices.deviceConnected     += OnDeviceConnected;
-			InputDevices.deviceDisconnected  += OnDeviceDisconnected;
-			InputDevices.deviceConfigChanged += OnDeviceConfigChanged;
+			XRInputs.DeviceConnected.AddListener(OnDeviceConnected);
+			XRInputs.DeviceDisconnected.AddListener(OnDeviceDisconnected);
+			XRInputs.DeviceConfigChanged.AddListener(OnDeviceConfigChanged);
 
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevices(devices);
-			foreach (var device in devices)
-				await OnDeviceConnectedAsync(device);
+			// Les devices déjà présents arrivent eux aussi en rafale : même traitement différé.
+			ScheduleHeadsetWatch();
 		}
 
 		public async UniTask Quit() {
@@ -112,15 +109,15 @@ namespace Nox.XR.Runtime {
 				return;
 			}
 
-			InputDevices.deviceConnected     -= OnDeviceConnected;
-			InputDevices.deviceDisconnected  -= OnDeviceDisconnected;
-			InputDevices.deviceConfigChanged -= OnDeviceConfigChanged;
+			XRInputs.DeviceConnected.RemoveListener(OnDeviceConnected);
+			XRInputs.DeviceDisconnected.RemoveListener(OnDeviceDisconnected);
+			XRInputs.DeviceConfigChanged.RemoveListener(OnDeviceConfigChanged);
 
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevices(devices);
-			foreach (var device in devices)
-				await OnDeviceDisconnectedAsync(device);
+			// Les devices de la session vont tous se déconnecter : la surveillance n'a plus rien à
+			// vérifier, on l'arrête (l'incrément de version termine la boucle en cours).
+			_deviceWatchVersion++;
 
+			await XRController.Remove();
 			await XRLoaderManager.Stop();
 		}
 
@@ -128,31 +125,76 @@ namespace Nox.XR.Runtime {
 
 		#region Device Events
 
-		private void OnDeviceConnected(InputDevice device)
-			=> OnDeviceConnectedAsync(device).Forget();
+		/// <summary>
+		/// Délai de stabilisation après un événement de device (secondes). Unity réénumère <b>tous</b>
+		/// les devices d'un coup quand un tracker se branche/débranche ou qu'une feature OpenXR change :
+		/// on attend que la rafale soit finie avant d'agir, sinon le proxy XR (et donc l'avatar) serait
+		/// recréé pour rien.
+		/// </summary>
+		private const float DeviceSettleDelay = 0.75f;
 
-		private async UniTask OnDeviceConnectedAsync(InputDevice device) {
-			CoreAPI.LoggerAPI.Log($"Device connected: {device.name} {device.characteristics}");
-			if (!device.characteristics.HasFlag(InputDeviceCharacteristics.HeadMounted)) 
-				return;
-			if (await XRController.Make())
-				return;
-			CoreAPI.LoggerAPI.LogWarning($"Failed to {nameof(XRController)}.");
-		}
+		private bool _deviceWatchRunning;
+		private int  _deviceWatchVersion;
+
+		private void OnDeviceConnected(InputDevice device)
+			=> OnDeviceChanged(device, "connected");
 
 		private void OnDeviceDisconnected(InputDevice device)
-			=> OnDeviceDisconnectedAsync(device).Forget();
-
-		private async UniTask OnDeviceDisconnectedAsync(InputDevice device) {
-			CoreAPI.LoggerAPI.Log($"Device disconnected: {device.name} {device.characteristics}");
-			if (!device.characteristics.HasFlag(InputDeviceCharacteristics.HeadMounted))
-				return;
-			if (!await XRController.Remove())
-				CoreAPI.LoggerAPI.LogWarning($"Failed to remove {nameof(XRController)}.");
-		}
+			=> OnDeviceChanged(device, "disconnected");
 
 		private void OnDeviceConfigChanged(InputDevice device)
-			=> CoreAPI.LoggerAPI.Log($"Device config changed: {device.name} {device.characteristics}");
+			=> OnDeviceChanged(device, "config changed");
+
+		/// <summary>
+		/// Journalise le changement (en debug : ces rafales sont très bavardes) et replanifie la
+		/// vérification du casque. Les trackers et les manettes n'ont aucun effet direct : seul le casque
+		/// fait entrer/sortir de la VR, et il est regardé <b>après</b> le calme.
+		/// </summary>
+		private void OnDeviceChanged(InputDevice device, string change) {
+			CoreAPI?.LoggerAPI?.LogDebug($"Device {change}: {device.name} {device.characteristics}");
+			ScheduleHeadsetWatch();
+		}
+
+		private void ScheduleHeadsetWatch() {
+			_deviceWatchVersion++;
+			if (_deviceWatchRunning)
+				return;
+
+			_deviceWatchRunning = true;
+			WatchHeadsetAsync(_deviceWatchVersion).Forget();
+		}
+
+		/// <summary>
+		/// Attend la fin de la rafale d'événements, puis met le proxy XR en accord avec la présence réelle
+		/// du casque : création quand il apparaît, destruction quand il disparaît. Aucun effet quand
+		/// l'état correspond déjà — c'est ce qui évite de recharger l'avatar à chaque tracker.
+		/// </summary>
+		private async UniTaskVoid WatchHeadsetAsync(int version) {
+			while (version == _deviceWatchVersion)
+				await UniTask.Delay(TimeSpan.FromSeconds(DeviceSettleDelay));
+
+			_deviceWatchRunning = false;
+
+			if (CoreAPI == null || !XRLoaderManager.IsRunning)
+				return;
+
+			try {
+				var hasHeadset = XRInputs.HasHeadset;
+				var isCurrent  = XRController.IsCurrent();
+
+				if (hasHeadset == isCurrent)
+					return;
+
+				if (hasHeadset) {
+					if (!await XRController.Make())
+						CoreAPI.LoggerAPI.LogWarning($"Failed to {nameof(XRController)}.");
+				} else if (!await XRController.Remove()) {
+					CoreAPI.LoggerAPI.LogWarning($"Failed to remove {nameof(XRController)}.");
+				}
+			} catch (Exception e) {
+				CoreAPI.LoggerAPI.LogError($"Headset watch failed: {e.Message}");
+			}
+		}
 
 		#endregion
 		

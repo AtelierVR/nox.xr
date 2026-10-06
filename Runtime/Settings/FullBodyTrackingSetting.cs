@@ -1,5 +1,6 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
+using Nox.XR.Runtime.FullBody;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -16,7 +17,9 @@ namespace Nox.XR.Runtime.Settings {
 		public override int GetOrder() => 3;
 
 		public override bool IsActive()
-			=> EnableXRSetting.Value && Client.Instance != null;
+			=> Client.Instance != null
+			   && EnableXRSetting.Value
+			   && FullBodyCalibration.IsXRControllerActive;
 
 		public FullBodyTrackingSetting() {
 			SetValue(Value, notify: false);

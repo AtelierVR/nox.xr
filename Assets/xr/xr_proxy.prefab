@@ -1130,6 +1130,7 @@ GameObject:
   - component: {fileID: 82659967211542849}
   - component: {fileID: 7903719579555557988}
   - component: {fileID: 4157944591312504547}
+  - component: {fileID: 1418479159231371243}
   m_Layer: 0
   m_Name: Avatar
   m_TagString: Untagged
@@ -1193,6 +1194,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Nox.XR::Nox.XR.Connectors.MicrophoneConnector
   _initialSpeak: 2
+--- !u!114 &1418479159231371243
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7929152991253842747}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da605ad663430d54e9302ac05c23cd11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Runtime::Nox.XR.Runtime.FullBody.FullBodyCalibration
+  bones: 000000000500000006000000
+  avatarLoader: {fileID: 82659967211542849}
+  player: {fileID: 6788632155518835669}
 --- !u!1 &9005094917879979828
 GameObject:
   m_ObjectHideFlags: 0
@@ -12030,7 +12046,6 @@ MonoBehaviour:
   interactions:
   - {fileID: 0}
   - {fileID: 0}
-  microphone: {fileID: 4157944591312504547}
   autoFixViewHeight: 1
   defaultViewHeight: 1.7
 --- !u!114 &7182633630765526731

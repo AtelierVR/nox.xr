@@ -1,10 +1,22 @@
 using System.Collections.Generic;
 using Nox.CCK.XR;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.XR;
 
 namespace Nox.XR.Runtime.Providers {
 	public class UnityXR : IXRInputProvider {
+		/// <summary>Événements de devices du runtime XR (le provider est leur seule source).</summary>
+		public readonly XRDeviceEvents Devices = new();
+
+		public UnityEvent<InputDevice> DeviceConnected
+			=> Devices.Connected;
+
+		public UnityEvent<InputDevice> DeviceDisconnected
+			=> Devices.Disconnected;
+
+		public UnityEvent<InputDevice> DeviceConfigChanged
+			=> Devices.ConfigChanged;
 
 		public bool HasDevice(XRNode node) {
 			var devices = new List<InputDevice>();

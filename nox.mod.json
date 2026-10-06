@@ -41,6 +41,18 @@
       "register": "git+https://github.com/AtelierVR/nox.controllers.git"
     },
     {
+      "id": "control",
+      "type": "depends",
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/api.nox.control.git"
+    },
+    {
+      "id": "terminal",
+      "type": "depends",
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.terminal.git"
+    },
+    {
       "id": "avatar",
       "type": "depends",
       "version": ">=1.0.0",
