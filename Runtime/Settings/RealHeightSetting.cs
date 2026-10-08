@@ -45,7 +45,7 @@ namespace Nox.XR.Runtime.Settings {
 		protected override GameObject GetPrefab()
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/range.prefab");
 
-		public static float Value {
+		public static new float Value {
 			get => Config.Load().Get(ConfigKey, Config.Load().Get(LegacyConfigKey, Automatic));
 			set {
 				var config = Config.Load();

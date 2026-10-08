@@ -13,7 +13,6 @@ using Transform = UnityEngine.Transform;
 using Nox.Controllers;
 using Nox.Players;
 using UnityEngine.EventSystems;
-using Unity.XR.CoreUtils;
 
 namespace Nox.XR.Runtime {
 	public partial class XRController {
@@ -44,17 +43,6 @@ namespace Nox.XR.Runtime {
 			=> player.bodyCollider;
 
 		#region View Recentering (IXRController)
-
-		private XROrigin GetXrOrigin() {
-			if (_xrOrigin)
-				return _xrOrigin;
-
-			_xrOrigin = GetComponent<XROrigin>();
-			if (!_xrOrigin)
-				_xrOrigin = XROriginSetter.GlobalOrigin;
-
-			return _xrOrigin;
-		}
 
 		[NoxPublic(NoxAccess.Method)]
 		public float GetViewHeight()
@@ -102,10 +90,22 @@ namespace Nox.XR.Runtime {
 			Logger.LogDebug($"ReHeight: view → {height:F2} m (trackers {delta:+0.###;-0.###} m)", this);
 		}
 
+		/// <summary>
+		/// Recentres the view over the player: only the X/Z are corrected, the look direction and the height are
+		/// kept (see <see cref="ReHeight"/>).
+		/// </summary>
 		[NoxPublic(NoxAccess.Method)]
-		public void ReCenter()
-			=> ReCenter(transform.position, transform.forward);
+		public void ReCenter() {
+			// The proxy root stays where it was created, the AutoHandPlayer capsule is what moves with the player.
+			var position = player ? player.transform.position : transform.position;
+			var forward  = player && player.headCamera ? player.headCamera.transform.forward : transform.forward;
+			ReCenter(position, forward);
+		}
 
+		/// <summary>
+		/// Recentres the view on a world position, keeping the current height: the trackers node (the tracking
+		/// space, see <see cref="trackers"/>) is moved, so the body and the avatar do not follow the view.
+		/// </summary>
 		[NoxPublic(NoxAccess.Method)]
 		public void ReCenter(Vector3 worldPosition, Vector3 forward) {
 			var camera = GetCamera();
@@ -114,32 +114,25 @@ namespace Nox.XR.Runtime {
 				return;
 			}
 
-			var flatForward = Vector3.ProjectOnPlane(forward, Vector3.up);
-			// The current Y is kept: the vertical is handled by ReHeight().
-			var target = new Vector3(worldPosition.x, camera.transform.position.y, worldPosition.z);
-
-			var origin = GetXrOrigin();
-			if (origin) {
-				// XROrigin handles both tracking modes (Floor and Device).
-				origin.MoveCameraToWorldLocation(target);
-
-				if (flatForward.sqrMagnitude > 0.0001f)
-					origin.MatchOriginUpCameraForward(Vector3.up, flatForward.normalized);
-
-				Logger.LogDebug($"ReCenter: view → ({target.x:F2}, {target.z:F2}) forward {flatForward}", this);
+			if (!trackers) {
+				Logger.LogError($"{nameof(ReCenter)}: no trackers node on this XR proxy (see {nameof(trackers)}), cannot recenter the view.", this);
 				return;
 			}
 
-			// Fallback without an XROrigin: world rotation, then translation of the rig.
-			var camForward = Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up).normalized;
-			if (flatForward.sqrMagnitude > 0.0001f && camForward.sqrMagnitude > 0.0001f)
-				transform.rotation = Quaternion.FromToRotation(camForward, flatForward.normalized) * transform.rotation;
+			var flatForward = Vector3.ProjectOnPlane(forward, Vector3.up);
+			var camPosition = camera.transform.position;
 
-			var delta = target - camera.transform.position;
-			delta.y = 0f;
-			transform.position += delta;
+			if (flatForward.sqrMagnitude > 0.0001f) {
+				var camForward = Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up);
+				if (camForward.sqrMagnitude > 0.0001f)
+					trackers.RotateAround(camPosition, Vector3.up, Vector3.SignedAngle(camForward, flatForward, Vector3.up));
+			}
 
-			Logger.LogDebug($"ReCenter (fallback): view → ({target.x:F2}, {target.z:F2}) forward {flatForward}", this);
+			// The current Y is kept: the vertical is handled by ReHeight().
+			var delta = new Vector3(worldPosition.x - camPosition.x, 0f, worldPosition.z - camPosition.z);
+			trackers.position += delta;
+
+			Logger.LogDebug($"ReCenter: view → ({worldPosition.x:F2}, {worldPosition.z:F2}) forward {flatForward}", this);
 		}
 
 		[NoxPublic(NoxAccess.Method)]

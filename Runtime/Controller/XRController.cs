@@ -11,11 +11,9 @@ using Logger = Nox.CCK.Utils.Logger;
 using Nox.Controllers;
 using Nox.Players;
 using Nox.XR.Runtime.Connectors;
-using Nox.XR.Runtime.FullBody;
 using Nox.XR.Runtime.Providers;
 using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
-using Unity.XR.CoreUtils;
 using Nox.XR.Runtime.Loaders;
 
 namespace Nox.XR.Runtime {
@@ -178,8 +176,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		/// <summary>Max wait (seconds) for the avatar before the automatic height correction.</summary>
 		private const float AutoFixWaitSeconds = 5f;
 
-		private XROrigin _xrOrigin;
-
 
 		public void Dispose() {
 			DisposeNameplate();
@@ -197,18 +193,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		private void Start() {
 			StartupAutoHand().Forget();
 			AutoFixViewHeight().Forget();
-		}
-
-		/// <summary>
-		/// Brings the view to the recommended height when it starts under the floor (no headset, simulator, or
-		/// OpenXR reporting a floor origin). Does nothing when the measured height is plausible.
-		/// </summary>
-		private void SynchronizeControllerFromPlayer() {
-			if (_attachedPlayer == null)
-				return;
-			Logger.LogDebug($"Synchronizing controller from player at {_attachedPlayer.Position} with rotation {_attachedPlayer.Rotation}");
-			player.SetPosition(_attachedPlayer.Position);
-			player.SetRotation(_attachedPlayer.Rotation);
 		}
 	}
 }
