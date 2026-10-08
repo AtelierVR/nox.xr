@@ -38,8 +38,7 @@ namespace Nox.XR.Runtime {
 		public void OnInitializeMain(IMainModCoreAPI api) {
 			CoreAPI = api;
 
-			// Repli générique : la détection de devices (XRInputs.HasHeadset, Client.IsReady(),
-			// priorité du controller XR) doit fonctionner même sans provider de mod (AutoHand).
+				// Generic fallback: device detection must also work without a mod provider (AutoHand).
 			XRInputs.DefaultProvider ??= new UnityXR();
 
 			_lang = api.AssetAPI.GetAsset<LanguagePack>("lang.asset");
@@ -47,15 +46,22 @@ namespace Nox.XR.Runtime {
 
 			_settings = new IHandler[] {
 				new EnableXRSetting(),
-				new StartVRSetting(),
+				new StartVRSetting(),			
+				new RecenterViewSetting(),				
 				new PokeEnabledSetting(),
 				new PokeDisablePercentSetting(),
 				new IPDSetting(),
 				new FullBodyTrackingSetting(),
 				new CalibrateFullBodySetting(),
 				new FullBodyCalibrationRangeSetting(),
+				new RealHeightSetting(),
+				new PlayerArmSpanSetting(),
+				new EstimatePlayerMetricsSetting(),
 				new OneHandValidationSetting(),
-				new TrackersIncludeControllerSetting()
+				new TrackersIncludeControllerSetting(),
+				new TurnModeSetting(),
+				new SnapTurnAngleSetting(),
+				new SmoothTurnSpeedSetting()
 			};
 
 			foreach (var setting in _settings)

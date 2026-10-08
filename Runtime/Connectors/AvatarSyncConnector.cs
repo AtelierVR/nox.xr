@@ -3,6 +3,7 @@ using Autohand;
 using Nox.Avatars.Hand;
 using Nox.Avatars.Parameters;
 using Nox.Avatars.Rigging;
+using Nox.Avatars.Scale;
 using Nox.CCK;
 using Nox.CCK.Players;
 using Nox.CCK.XR;
@@ -11,6 +12,7 @@ using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 using NoxHandType = Nox.Avatars.Hand.HandType;
 using Nox.CCK.Avatars.Rigging;
+using Nox.XR.Runtime.Settings;
 
 namespace Nox.XR.Runtime.Connectors {
 	public class AvatarSyncConnector : MonoBehaviour {
@@ -19,6 +21,8 @@ namespace Nox.XR.Runtime.Connectors {
 
 		private IController _controller;
 		private bool _controllerSearched;
+		private XRController _xr;
+		private bool _xrSearched;
 		private IRigProvider _rigProvider;
 
 		// ReSharper disable Unity.PerformanceAnalysis
@@ -28,17 +32,10 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Local counterpart of <c>RemotePhysical.Update</c>: writes the tracked parts exposed by the
-		/// controller onto the avatar rig every frame, with no interpolation and no threshold.
-		/// <para>
-		/// The parts read here are the very values that are sent to the network, so a remote client replays
-		/// exactly what this writes (theirs interpolated between packets). <c>PlayerRig.Base</c> is skipped:
-		/// the local avatar's body is already driven by the rig and the player's physics, the part is only
-		/// sent so remote clients know where the body is. Parts the rig does not expose (fingers on a rig
-		/// limited to humanoid bones) are ignored by <see cref="RigPartDriver.Write"/>. Arms are written too:
-		/// the rig parts are the arm IK targets, so grabbing only swaps the target for the grab point and
-		/// the write stays harmlessly behind it.
-		/// </para>
+		/// Writes the tracked parts exposed by the controller onto the local rig every frame, with no
+		/// interpolation and no threshold. These are the values sent to the network, so a remote client replays
+		/// exactly what is written here. <c>PlayerRig.Base</c> is skipped: the local body is already driven by
+		/// the rig and the player's physics.
 		/// </summary>
 		private void DriveRigParts() {
 			var rig = RigProvider?.GetRig();
@@ -84,20 +81,81 @@ namespace Nox.XR.Runtime.Connectors {
 			}
 		}
 
-		private void LateUpdate() {
-			var anchor = avatarLoader?.GetAvatar()?.Descriptor?.Anchor;
-			if (anchor != null && player != null) {
-				var pos = anchor.transform.position;
-				pos.y = player.transform.position.y;
-				anchor.transform.position = pos;
+		/// <summary>XR proxy of this avatar, holding the serialized rig node references.</summary>
+		private XRController Xr {
+			get {
+				if (_xrSearched)
+					return _xr;
+
+				_xrSearched = true;
+				_xr = GetComponentInParent<XRController>();
+				if (!_xr)
+					Logger.LogWarning(
+						$"{nameof(AvatarSyncConnector)}: no {nameof(XRController)} above, the player pose is not fitted to the avatar.",
+						this
+					);
+
+				return _xr;
 			}
 		}
 
+		private void LateUpdate() {
+			RescaleTrackers();
+			GroundAvatar();
+		}
+
 		/// <summary>
-		/// Converts the player's world-space body velocity into a reference frame
-		/// aligned with the player's look direction (head forward projected onto
-		/// the horizontal plane). This fixed the mismatch between the raw
-		/// `player.body.linearVelocity` and the avatar's "true angular forward".
+		/// Scales the <c>trackers</c> node so the player's real pose matches the avatar's proportions: the
+		/// factor is the avatar's height divided by the player's (<see cref="RealHeightSetting"/>). 1 means the
+		/// avatar is the player's size.
+		/// </summary>
+		private void RescaleTrackers() {
+			var trackers = Xr ? Xr.trackers : null;
+			if (!trackers)
+				return;
+
+			var avatarHeight = AvatarHeight();
+			var realHeight   = RealHeightSetting.Value;
+			var factor       = avatarHeight > 0.1f && realHeight > 0.1f ? avatarHeight / realHeight : 1f;
+
+			if (Mathf.Approximately(trackers.localScale.y, factor))
+				return;
+
+			trackers.localScale = new Vector3(factor, factor, factor);
+			Logger.LogDebug($"Trackers ×{factor:F3} (avatar {avatarHeight:F2} m / player {realHeight:F2} m).", this);
+		}
+
+		/// <summary>
+		/// Keeps the avatar on the ground: the AutoHandPlayer moves its container vertically (view height,
+		/// crouching) and the avatar inherits it. That vertical component is cancelled on the
+		/// <c>avatarContainer</c> node, which still follows the container in X/Z and rotation.
+		/// </summary>
+		private void GroundAvatar() {
+			var avatar    = Xr ? Xr.avatarContainer : null;
+			var container = player ? player.trackingContainer : null;
+			if (!avatar || !container || avatar == container)
+				return;
+
+			var offset = -player.heightOffset;
+			var local  = avatar.localPosition;
+			if (Mathf.Approximately(local.y, offset))
+				return;
+
+			avatar.localPosition = new Vector3(local.x, offset, local.z);
+		}
+
+		/// <summary>
+		/// Real (world) height of the avatar in metres, from its scale module. The value is measured on the
+		/// model's rest pose, so it does not follow the animation or the trackers.
+		/// </summary>
+		private float AvatarHeight()
+			=> avatarLoader?.GetAvatar()?.Descriptor
+				?.GetModules<IScaleAvatarModule>()
+				.FirstOrDefault()?.Height ?? 0f;
+
+		/// <summary>
+		/// Converts the player's world body velocity into a frame aligned with the look direction (head forward
+		/// projected on the horizontal plane).
 		/// </summary>
 		private Vector3 GetLookVelocity() {
 			var worldVelocity = player.body?.linearVelocity ?? Vector3.zero;
@@ -191,12 +249,7 @@ namespace Nox.XR.Runtime.Connectors {
 					}
 					case "tracking/head/position":
 					case "tracking/head/rotation":
-						// Deliberately not written: the head pose travels as the `PlayerRig.Head` part (see
-						// `XRController.GetParts`), which is exactly what remote clients replay through
-						// `RemotePhysical.Update`, and the local rig target is written by `DriveRigParts`.
-						// Writing it a second time through these parameters only added a second writer, with a
-						// different cadence, a different formula (this one used to apply the eye offset) and a
-						// 1 mm threshold that held the head target in place.
+						// The head pose travels as the `PlayerRig.Head` part (see `XRController.GetParts`).
 						break;
 					case "tracking/left_hand/active": {
 						var active = XRInputs.HasHandLeft;
@@ -222,19 +275,17 @@ namespace Nox.XR.Runtime.Connectors {
 				}
 			}
 
-			var heightP = parameterModule.GetParameter("Height")
-				?? parameterModule.GetParameter("EyeHeight");
-			float maxHeight;
-			if (heightP != null)
-				maxHeight = heightP.Value.ToFloat();
-			else if (player.headCamera)
-				maxHeight = player.headCamera.transform.position.y - player.transform.position.y;
-			else
-				maxHeight = 1.7f;
+			// AutoHand needs the player's height as a bound; the pose scaling happens on the `trackers` node
+			// (see RescaleTrackers).
+			var avatarHeight = AvatarHeight();
+			var maxHeight = avatarHeight > 0.1f
+				? avatarHeight
+				: player.headCamera
+					? player.headCamera.transform.position.y - player.transform.position.y
+					: 1.7f;
 
 			if (!Mathf.Approximately(player.minMaxHeight.y, maxHeight))
 				player.minMaxHeight = new Vector2(player.minMaxHeight.x, maxHeight);
 		}
-
 	}
 }

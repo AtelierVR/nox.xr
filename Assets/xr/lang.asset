@@ -22,17 +22,17 @@ MonoBehaviour:
     - key: settings.group.xr.general.label
       value: "General"
     - key: settings.entry.xr.general.start_vr.label
-      value: "Virtual Reality"
+      value: "VR Mode"
     - key: settings.entry.xr.general.start_vr.start
-      value: "Enable"
+      value: "Enable VR"
     - key: settings.entry.xr.general.start_vr.stop
-      value: "Disable"
+      value: "Disable VR"
     - key: settings.entry.xr.general.enable_xr.label
       value: "Enable XR"
     - key: settings.entry.xr.general.poke.label
       value: "Enable Finger Poke"
     - key: settings.entry.xr.general.ipd.label
-      value: "IPD (Inter-Pupillary Distance)"
+      value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Poke Disable Threshold"
     - key: settings.entry.xr.general.full_body_tracking.label
@@ -45,10 +45,42 @@ MonoBehaviour:
       value: "Save Calibration"
     - key: settings.entry.xr.general.full_body_calibration_range.label
       value: "Calibration Range"
+    - key: settings.entry.xr.general.recenter.label
+      value: "Recenter View"
+    - key: settings.entry.xr.general.recenter.button
+      value: "Recenter"
+    - key: settings.entry.xr.fbt.real_height.label
+      value: "Real Height"
+    - key: settings.entry.xr.general.player_arm_span.label
+      value: "Arm Span"
+    - key: settings.entry.xr.general.estimate_player_metrics.label
+      value: "Estimate Height / Arm Span"
+    - key: settings.group.xr.fbt.label
+      value: "Full-Body Tracking"
+    - key: settings.group.xr.interaction.label
+      value: "Interaction"
+    - key: settings.entry.xr.general.estimate_player_metrics.estimating
+      value: "Stay in T-pose... {0}s"
     - key: settings.entry.xr.general.one_hand_validation.label
       value: "One-Hand Validation"
     - key: settings.entry.xr.general.trackers_include_controller.label
       value: "Trackers Flagged as Controllers"
+    - key: settings.group.xr.movement.label
+      value: "Movement"
+    - key: settings.entry.xr.movement.turn_mode.label
+      value: "Turn Mode"
+    - key: settings.entry.xr.movement.turn_mode.option.snap
+      value: "Snap Turn"
+    - key: settings.entry.xr.movement.turn_mode.option.smooth
+      value: "Continuous Rotation"
+    - key: settings.entry.xr.movement.snap_turn_angle.label
+      value: "Snap Turn Angle"
+    - key: settings.entry.xr.movement.smooth_turn_speed.label
+      value: "Continuous Turn Speed"
+    - key: settings.range.value.degrees
+      value: "{0}°"
+    - key: settings.range.value.degrees_per_second
+      value: "{0}°/s"
     - key: terminal.command.xr.description
       value: "XR diagnostics: loaders, devices, trackers and full-body calibration."
     - key: terminal.command.xr.short
@@ -64,17 +96,17 @@ MonoBehaviour:
     - key: settings.group.xr.general.label
       value: "Général"
     - key: settings.entry.xr.general.start_vr.label
-      value: "Réalité Virtuelle"
+      value: "Mode VR"
     - key: settings.entry.xr.general.start_vr.start
-      value: "Activer"
+      value: "Activer la VR"
     - key: settings.entry.xr.general.start_vr.stop
-      value: "Désactiver"
+      value: "Désactiver la VR"
     - key: settings.entry.xr.general.enable_xr.label
       value: "Activer la XR"
     - key: settings.entry.xr.general.poke.label
       value: "Activer le poke des doigts"
     - key: settings.entry.xr.general.ipd.label
-      value: "IPD (Distance Inter-Pupillaire)"
+      value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Seuil de désactivation du poke"
     - key: settings.entry.xr.general.full_body_tracking.label
@@ -87,10 +119,42 @@ MonoBehaviour:
       value: "Enregistrer la calibration"
     - key: settings.entry.xr.general.full_body_calibration_range.label
       value: "Portée de calibration"
+    - key: settings.entry.xr.general.recenter.label
+      value: "Recentrer la vue"
+    - key: settings.entry.xr.general.recenter.button
+      value: "Recentrer"
+    - key: settings.entry.xr.fbt.real_height.label
+      value: "Taille réelle"
+    - key: settings.entry.xr.general.player_arm_span.label
+      value: "Envergure des bras"
+    - key: settings.entry.xr.general.estimate_player_metrics.label
+      value: "Estimer taille / envergure"
+    - key: settings.group.xr.fbt.label
+      value: "Suivi du corps entier"
+    - key: settings.group.xr.interaction.label
+      value: "Interaction"
+    - key: settings.entry.xr.general.estimate_player_metrics.estimating
+      value: "Restez en T-pose... {0}s"
     - key: settings.entry.xr.general.one_hand_validation.label
       value: "Validation à une main"
     - key: settings.entry.xr.general.trackers_include_controller.label
       value: "Trackers signalés comme manettes"
+    - key: settings.group.xr.movement.label
+      value: "Mouvement"
+    - key: settings.entry.xr.movement.turn_mode.label
+      value: "Mode de rotation"
+    - key: settings.entry.xr.movement.turn_mode.option.snap
+      value: "Rotation par crans"
+    - key: settings.entry.xr.movement.turn_mode.option.smooth
+      value: "Rotation continue"
+    - key: settings.entry.xr.movement.snap_turn_angle.label
+      value: "Angle de rotation par crans"
+    - key: settings.entry.xr.movement.smooth_turn_speed.label
+      value: "Vitesse de rotation continue"
+    - key: settings.range.value.degrees
+      value: "{0}°"
+    - key: settings.range.value.degrees_per_second
+      value: "{0}°/s"
     - key: terminal.command.xr.description
       value: "Diagnostic XR : loaders, périphériques, trackers et calibration du corps entier."
     - key: terminal.command.xr.short

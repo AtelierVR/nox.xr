@@ -12,9 +12,9 @@ namespace Nox.XR.Runtime.Settings {
 		private const string ConfigKey = "settings.xr.one_hand_validation";
 
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "one_hand_validation" };
+			=> new[] { "xr", "interaction", "one_hand_validation" };
 
-		public override int GetOrder() => 6;
+		public override int GetOrder() => 2;
 
 		public override bool IsActive()
 			=> Client.Instance != null

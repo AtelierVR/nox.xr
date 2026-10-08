@@ -17,12 +17,14 @@ namespace Nox.XR.Runtime.Settings {
 
 		public override bool IsActive() => true;
 
+		/// <summary>
+		/// Le texte dépend de <see cref="XRLoaderManager.IsRunning"/>, qui change aussi sans passer par ce
+		/// réglage (démarrage automatique en arrivant en jeu, sortie de VR par le bouton, entrée/sortie depuis
+		/// les mods) : on le rafraîchit donc à chaque notification, quel que soit le réglage qui l'a déclenchée.
+		/// </summary>
 		public override void OnUpdated(IHandler handler) {
-			if (handler is EnableXRSetting) {
-				SetInteractable(EnableXRSetting.Value);
-				RefreshLabel();
-			} else if (handler == this)
-				RefreshLabel();
+			SetInteractable(EnableXRSetting.Value);
+			RefreshLabel();
 		}
 
 		public StartVRSetting() {

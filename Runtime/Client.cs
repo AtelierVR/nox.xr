@@ -9,6 +9,7 @@ using Nox.Controllers;
 using Nox.UI;
 using Nox.CCK.XR;
 using Nox.Nameplate;
+using Nox.Settings;
 using Nox.Users;
 using UnityEngine;
 using Nox.XR.Runtime.Loaders;
@@ -77,6 +78,7 @@ namespace Nox.XR.Runtime {
 
         public async UniTask OnDisposeClientAsync() {
 			StandUpWidget.Hide();
+			FullBodyCalibrationWidget.Hide();
 
 			foreach (var e in _events)
 				CoreAPI?.EventAPI.Unsubscribe(e);
@@ -99,8 +101,11 @@ namespace Nox.XR.Runtime {
 			XRInputs.DeviceDisconnected.AddListener(OnDeviceDisconnected);
 			XRInputs.DeviceConfigChanged.AddListener(OnDeviceConfigChanged);
 
-			// Les devices déjà présents arrivent eux aussi en rafale : même traitement différé.
+			// Already present devices also arrive in a burst: same deferred handling.
 			ScheduleHeadsetWatch();
+
+			// The loader state drives several XR settings (Start VR label, IPD…).
+			SettingsNotifier.NotifyUpdated(null);
 		}
 
 		public async UniTask Quit() {
@@ -113,24 +118,20 @@ namespace Nox.XR.Runtime {
 			XRInputs.DeviceDisconnected.RemoveListener(OnDeviceDisconnected);
 			XRInputs.DeviceConfigChanged.RemoveListener(OnDeviceConfigChanged);
 
-			// Les devices de la session vont tous se déconnecter : la surveillance n'a plus rien à
-			// vérifier, on l'arrête (l'incrément de version termine la boucle en cours).
+			// The session devices are all about to disconnect: stop the watch.
 			_deviceWatchVersion++;
 
 			await XRController.Remove();
 			await XRLoaderManager.Stop();
+
+			SettingsNotifier.NotifyUpdated(null);
 		}
 
 		#endregion
 
 		#region Device Events
 
-		/// <summary>
-		/// Délai de stabilisation après un événement de device (secondes). Unity réénumère <b>tous</b>
-		/// les devices d'un coup quand un tracker se branche/débranche ou qu'une feature OpenXR change :
-		/// on attend que la rafale soit finie avant d'agir, sinon le proxy XR (et donc l'avatar) serait
-		/// recréé pour rien.
-		/// </summary>
+		/// <summary>Settle delay after a device event, in seconds.</summary>
 		private const float DeviceSettleDelay = 0.75f;
 
 		private bool _deviceWatchRunning;
@@ -145,11 +146,7 @@ namespace Nox.XR.Runtime {
 		private void OnDeviceConfigChanged(InputDevice device)
 			=> OnDeviceChanged(device, "config changed");
 
-		/// <summary>
-		/// Journalise le changement (en debug : ces rafales sont très bavardes) et replanifie la
-		/// vérification du casque. Les trackers et les manettes n'ont aucun effet direct : seul le casque
-		/// fait entrer/sortir de la VR, et il est regardé <b>après</b> le calme.
-		/// </summary>
+		/// <summary>Logs the change and reschedules the headset watch.</summary>
 		private void OnDeviceChanged(InputDevice device, string change) {
 			CoreAPI?.LoggerAPI?.LogDebug($"Device {change}: {device.name} {device.characteristics}");
 			ScheduleHeadsetWatch();
@@ -165,9 +162,7 @@ namespace Nox.XR.Runtime {
 		}
 
 		/// <summary>
-		/// Attend la fin de la rafale d'événements, puis met le proxy XR en accord avec la présence réelle
-		/// du casque : création quand il apparaît, destruction quand il disparaît. Aucun effet quand
-		/// l'état correspond déjà — c'est ce qui évite de recharger l'avatar à chaque tracker.
+		/// Waits for the burst to settle, then creates or removes the XR proxy to match the headset presence.
 		/// </summary>
 		private async UniTaskVoid WatchHeadsetAsync(int version) {
 			while (version == _deviceWatchVersion)
@@ -177,6 +172,9 @@ namespace Nox.XR.Runtime {
 
 			if (CoreAPI == null || !XRLoaderManager.IsRunning)
 				return;
+
+			// The usable tracker count may have changed with the burst.
+			FullBodyCalibrationWidget.Refresh();
 
 			try {
 				var hasHeadset = XRInputs.HasHeadset;
@@ -201,7 +199,8 @@ namespace Nox.XR.Runtime {
 		#region Widget
 
 		/// <summary>
-		/// Fournit les widgets du mod à la page qui les demande (voir <see cref="StandUpWidget"/>).
+		/// Provides the mod widgets to the requesting page. The request expects every widget of the mod: the
+		/// page collects one entry per callback call.
 		/// </summary>
 		private static void OnWidgetRequest(EventData context) {
 			if (!context.TryGet(0, out int mid)) return;
@@ -212,16 +211,20 @@ namespace Nox.XR.Runtime {
 
 			if (StandUpWidget.TryMake(menu, parent, out var widget) && widget.Item2 != null)
 				context.Callback(widget.Item2, widget.Item1);
+
+			if (FullBodyCalibrationWidget.TryMake(menu, parent, out widget) && widget.Item2 != null)
+				context.Callback(widget.Item2, widget.Item1);
 		}
 
-		/// <summary>
-		/// Le bouton « Stand up » n'a de sens que si le proxy XR est le contrôleur courant :
-		/// on l'ajoute ou le retire à chaud quand le contrôleur courant change.
-		/// </summary>
+		/// <summary>Adds or removes the widgets when the current controller changes.</summary>
 		private static void OnCurrentControllerChanged(EventData context) {
-			if (context.TryGet<IXRController>(0, out var _))
+			if (context.TryGet<IXRController>(0, out var _)) {
 				StandUpWidget.Show();
-			else StandUpWidget.Hide();
+				FullBodyCalibrationWidget.Refresh();
+			} else {
+				StandUpWidget.Hide();
+				FullBodyCalibrationWidget.Hide();
+			}
 		}
 
 		#endregion

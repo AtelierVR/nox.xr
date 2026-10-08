@@ -5,15 +5,11 @@ using UnityEngine.XR;
 
 namespace Nox.XR.Runtime.FullBody {
 	/// <summary>
-	/// Trackers du runtime XR actif, tels que les <see cref="InputDevice"/> les exposent (tout runtime
-	/// publiant des trackers génériques, OpenXR compris).
+	/// Trackers of the active XR runtime, as <see cref="InputDevice"/> exposes them (any runtime publishing
+	/// generic trackers, OpenXR included).
 	/// <para>
-	/// C'est le repli générique de nox.xr : il ne dépend d'aucune API de runtime. Un loader qui sait
-	/// mieux lire les trackers de son runtime les expose via <c>IXRLoaderProvider.Trackers</c>.
-	/// </para>
-	/// <para>
-	/// Ce provider porte aussi le filtre des trackers (<see cref="IsCandidate"/>), réutilisé par les
-	/// diagnostics : la raison affichée est exactement celle qui a rejeté le device en jeu.
+	/// This is the generic fallback of nox.xr: it depends on no runtime API. It also carries the tracker
+	/// filter (<see cref="IsCandidate"/>), reused by the diagnostics.
 	/// </para>
 	/// </summary>
 	public sealed class XRInputDevicesTrackerProvider : ITrackerProvider {
@@ -112,11 +108,18 @@ namespace Nox.XR.Runtime.FullBody {
 				device.TryGetFeatureValue(CommonUsages.devicePosition, out var position);
 				device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rotation);
 
-				// Poses en espace de suivi : c'est nox.xr qui applique l'origine XR à tous les providers.
+				// Velocities travel with the pose: a part carries them and the remote side uses them (physics,
+				// interpolation). Not every runtime exposes them, hence the guarded reads (0 when missing).
+				device.TryGetFeatureValue(CommonUsages.deviceVelocity, out var velocity);
+				device.TryGetFeatureValue(CommonUsages.deviceAngularVelocity, out var angularVelocity);
+
+				// Tracking-space poses: nox.xr applies the XR origin to every provider.
 				into.Add(new TrackerPose {
-					Id       = string.IsNullOrEmpty(device.serialNumber) ? $"{device.name}#{i}" : device.serialNumber,
-					Position = position,
-					Rotation = rotation
+					Id              = string.IsNullOrEmpty(device.serialNumber) ? $"{device.name}#{i}" : device.serialNumber,
+					Position        = position,
+					Rotation        = rotation,
+					Velocity        = velocity,
+					AngularVelocity = angularVelocity
 				});
 			}
 		}

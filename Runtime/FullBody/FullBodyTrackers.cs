@@ -7,27 +7,11 @@ using UnityEngine.XR;
 
 namespace Nox.XR.Runtime.FullBody {
 	/// <summary>
-	/// Trackers utilisés par le suivi du corps entier.
-	///
-	/// <para>
-	/// Les trackers viennent des loaders XR (<see cref="IXRLoaderProvider.Trackers"/>), comme les
-	/// entrées viennent de <see cref="IXRLoaderProvider.Binding"/> : nox.xr ne connaît aucun runtime.
-	/// Les loaders de <b>tous</b> les mods chargés sont interrogés (pas seulement celui qui pilote la
-	/// XR) puis dédupliqués par numéro de série, donc un runtime peut compléter les trackers qu'un
-	/// autre ne voit pas.
-	/// </para>
-	///
-	/// <para>
-	/// Les devices du runtime XR actif (<see cref="XRInputDevicesTrackerProvider"/>) sont ajoutés en
-	/// dernier : c'est le repli générique, qui couvre les runtimes dont le loader n'expose pas de
-	/// <see cref="ITrackerProvider"/>.
-	/// </para>
+	/// Trackers used by full-body tracking. They come from the XR loaders of every loaded mod (deduplicated by
+	/// serial), then from the generic <see cref="XRInputDevicesTrackerProvider"/> fallback.
 	/// </summary>
 	public static class FullBodyTrackers {
-		/// <summary>
-		/// Fournisseurs interrogés, dans l'ordre de lecture : les loaders connus (runtime actif en
-		/// premier) puis le repli générique des devices XR.
-		/// </summary>
+		/// <summary>Providers read in order: known loaders first, then the generic XR device fallback.</summary>
 		public static List<ITrackerProvider> Providers() {
 			var providers = new List<ITrackerProvider>();
 
@@ -57,14 +41,8 @@ namespace Nox.XR.Runtime.FullBody {
 			=> IsCandidate(device, excludeHanded, true, out reason);
 
 		/// <summary>
-		/// Transform dans lequel les poses des devices XR sont exprimées : le <i>camera floor offset</i>
-		/// de l'<see cref="XROrigin"/> (l'objet dont la caméra XR est l'enfant), et non la racine du rig.
-		/// <para>
-		/// La distinction est essentielle : la racine du rig peut être à un endroit du monde arbitraire
-		/// (elle ne bouge pas quand le joueur marche, c'est le rig qui la déplace), alors que les poses
-		/// des devices sont relatives à l'espace de suivi — celui du <c>TrackedPoseDriver</c> de la
-		/// caméra. Passer par la mauvaise racine plaçait les trackers à plusieurs mètres des bones.
-		/// </para>
+		/// Space the XR device poses are expressed in: the camera floor offset of the <see cref="XROrigin"/>
+		/// (the object the XR camera is a child of), not the rig root, which sits anywhere in the world.
 		/// </summary>
 		public static Transform TrackingSpace() {
 			var origin = XROriginSetter.GlobalOrigin;
@@ -100,8 +78,8 @@ namespace Nox.XR.Runtime.FullBody {
 		}
 
 		/// <summary>
-		/// Ramène dans l'espace monde les poses des entrées à partir de <paramref name="from"/> : les
-		/// providers publient l'espace de suivi de leur runtime, l'origine XR appartient à nox.xr.
+		/// Brings the entries from <paramref name="from"/> to world space: providers publish their runtime
+		/// tracking space, the XR origin belongs to nox.xr.
 		/// </summary>
 		private static void ToWorldSpace(List<TrackerPose> trackers, int from, Transform origin) {
 			if (!origin)
@@ -111,7 +89,10 @@ namespace Nox.XR.Runtime.FullBody {
 				var tracker = trackers[i];
 				tracker.Position = origin.TransformPoint(tracker.Position);
 				tracker.Rotation = origin.rotation * tracker.Rotation;
-				trackers[i]       = tracker;
+				// Velocities are tracking-space directions: rotate them, do not translate.
+				tracker.Velocity        = origin.rotation * tracker.Velocity;
+				tracker.AngularVelocity = origin.rotation * tracker.AngularVelocity;
+				trackers[i]             = tracker;
 			}
 		}
 

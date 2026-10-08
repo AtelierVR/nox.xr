@@ -4,21 +4,26 @@ using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.UI;
 using Nox.UI.Widgets;
+using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Nox.XR.Runtime.Widgets {
 	/// <summary>
-	/// "Stand up" widget: recentres the rig's view and brings it back to the recommended height (see
-	/// <see cref="IXRController.ReCenterAndReHeight"/>). Added or removed live when the current controller
-	/// changes.
+	/// Full-body calibration widget: starts a calibration, or confirms the one running — the same action as
+	/// <see cref="CalibrateFullBodySetting"/>, without opening the menu.
+	/// <para>
+	/// Only available when a calibration makes sense: the XR proxy is current and at least one tracker is
+	/// usable (<see cref="IsAvailable"/>).
+	/// </para>
 	/// </summary>
-	public class StandUpWidget : MonoBehaviour, IWidget {
+	public class FullBodyCalibrationWidget : MonoBehaviour, IWidget {
 		public static string GetDefaultKey()
-			=> "stand_up";
+			=> "full_body_calibration";
 
 		/// <summary>Live instances.</summary>
-		internal static readonly HashSet<StandUpWidget> All = new();
+		internal static readonly HashSet<FullBodyCalibrationWidget> All = new();
 
 		/// <summary>Last widget container a page provided (see <see cref="Show"/>).</summary>
 		private static IMenu _menu;
@@ -38,23 +43,29 @@ namespace Nox.XR.Runtime.Widgets {
 		public Vector2Int GetSize()
 			=> Vector2Int.one;
 
-		/// <summary>Before the navigation widgets: a fallback action.</summary>
+		/// <summary>Right after <see cref="StandUpWidget"/> (101): a tracking action, not a fallback.</summary>
 		public int GetPriority()
-			=> 101;
+			=> 102;
 
-		/// <summary>True when the current controller is the XR proxy.</summary>
+		/// <summary>
+		/// True when the XR proxy is the current controller and <see cref="FullBodyCalibration.TrackerCount"/>
+		/// reports at least one tracker.
+		/// </summary>
 		public static bool IsAvailable()
-			=> Client.ControllerAPI?.Current is IXRController;
+			=> Client.ControllerAPI?.Current is IXRController
+			   && FullBodyCalibration.TrackerCount > 0;
 
-		/// <summary>Recentres the view and brings it to the height recommended for the current avatar.</summary>
-		public static void StandUp() {
-			if (Client.ControllerAPI?.Current is not IXRController controller)
+		/// <summary>Starts the calibration, or confirms it when one is running.</summary>
+		private void OnClick() {
+			var calibration = FullBodyCalibration.Instance;
+			if (calibration == null)
 				return;
-			controller.ReCenterAndReHeight();
-		}
 
-		private void OnClick()
-			=> StandUp();
+			if (calibration.IsCalibrating)
+				calibration.ConfirmCalibration();
+			else
+				calibration.StartCalibration();
+		}
 
 		/// <summary>Builds the grid item, or returns false when the button is not available.</summary>
 		public static bool TryMake(IMenu menu, RectTransform parent, out (GameObject, IWidget) values) {
@@ -68,7 +79,7 @@ namespace Nox.XR.Runtime.Widgets {
 
 			var prefab    = Client.CoreAPI.AssetAPI.GetAsset<GameObject>("ui:prefabs/grid_item.prefab");
 			var instance  = prefab.Instantiate(parent);
-			var component = instance.AddComponent<StandUpWidget>();
+			var component = instance.AddComponent<FullBodyCalibrationWidget>();
 
 			var button = Reference.GetComponent<Button>("button", instance);
 			button.onClick.AddListener(component.OnClick);
@@ -83,6 +94,14 @@ namespace Nox.XR.Runtime.Widgets {
 			return true;
 		}
 
+		/// <summary>Adds or removes the button to match the current state.</summary>
+		internal static void Refresh() {
+			if (IsAvailable())
+				Show();
+			else
+				Hide();
+		}
+
 		/// <summary>
 		/// Adds the button to the current page unless it is already there. The menu keeps several copies of each
 		/// page, so the test is per page and not on the global instance count.
@@ -91,7 +110,7 @@ namespace Nox.XR.Runtime.Widgets {
 			if (!_parent || _menu == null || !IsAvailable())
 				return;
 
-			if (_parent.GetComponentInChildren<StandUpWidget>(true))
+			if (_parent.GetComponentInChildren<FullBodyCalibrationWidget>(true))
 				return;
 
 			if (!TryMake(_menu, _parent, out var values) || values.Item2 == null)
@@ -114,8 +133,8 @@ namespace Nox.XR.Runtime.Widgets {
 		}
 
 		private async UniTask UpdateIcon() {
-			var icon      = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>("ui:icons/person.png");
-			var labelIcon = Reference.GetComponent<Image>("icon", _content);
+			var icon         = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>("ui:icons/fbt.png");
+			var labelIcon    = Reference.GetComponent<Image>("icon", _content);
 			labelIcon.sprite = icon;
 		}
 	}

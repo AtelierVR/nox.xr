@@ -15,6 +15,15 @@ namespace Nox.XR.Trackers {
 		public Vector3    Position;
 		public Quaternion Rotation;
 
+		/// <summary>
+		/// Vitesse du device, dans le même espace que <see cref="Position"/> (le runtime la fournit via
+		/// <c>CommonUsages.deviceVelocity</c>). Reste à zéro quand le runtime ne l'expose pas.
+		/// </summary>
+		public Vector3 Velocity;
+
+		/// <summary>Vitesse angulaire (rad/s), même espace que <see cref="Rotation"/>.</summary>
+		public Vector3 AngularVelocity;
+
 		public override string ToString()
 			=> $"{Id} @ {Position}";
 	}

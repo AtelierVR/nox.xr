@@ -22,15 +22,12 @@ namespace Nox.XR.Runtime.FullBody {
 	/// <summary>
 	/// Full-body tracking calibration and driver for the local XR player.
 	/// <para>
-	/// <b>Calibration</b> demande à l'avatar sa pose de calibration — la couche standard « Pose »,
-	/// <see cref="AvatarPose.Calibration"/> — puis affiche chaque tracker détecté comme une sphère à côté du
-	/// bone auquel il est rattaché et le relie au bone compatible le plus proche dans la portée de
-	/// <see cref="FullBodyCalibrationRangeSetting"/> (au plus un tracker par bone). Les offsets obtenus sont
-	/// mémorisés par numéro de série d'appareil (voir <see cref="FullBodyCalibrationData"/>) et réappliqués ensuite.
+	/// <b>Calibration</b> asks the avatar for its calibration pose (<see cref="AvatarPose.Calibration"/>) and
+	/// links every detected tracker to the closest compatible bone within
+	/// <see cref="FullBodyCalibrationRangeSetting"/> (at most one tracker per bone).
 	/// </para>
 	/// <para>
-	/// <b>Driving</b> writes the calibrated hip/foot rig targets every frame from the tracker poses,
-	/// with the position offset re-scaled by the avatar scale so the result survives avatar scaling.
+	/// <b>Driving</b> writes the calibrated rig targets every frame from the tracker poses.
 	/// </para>
 	/// </summary>
 	[DefaultExecutionOrder(16)]
@@ -38,10 +35,7 @@ namespace Nox.XR.Runtime.FullBody {
 		public static FullBodyCalibration Instance { get; private set; }
 
 		/// <summary>
-		/// Bones a tracker may be assigned to: the parts the avatar's rig actually exposes
-		/// (<see cref="IRigging.GetParts"/> — each part id is a <see cref="PlayerRig"/> — converted to a humanoid bone).
-		/// Sourcing them from the rig makes the calibration follow whatever the active backend provides
-		/// (FinalIK exposes pelvis/feet, RigBuilder also exposes spine/arms/legs/toes) instead of a hard-coded list.
+		/// Bones a tracker may be assigned to: the parts the avatar's rig exposes, converted to humanoid bones.
 		/// </summary>
 		public static List<HumanBodyBones> GetAssignableBones(IRigging rig) {
 			var bones = new List<HumanBodyBones>();
@@ -63,7 +57,7 @@ namespace Nox.XR.Runtime.FullBody {
 		public AvatarLoaderConnector avatarLoader;
 		public AutoHandPlayer         player;
 
-		/// <summary>Bones pilotés sur lesquels l'avertissement « aucune cible IK » a déjà été émis.</summary>
+		/// <summary>Bones already reported as having no IK target.</summary>
 		private readonly HashSet<HumanBodyBones> _missingParts = new();
 
 		// Owned by this mod (nox.xr): assets live in Packages/nox.xr/Assets/xr/calibration.
@@ -74,19 +68,16 @@ namespace Nox.XR.Runtime.FullBody {
 		private readonly List<TrackerPose> _trackers = new();
 		private readonly Dictionary<HumanBodyBones, TrackerPose> _matches = new();
 
-		/// <summary>Validation armée (voir <see cref="CheckValidation"/>).</summary>
+		/// <summary>Validation armed (see <see cref="CheckValidation"/>).</summary>
 		private bool _validationLatch;
 
-		/// <summary>Temps restant avant que la validation ne puisse s'armer, après le lancement.</summary>
+		/// <summary>Time left before the validation may arm.</summary>
 		private float _validationArmedIn;
 
-		/// <summary>Délai d'armement de la validation (l'appui qui lance la calibration doit retomber).</summary>
+		/// <summary>Arming delay: the press that starts a calibration must be released first.</summary>
 		private const float ValidationArmDelay = 0.35f;
 
-		/// <summary>
-		/// Blocage temporaire après une validation : le même appui peut valider (aux manettes) et cliquer le
-		/// bouton du menu, ce qui relancerait une calibration aussitôt après l'avoir validée.
-		/// </summary>
+		/// <summary>Short lockout after a validation, so the same press cannot start a new calibration.</summary>
 		private float _restartCooldown;
 
 		private const float RestartCooldown = 0.5f;
@@ -101,6 +92,34 @@ namespace Nox.XR.Runtime.FullBody {
 
 		public bool HasCalibration
 			=> !_data.IsEmpty;
+
+		/// <summary>
+		/// IK targets of the tracked bones (key = part index), published so the controller can expose them as
+		/// parts: that channel (threshold, interpolation, batching) is what lets a viewer replay the pose applied
+		/// locally. Velocities come straight from the tracker device.
+		/// </summary>
+		private static readonly Dictionary<ushort, (Vector3 Position, Quaternion Rotation, Vector3 Velocity, Vector3 Angular)> DriverTargets = new();
+
+		/// <summary>Part ids of the full-body targets currently driven by a tracker.</summary>
+		public static ICollection<ushort> DriverTargetIds
+			=> DriverTargets.Keys;
+
+		/// <summary>
+		/// Target of a part, when a tracker drives it: a fresh <see cref="TransformObject"/> carrying the pose
+		/// (position/rotation) and the tracker velocities, so callers may own and mutate it.
+		/// </summary>
+		public static bool TryGetDriverTarget(ushort partId, out TransformObject target) {
+			target = null;
+			if (!DriverTargets.TryGetValue(partId, out var driven))
+				return false;
+
+			target = new TransformObject();
+			target.SetPosition(driven.Position);
+			target.SetRotation(driven.Rotation);
+			target.SetVelocity(driven.Velocity);
+			target.SetAngular(driven.Angular);
+			return true;
+		}
 
 		#region Diagnostics
 
@@ -134,6 +153,25 @@ namespace Nox.XR.Runtime.FullBody {
 		public static bool IsXRControllerActive
 			=> XRController.IsCurrent();
 
+		/// <summary>
+		/// Usable trackers right now, with the same filters as the calibration: hands and controllers are
+		/// excluded, a tracker flagged as a controller counts when <see cref="AllowControllerFlaggedTrackers"/> is on.
+		/// 0 outside XR or when full-body tracking is off.
+		/// </summary>
+		public static int TrackerCount {
+			get {
+				if (!IsXRControllerActive || !FullBodyTrackingSetting.Value)
+					return 0;
+
+				_probeTrackers.Clear();
+				FullBodyTrackers.Get(_probeTrackers, excludeHanded: true, excludeControllers: !AllowControllerFlaggedTrackers);
+				return _probeTrackers.Count;
+			}
+		}
+
+		/// <summary>Shared working list of <see cref="TrackerCount"/>, which only counts.</summary>
+		private static readonly List<TrackerPose> _probeTrackers = new();
+
 		#region Lifecycle
 
 		private void Awake()
@@ -143,12 +181,15 @@ namespace Nox.XR.Runtime.FullBody {
 			=> _data = FullBodyCalibrationStore.Load();
 
 		private void OnDisable() {
+			DriverTargets.Clear();
+
 			if (IsCalibrating)
 				CancelCalibration();
 			ClearVisuals();
 		}
 
 		private void OnDestroy() {
+			DriverTargets.Clear();
 			SetExternalRootControl(false);
 			if (Instance == this)
 				Instance = null;
@@ -161,18 +202,22 @@ namespace Nox.XR.Runtime.FullBody {
 			if (!IsXRControllerActive)
 				return;
 
+			if (IsEstimatingMetrics)
+				TickMetricsEstimate();
+
 			if (IsCalibrating)
 				TickCalibration();
 		}
 
 		private void LateUpdate() {
-			if (!IsXRControllerActive)
+			if (!IsXRControllerActive) {
+				DriverTargets.Clear();
 				return;
+			}
 
-			// Pendant la calibration l'avatar est dans sa pose de calibration (l'avatar a coupé son propre suivi) :
-			// les cibles du rig ne sont pas écrites, sinon l'IK réécrirait la pose par-dessus. La racine, elle, est
-			// alignée sur la tête (voir ApplyCalibrationRoot).
+			// The avatar is in its calibration pose, so the rig targets are not written.
 			if (IsCalibrating) {
+				DriverTargets.Clear();
 				ApplyCalibrationRoot();
 				return;
 			}
@@ -195,17 +240,10 @@ namespace Nox.XR.Runtime.FullBody {
 
 			IsCalibrating = true;
 			_matches.Clear();
-			// La calibration est lancée par un clic dans le menu, donc avec la gâchette : on désarme la
-			// validation jusqu'à ce que les deux mains soient relâchées (sinon elle se validait seule).
-			_validationLatch  = false;
+			_validationLatch   = false;
 			_validationArmedIn = ValidationArmDelay;
 
-			// La pose de calibration est demandée à l'avatar (couche « Pose ») : c'est elle qui coupe le suivi
-			// (TrackingControl) et met l'avatar en T-pose, il n'y a pas d'autre chemin.
 			SetPose(AvatarPose.Calibration);
-
-			// Le jeu pilote la racine pendant la calibration (alignée sur la tête) : VRIK arrête de la déplacer
-			// lui-même (voir ApplyCalibrationRoot).
 			SetExternalRootControl(true);
 
 			CreateVisuals();
@@ -252,12 +290,7 @@ namespace Nox.XR.Runtime.FullBody {
 			NotifySettingsMenu();
 		}
 
-		/// <summary>
-		/// Rafraîchit le menu de réglages : le libellé du bouton de calibration dépend de l'état de la
-		/// calibration, qui peut changer sans clic — validation aux manettes, perte du contrôleur XR,
-		/// nettoyage depuis le panneau. Un handler « nul » rafraîchit tous les handlers (comme l'événement
-		/// <c>controller_changed</c> de nox.settings).
-		/// </summary>
+		/// <summary>Refreshes the settings menu: the calibration button label follows the calibration state.</summary>
 		private static void NotifySettingsMenu()
 			=> SettingsNotifier.NotifyUpdated(null);
 
@@ -278,15 +311,11 @@ namespace Nox.XR.Runtime.FullBody {
 		}
 
 		/// <summary>
-		/// Validates the calibration with the controllers: both trigger/grip buttons together, or a
-		/// single one when only one controller is connected or <see cref="OneHandValidationSetting"/> is on.
-		/// <para/>
-		/// La validation est <b>désarmée</b> tant que les deux mains n'ont pas été relâchées : le clic qui
-		/// lance la calibration (ou le menu) se fait à la gâchette, et sans ça la calibration se validait
-		/// toute seule dans la frame suivante.
+		/// Validates the calibration with the controllers: both trigger/grip buttons together, or a single one
+		/// when only one controller is connected or <see cref="OneHandValidationSetting"/> is on. The validation
+		/// only arms once both hands have been released.
 		/// </summary>
 		private void CheckValidation() {
-			// Délai d'armement : laisse retomber l'appui qui a lancé la calibration.
 			if (_validationArmedIn > 0f) {
 				_validationArmedIn -= Time.unscaledDeltaTime;
 				return;
@@ -300,7 +329,7 @@ namespace Nox.XR.Runtime.FullBody {
 			var left  = leftConnected && IsHandPressed(XRNode.LeftHand);
 			var right = rightConnected && IsHandPressed(XRNode.RightHand);
 
-			// Rien de pressé : la validation s'arme, et ne se déclenchera qu'à la pression suivante.
+			// Nothing pressed: the next press will validate.
 			if (!left && !right) {
 				_validationLatch = true;
 				return;
@@ -338,10 +367,8 @@ namespace Nox.XR.Runtime.FullBody {
 		private static readonly List<InputDevice> HandBuffer = new();
 
 		/// <summary>
-		/// Attache chaque tracker à son bone le plus proche <b>dans la portée</b> (elle borne la distance
-		/// maximale du lien), à raison d'un tracker par bone et d'un bone par tracker : les paires les
-		/// plus proches sont liées d'abord. Au-delà de la portée, le tracker reste ignoré — c'est ce qui
-		/// se voit à l'écran (le bone lié affiche sa portée, les autres rien).
+		/// Links every tracker to its closest bone within the calibration range, one tracker per bone: the
+		/// closest pairs are linked first, and a tie is broken by the height gap.
 		/// </summary>
 		private void MatchTrackers(IRigging rig) {
 			_matches.Clear();
@@ -351,7 +378,7 @@ namespace Nox.XR.Runtime.FullBody {
 
 			var range      = EffectiveRange;
 			var used       = new bool[_trackers.Count];
-			var candidates = new List<(float distance, int bone, int tracker)>();
+			var candidates = new List<(float score, float distance, int bone, int tracker)>();
 
 			for (var b = 0; b < bones.Count; b++) {
 				var boneTransform = ReferenceBone(rig, bones[b]);
@@ -360,14 +387,18 @@ namespace Nox.XR.Runtime.FullBody {
 
 				for (var t = 0; t < _trackers.Count; t++) {
 					var distance = Vector3.Distance(boneTransform.position, _trackers[t].Position);
-					if (distance <= range)
-						candidates.Add((distance, b, t));
+					if (distance > range)
+						continue;
+
+					// The height gap breaks ties between bones at a comparable distance.
+					var heightGap = Mathf.Abs(boneTransform.position.y - _trackers[t].Position.y);
+					candidates.Add((distance + heightGap, distance, b, t));
 				}
 			}
 
 			// Greedy: closest pairs first, one bone and one tracker each.
-			candidates.Sort((a, b) => a.distance.CompareTo(b.distance));
-			foreach (var (_, boneIndex, trackerIndex) in candidates) {
+			candidates.Sort((a, b) => a.score.CompareTo(b.score));
+			foreach (var (_, _, boneIndex, trackerIndex) in candidates) {
 				var bone = bones[boneIndex];
 				if (used[trackerIndex] || _matches.ContainsKey(bone))
 					continue;
@@ -390,8 +421,11 @@ namespace Nox.XR.Runtime.FullBody {
 				var inverse = Quaternion.Inverse(tracker.Rotation);
 				var offset  = inverse * (boneTransform.position - tracker.Position);
 
-				// Un bone à plus d'une portée de son tracker veut dire que la pose de calibration n'est pas
-				// celle attendue (rig non figé, couche de calibration absente…) : le lien serait faux.
+				// The hips are driven with the tracker's yaw (see TickDriving), so the offset is measured in the
+				// same frame.
+				if (pair.Key == HumanBodyBones.Hips && YawOf(tracker.Rotation) is { } captureYaw)
+					offset = Quaternion.Inverse(captureYaw) * (boneTransform.position - tracker.Position);
+
 				if (offset.magnitude > EffectiveRange)
 					Logger.LogWarning($"Calibration: {pair.Key} est à {offset.magnitude:0.##} m de {tracker.Id} — la pose de calibration semble fausse (l'avatar doit être en pose {AvatarPose.Calibration} pendant la calibration), l'offset risque d'être inutilisable.", this, tag: nameof(FullBodyCalibration));
 
@@ -412,6 +446,8 @@ namespace Nox.XR.Runtime.FullBody {
 		#region Driving
 
 		private void TickDriving() {
+			DriverTargets.Clear();
+
 			if (_data.IsEmpty)
 				return;
 
@@ -427,41 +463,35 @@ namespace Nox.XR.Runtime.FullBody {
 				var bone  = binding.BodyBone;
 				var found = FindTracker(binding.TrackerId);
 
-				// Tracker absent (débranché, batterie vide, session qui redémarre…) : le bone repasse en
-				// IK au lieu de rester figé sur sa dernière pose, et reprendra tout seul au retour.
+				// A tracker that is gone hands the bone back to the animation instead of leaving it frozen on its
+				// last pose; publishing the animated reference pose keeps both channels consistent.
 				if (found == null) {
-					// On rend la main à l'avatar (plus d'override) avant de relâcher le canal contrôleur.
 					rig.SetTracking(bone, RiggingTrackingMode.Normal);
 					if (rig.IsActive(bone))
 						rig.SetActive(bone, false);
 					SetTrackingActive(bone, false);
+
+					var reference = ReferenceBone(rig, bone);
+					if (reference) {
+						var relaxed = (reference.position, reference.rotation, Vector3.zero, Vector3.zero);
+						DriverTargets[bone.ToIndex()] = relaxed;
+						RigPartDriver.Write(rig, bone.ToIndex(), relaxed.position, relaxed.rotation);
+					}
 					continue;
 				}
 
-				// La cible IK du bone doit être active, sinon le rig ignore l'écriture : c'est le cas du
-				// pelvis en 3-point (poids VRIK à 0 tant qu'aucun tracker de bassin n'est utilisé).
-				//
-				// Le suivi physique prime sur la pose demandée par l'avatar : un tracker présent suit, même
-				// quand un TrackingControl a coupé le membre. Après une calibration, l'état « Calibration »
-				// laisse le bassin en Animation et l'état « Normal » ne le rétablit pas (il ne liste que la
-				// tête, les mains et les pieds) : sans ça l'override reste, `IsActive` est faux et les poids
-				// VRIK du pelvis restent à 0 — la cible du bassin est écrite mais jamais suivie.
+				// A present tracker wins over the pose asked by the avatar: the target is always written.
 				rig.SetTracking(bone, RiggingTrackingMode.Tracking);
 				rig.SetActive(bone, true);
 				SetTrackingActive(bone, true);
 
-				var tracker     = found.Value;
+				var tracker = found.Value;
+
+				// Only the avatar scale changed since the capture is compensated.
 				var scaleFactor = binding.Scale > 0f ? scale / binding.Scale : 1f;
 				var offset      = tracker.Rotation * (binding.OffsetPosition * scaleFactor);
 
-				// Le bassin : l'offset tracker → bassin (~13 cm, quasi horizontal) ne suit que le *cap* du
-				// tracker. Avec la rotation complète, incliner le tracker faisait basculer cet offset dans le
-				// plan vertical : le bassin montait quand on inclinait le tracker vers le bas, et ne bougeait
-				// pas dans l'autre sens (la descente est bloquée par la colonne). Une rotation autour de l'axe
-				// vertical préserve la composante Y de l'offset : la hauteur du bassin ne dépend donc plus de
-				// l'inclinaison, alors que sa translation et son cap continuent de le déplacer.
-				// (L'offset est appliqué en entier, 3 axes : c'est la position du bone donnée par le tracker,
-				// mesurée pendant la calibration — l'aplatir sur le plan jetait sa composante Y.)
+				// The hips follow the tracker's yaw only, so tilting the tracker does not move the pelvis vertically.
 				if (bone == HumanBodyBones.Hips) {
 					var yaw = YawOf(tracker.Rotation);
 					if (yaw.HasValue)
@@ -471,17 +501,19 @@ namespace Nox.XR.Runtime.FullBody {
 				var position = tracker.Position + offset;
 				var rotation = tracker.Rotation * binding.OffsetRotation;
 
+				// Published as a controller part: a viewer replays it through the parts channel.
+				DriverTargets[bone.ToIndex()] = (position, rotation, tracker.Velocity, tracker.AngularVelocity);
+
 				if (RigPartDriver.Write(rig, bone.ToIndex(), position, rotation))
 					_missingParts.Remove(bone);
 				else if (_missingParts.Add(bone))
-					Logger.LogWarning($"Full-body tracking: aucune cible IK pour {bone} sur le rig — ce bone ne suivra pas son tracker.", this, tag: nameof(FullBodyCalibration));
+					Logger.LogWarning($"Full-body tracking: no IK target for {bone} on the rig, this bone will not follow its tracker.", this, tag: nameof(FullBodyCalibration));
 			}
 		}
 
 		/// <summary>
-		/// Cap (rotation autour de l'axe vertical) de <paramref name="rotation"/> — utilisé pour le bassin, dont
-		/// l'offset de position ne doit pas suivre le piqué/roulis du tracker. Renvoie <c>null</c> quand le cap
-		/// n'est pas définissable (axe avant, puis axe « up », quasi verticaux — tracker posé à plat).
+		/// Yaw of <paramref name="rotation"/> (rotation around the vertical axis), used for the hips so their
+		/// position offset does not follow the tracker's pitch or roll. Null when the yaw cannot be defined.
 		/// </summary>
 		private static Quaternion? YawOf(Quaternion rotation) {
 			var forward = rotation * Vector3.forward;
@@ -497,12 +529,8 @@ namespace Nox.XR.Runtime.FullBody {
 		}
 
 		/// <summary>
-		/// Bone servant de référence pour le suivi d'un membre. Pour un pied, le solveur de jambe de VRIK fait
-		/// correspondre la cible au <b>dernier</b> bone de la chaîne — les orteils quand le rig les expose
-		/// (<c>IKSolverVRLeg.Leg.PreSolve</c> : <c>position = lastBone.solverPosition</c>,
-		/// <c>toes.solverRotation = IKRotation</c>), comme <c>VRIKCalibrator.CalibrateLeg</c> qui prend
-		/// <c>leftToes ?? leftFoot</c>. Mesurer l'offset sur la cheville tirerait les orteils vers la position de
-		/// la cheville et leur donnerait la rotation de la cheville.
+		/// Bone used as the reference for a limb. For a foot, the VRIK leg solver matches the target to the last
+		/// bone of the chain (the toes when the rig exposes them), and offsets are measured on it.
 		/// </summary>
 		private static Transform ReferenceBone(IRigging rig, HumanBodyBones bone) {
 			if (bone == HumanBodyBones.LeftFoot || bone == HumanBodyBones.RightFoot) {
@@ -521,7 +549,7 @@ namespace Nox.XR.Runtime.FullBody {
 			return null;
 		}
 
-		/// <summary>Reflète l'état des bones suivis sur les paramètres <c>tracking/*/active</c> de l'avatar.</summary>
+		/// <summary>Mirrors the state of the driven bones on the avatar's <c>tracking/*/active</c> parameters.</summary>
 		private void SetTrackingActive(HumanBodyBones bone, bool active) {
 			var parameters = GetParameters();
 			if (parameters == null)
@@ -534,14 +562,105 @@ namespace Nox.XR.Runtime.FullBody {
 
 		#endregion
 
+		#region Player metrics (height / arm span)
+
+		/// <summary>Duration of the T-pose capture started by <see cref="StartMetricsEstimate"/>.</summary>
+		public const float MetricsEstimateDelay = 5f;
+
+		/// <summary>
+		/// Eye height as a fraction of the total height (anthropometric ratio). The headset gives the eye height,
+		/// the total height follows.
+		/// </summary>
+		private const float EyeHeightRatio = 0.936f;
+
+		/// <summary>Plausible player height: bounds an estimation made crouched or while moving.</summary>
+		private const float MinPlayerHeight = 1.2f;
+		private const float MaxPlayerHeight = 2.2f;
+
+		private float _metricsRemaining;
+		private float _metricsEyeHeight;
+		private float _metricsArmSpan;
+		private int   _metricsShownSecond = -1;
+
+		/// <summary>True while the capture runs (shown by the settings button).</summary>
+		public bool IsEstimatingMetrics
+			=> _metricsRemaining > 0f;
+
+		/// <summary>Seconds left in the capture.</summary>
+		public float MetricsEstimateRemaining
+			=> Mathf.Max(0f, _metricsRemaining);
+
+		/// <summary>
+		/// Starts the capture: stay in T-pose without moving. The highest eye position and the widest hand span
+		/// are kept, then written to <see cref="RealHeightSetting"/> and <see cref="PlayerArmSpanSetting"/>.
+		/// </summary>
+		public void StartMetricsEstimate() {
+			if (!IsXRControllerActive || IsCalibrating)
+				return;
+
+			_metricsRemaining = MetricsEstimateDelay;
+			_metricsEyeHeight = 0f;
+			_metricsArmSpan   = 0f;
+			_metricsShownSecond = Mathf.CeilToInt(MetricsEstimateDelay);
+			SettingsNotifier.NotifyUpdated(null);
+		}
+
+		private void TickMetricsEstimate() {
+			_metricsRemaining -= Time.unscaledDeltaTime;
+
+			var camera = player && player.headCamera ? player.headCamera.transform : null;
+			if (camera)
+				_metricsEyeHeight = Mathf.Max(_metricsEyeHeight, camera.position.y);
+
+			// In T-pose the hand span is the arm span (wrist to wrist).
+			if (player && player.handLeft && player.handRight)
+				_metricsArmSpan = Mathf.Max(_metricsArmSpan, Vector3.Distance(player.handLeft.transform.position, player.handRight.transform.position));
+
+			var second = Mathf.CeilToInt(Mathf.Max(0f, _metricsRemaining));
+			if (second != _metricsShownSecond) {
+				_metricsShownSecond = second;
+				SettingsNotifier.NotifyUpdated(null);
+			}
+
+			// Same controller validation as a calibration, so the capture can be confirmed before the delay.
+			if (_metricsRemaining > 0f && MetricsEstimateDelay - _metricsRemaining > ValidationArmDelay) {
+				var leftConnected  = XRInputs.HasHandLeft;
+				var rightConnected = XRInputs.HasHandRight;
+				var left  = leftConnected && IsHandPressed(XRNode.LeftHand);
+				var right = rightConnected && IsHandPressed(XRNode.RightHand);
+				if ((left || right) && (!leftConnected || left) && (!rightConnected || right))
+					_metricsRemaining = 0f;
+			}
+
+			if (_metricsRemaining > 0f)
+				return;
+
+			if (_metricsEyeHeight > 0.5f)
+				RealHeightSetting.Value = Mathf.Clamp(_metricsEyeHeight / EyeHeightRatio, MinPlayerHeight, MaxPlayerHeight);
+
+			if (_metricsArmSpan > 0f)
+				PlayerArmSpanSetting.Value = _metricsArmSpan;
+
+			Logger.LogDebug($"Mesures joueur : taille {RealHeightSetting.Value:F3} m (yeux {_metricsEyeHeight:F3} m), envergure {PlayerArmSpanSetting.Value:F3} m — avatar {AvatarHeight():F2} m", this, tag: nameof(FullBodyCalibration));
+			SettingsNotifier.NotifyUpdated(null);
+		}
+
+		/// <summary>
+		/// Real (world) height of the avatar in metres, from its scale module. The value is measured on the
+		/// model's rest pose, so it does not follow the animation or the trackers.
+		/// </summary>
+		private float AvatarHeight()
+			=> avatarLoader?.GetAvatar()?.Descriptor
+				?.GetModules<IScaleAvatarModule>()
+				.FirstOrDefault()?.Height ?? 0f;
+
+		#endregion
+
 		#region Pose
 
 		/// <summary>
-		/// Demande une pose à l'avatar par sa couche standard « Pose » : seul l'entier <c>Pose</c> est écrit
-		/// (0 normal, 1 présentation, 2 calibration, 3 assis — voir <see cref="AvatarPose"/>), c'est l'avatar
-		/// qui décide de la suite : ses états coupent le suivi avec <c>TrackingControl</c> et arrêtent ou
-		/// reprennent ses autres couches avec <c>PlayableLayerControl</c>. Le jeu ne touche donc ni aux poids des
-		/// couches, ni aux bones : il n'y a qu'une seule façon de mettre l'avatar en pose de calibration.
+		/// Asks the avatar for a pose through its standard "Pose" layer (see <see cref="AvatarPose"/>): only the
+		/// integer is written, the avatar cuts tracking and drives its own layers from it.
 		/// </summary>
 		private void SetPose(AvatarPose pose) {
 			var parameter = GetParameters()?.GetParameter(AvatarPoseConstants.ParameterName);
@@ -553,19 +672,18 @@ namespace Nox.XR.Runtime.FullBody {
 
 			parameter.Value = (int)pose;
 
-			// La couche doit être à 1 pour que sa pose soit visible : le module les démarre toutes à 1, mais un
-			// autre contrôle a pu l'arrêter. Son état « normal » ne fait rien, la laisser active est sans effet.
+			// The layer must be running for the pose to be visible.
 			if (pose != AvatarPose.Normal)
 				GetPlayableLayers()?.StartLayer(PlayableLayerNaming.Pose.ToString());
 
 			Logger.LogDebug($"Calibration: pose « {pose} » demandée à l'avatar.", this, tag: nameof(FullBodyCalibration));
 		}
 
-		/// <summary>Couches de l'avatar, pour les messages de diagnostic (« clé[rôle] »).</summary>
+		/// <summary>Avatar layers, for the diagnostic messages.</summary>
 		private string AvailableLayers() {
 			var layers = GetPlayableLayers();
 			if (layers == null)
-				return "aucune";
+				return "none";
 
 			var keys = new List<string>();
 			for (var i = 0; i < layers.LayerCount; i++)
@@ -623,24 +741,20 @@ namespace Nox.XR.Runtime.FullBody {
 				}
 				if (rangeVisual) {
 					rangeVisual.transform.SetPositionAndRotation(boneTransform.position, boneTransform.rotation);
-					// La sphère d'un bone lié se cale sur la distance réelle tracker ↔ bone (elle passe donc
-					// par le tracker), et disparaît sur les bones sans tracker.
 					SetWorldRadius(rangeVisual.transform, LinkedDistance(bone, boneTransform.position));
 				}
 			}
 		}
 
-		/// <summary>Distance entre <paramref name="bone"/> et le tracker qui lui est attaché, 0 s'il n'y en a pas.</summary>
+		/// <summary>Distance between <paramref name="bone"/> and its tracker, 0 when there is none.</summary>
 		private float LinkedDistance(HumanBodyBones bone, Vector3 bonePosition)
 			=> _matches.TryGetValue(bone, out var tracker)
 				? Vector3.Distance(bonePosition, tracker.Position)
 				: 0f;
 
 		/// <summary>
-		/// Applique un rayon en unités <b>monde</b> à un visuel dont la sphère fait 1 unité de diamètre
-		/// (sphère Unity). L'échelle du parent est compensée : les visuels sont enfants du joueur, qui
-		/// porte l'échelle de l'avatar — sans cela la sphère ne représentait plus la portée réelle
-		/// (elle subissait l'échelle une seconde fois).
+		/// Applies a world radius to a visual whose sphere is one unit across, compensating the parent scale:
+		/// the visuals are children of the player, which carries the avatar scale.
 		/// </summary>
 		private static void SetWorldRadius(Transform visual, float radius) {
 			const float diameter = 2f;
@@ -696,14 +810,8 @@ namespace Nox.XR.Runtime.FullBody {
 			=> FullBodyCalibrationRangeSetting.Value * Mathf.Max(0.01f, AvatarScale);
 
 		/// <summary>
-		/// Aligne la racine de l'avatar sur la tête pendant la calibration : même position X/Z et même cap (yaw),
-		/// ce qui permet au joueur d'aligner son avatar sur son corps (les pieds de la T-pose restent sous lui).
-		/// <para>
-		/// VRIK ne pilote plus la racine pendant la calibration (<c>SetExternalRootControl</c>) : sans ça sa
-		/// locomotion la déplace d'après la tête (les pieds « glissaient » quand on bouge la tête) et son
-		/// rattrapage d'angle la translate autour du pivot de l'Animator. Le Y est laissé tel quel,
-		/// <c>AvatarSyncConnector</c> le recale sur le joueur.
-		/// </para>
+		/// Aligns the avatar root on the head during a calibration (same X/Z and same yaw), so the player can line
+		/// up their avatar with their body. The Y is left alone, <c>AvatarSyncConnector</c> handles it.
 		/// </summary>
 		private void ApplyCalibrationRoot() {
 			var anchor = GetAnchor()?.transform;
@@ -711,25 +819,23 @@ namespace Nox.XR.Runtime.FullBody {
 			if (!anchor || !head)
 				return;
 
-			// Position : sous la tête (X/Z de la cible de tête, Y laissé à AvatarSyncConnector).
 			var position = anchor.position;
 			var headPos  = head.position;
 			anchor.position = new Vector3(headPos.x, position.y, headPos.z);
 
-			// Cap : l'avatar regarde où le joueur regarde (yaw seul, on ignore le piqué/roulis de la tête).
 			var forward = head.forward;
 			forward.y = 0f;
 			if (forward.sqrMagnitude > 0.0001f)
 				anchor.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
 		}
 
-		/// <summary>Cible de tête du rig (celle que suit le bone tête), sinon <c>null</c>.</summary>
+		/// <summary>Head target of the rig (the one the head bone follows), or <c>null</c>.</summary>
 		private Transform GetHeadTransform() {
 			var rig = GetRig();
 			return rig != null && rig.TryGetPart(HumanBodyBones.Head.ToIndex(), out var part) ? part.GetTransform() : null;
 		}
 
-		/// <summary>Donne/rend la main au rig sur la racine de l'avatar (voir <see cref="ApplyCalibrationRoot"/>).</summary>
+		/// <summary>Gives the rig control of the avatar root, or takes it back.</summary>
 		private void SetExternalRootControl(bool external)
 			=> GetRig()?.SetExternalRootControl(external);
 

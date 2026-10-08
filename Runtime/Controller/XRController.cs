@@ -69,8 +69,7 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		}
 
 		public static async UniTask<bool> Make() {
-			// Idempotent : le proxy est déjà le contrôleur courant (le casque est déjà là, un appel
-			// concurrent suit une rafale d'événements de devices) — le recréer rechargerait l'avatar.
+			// Idempotent: the proxy is already the current controller.
 			if (IsCurrent()) {
 				Logger.LogDebug("XR proxy already current, nothing to create.", tag: nameof(XRController));
 				return true;
@@ -138,6 +137,27 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		private IPlayer _attachedPlayer;
 		public XRInteractionGroup[] interactions;
 
+		/// <summary>
+		/// Proxy nodes, split by responsibility. The container (<c>AutoHandPlayer.trackingContainer</c>) holds
+		/// both and belongs to the AutoHandPlayer: locomotion, rotation and <c>heightOffset</c>.
+		/// <code>
+		/// xr_proxy
+		/// └── Container     ← AutoHandPlayer.trackingContainer
+		///     ├── Trackers  ← <see cref="trackers"/>
+		///     └── Avatar    ← <see cref="avatarContainer"/>
+		/// </code>
+		/// </summary>
+		[Header("Proxy nodes")]
+		[Tooltip("Node holding the player pose inside the container: head camera, controllers and hands. It is "
+		         + "the one scaled to fit the player pose to the avatar, and shifted to adjust the view height. "
+		         + "Never the container: the container holds the avatar.")]
+		public Transform trackers;
+
+		[Tooltip("Root node of the avatar (its container), a child of the AutoHandPlayer container. It follows "
+		         + "the container in position and rotation, and is never scaled: the avatar carries its own scale "
+		         + "(see IScaleAvatarModule).")]
+		public Transform avatarContainer;
+
 		[Header("View")]
 		[Tooltip("Replace automatiquement la vue à la hauteur recommandée si elle démarre sous le sol "
 		         + "(aucun casque / pose de tête non suivie). Sans effet si la hauteur est déjà plausible.")]
@@ -146,23 +166,16 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		[Tooltip("Hauteur (m) utilisée comme cible tant qu'aucun avatar n'a fourni sa taille.")]
 		[SerializeField] private float defaultViewHeight = DefaultViewHeight;
 
-		/// <summary>Hauteur de vue par défaut quand l'avatar n'a pas encore renseigné sa taille.</summary>
+		/// <summary>Default view height, used until an avatar provides its own size.</summary>
 		private const float DefaultViewHeight = 1.7f;
 
-		/// <summary>
-		/// Défaut du prefab Autohand pour <see cref="AutoHandPlayer.minMaxHeight"/> : tant que
-		/// l'avatar ne l'a pas remplacé, cette valeur ne représente pas une taille de joueur.
-		/// </summary>
+		/// <summary>Autohand prefab default for <see cref="AutoHandPlayer.minMaxHeight"/>.</summary>
 		private const float AutoHandDefaultMaxHeight = 2.5f;
 
-		/// <summary>
-		/// En dessous de cette hauteur, la vue est considérée comme née sous le sol.
-		/// </summary>
+		/// <summary>Below this height the view is considered to start under the floor.</summary>
 		private const float MinPlausibleViewHeight = 0.5f;
 
-		/// <summary>
-		/// Délai max (s) d'attente de l'avatar avant la correction automatique de hauteur.
-		/// </summary>
+		/// <summary>Max wait (seconds) for the avatar before the automatic height correction.</summary>
 		private const float AutoFixWaitSeconds = 5f;
 
 		private XROrigin _xrOrigin;
@@ -187,11 +200,9 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		}
 
 		/// <summary>
-		/// Replace la vue à la hauteur recommandée si elle est née sous le sol (aucun casque,
-		/// simulateur, ou OpenXR rapportant une origine au sol). Ne touche à rien si la hauteur
-		/// mesurée est plausible, afin de ne jamais déplacer un vrai casque correctement suivi.
+		/// Brings the view to the recommended height when it starts under the floor (no headset, simulator, or
+		/// OpenXR reporting a floor origin). Does nothing when the measured height is plausible.
 		/// </summary>
-
 		private void SynchronizeControllerFromPlayer() {
 			if (_attachedPlayer == null)
 				return;

@@ -14,7 +14,7 @@ namespace Nox.XR.Runtime.Settings {
 		public const float DefaultRange = 0.5f;
 
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "full_body_calibration_range" };
+			=> new[] { "xr", "fbt", "full_body_calibration_range" };
 
 		public override int GetOrder() => 5;
 
@@ -24,8 +24,7 @@ namespace Nox.XR.Runtime.Settings {
 			   && FullBodyCalibration.IsXRControllerActive;
 
 		public FullBodyCalibrationRangeSetting() {
-			// Stockée en mètres (utilisée telle quelle par la calibration) mais réglée/affichée en
-			// centimètres décimaux, par pas d'un centimètre.
+			// Stored in metres, set and displayed in decimal centimetres.
 			SetRange(0.1f, 3f);
 			SetStep(0.01f);
 			SetValue(Value);

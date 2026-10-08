@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Nox.XR.Runtime.Settings {
 	public sealed class PokeEnabledSetting : ToggleHandler {
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "poke" };
+			=> new[] { "xr", "interaction", "poke" };
 
 		public override int GetOrder()
 			=> 1;

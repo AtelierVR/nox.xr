@@ -62,9 +62,7 @@ namespace Nox.XR.Runtime {
 
 		[NoxPublic(NoxAccess.Method)]
 		public float GetRecommendedHeight() {
-			// minMaxHeight.y est renseigné depuis la taille de l'avatar (ScaleAvatarModule)
-			// par AvatarLoaderConnector/AvatarSyncConnector. Tant que ce n'est pas fait, la
-			// valeur reste le défaut du prefab Autohand, qui n'est pas une taille de joueur.
+			// minMaxHeight.y comes from the avatar size; until it does it is the Autohand prefab default.
 			if (player && player.minMaxHeight.y > 0f
 			           && !Mathf.Approximately(player.minMaxHeight.y, AutoHandDefaultMaxHeight))
 				return player.minMaxHeight.y;
@@ -88,15 +86,20 @@ namespace Nox.XR.Runtime {
 			if (height <= 0f)
 				height = GetRecommendedHeight();
 
-			// AutoHandPlayer applique heightOffset au trackingContainer (caméra, mains et
-			// avatar) : c'est le levier prévu pour corriger la hauteur de vue. Contrairement
-			// à un déplacement direct du transform, il est ré-appliqué à chaque frame.
+			// The lever is the `trackers` node, never `player.heightOffset`: that offset is applied to the
+			// container, which holds the avatar, so using it would move the avatar with the view.
+			if (!trackers) {
+				Logger.LogError($"{nameof(ReHeight)}: no trackers node on this XR proxy (see {nameof(trackers)}), cannot adjust the view height.", this);
+				return;
+			}
+
 			var delta = height - camera.transform.position.y;
 			if (Mathf.Abs(delta) < 0.001f)
 				return;
 
-			player.heightOffset += delta;
-			Logger.LogDebug($"ReHeight: view → {height:F2} m (heightOffset {player.heightOffset:+0.###;-0.###} m)", this);
+			// Local to the container, so the container writes of AutoHandPlayer do not overwrite it.
+			trackers.position += Vector3.up * delta;
+			Logger.LogDebug($"ReHeight: view → {height:F2} m (trackers {delta:+0.###;-0.###} m)", this);
 		}
 
 		[NoxPublic(NoxAccess.Method)]
@@ -112,13 +115,12 @@ namespace Nox.XR.Runtime {
 			}
 
 			var flatForward = Vector3.ProjectOnPlane(forward, Vector3.up);
-			// Y courant conservé : la verticale est gérée par ReHeight().
+			// The current Y is kept: the vertical is handled by ReHeight().
 			var target = new Vector3(worldPosition.x, camera.transform.position.y, worldPosition.z);
 
 			var origin = GetXrOrigin();
 			if (origin) {
-				// XROrigin gère les deux modes de tracking (Floor et Device) : on le laisse
-				// placer/faire tourner le rig plutôt que de manipuler les transforms à la main.
+				// XROrigin handles both tracking modes (Floor and Device).
 				origin.MoveCameraToWorldLocation(target);
 
 				if (flatForward.sqrMagnitude > 0.0001f)
@@ -128,7 +130,7 @@ namespace Nox.XR.Runtime {
 				return;
 			}
 
-			// Repli sans XROrigin : rotation dans l'espace monde, puis translation du rig.
+			// Fallback without an XROrigin: world rotation, then translation of the rig.
 			var camForward = Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up).normalized;
 			if (flatForward.sqrMagnitude > 0.0001f && camForward.sqrMagnitude > 0.0001f)
 				transform.rotation = Quaternion.FromToRotation(camForward, flatForward.normalized) * transform.rotation;
@@ -152,9 +154,8 @@ namespace Nox.XR.Runtime {
 			foreach (var ability in controller.GetAbilities())
 				SetAbilities(ability.Key, ability.Value);
 
-			// Un loader fraîchement créé n'a pas encore d'avatar : le charger ici
-			// ferait démarrer un chargement avant SetupAvatar(), qui en lancerait un
-			// second en parallèle (annulations et avatars détruits en cascade).
+			// A freshly created loader has no avatar yet: loading it here would start a
+			// load before SetupAvatar(), which would start a second one in parallel.
 			if (controller is IControllerAvatar ca && avatarLoader?.GetAvatar() != null) {
 				var identifier = ca.GetAvatar()?.Identifier ?? Identifier.Invalid;
 				if (identifier.IsValid())
@@ -167,16 +168,11 @@ namespace Nox.XR.Runtime {
 		/// <summary>
 		/// <c>PlayerRig.Base</c> part of this controller: the pose of the avatar's root.
 		/// <para>
-		/// The loaded avatar is parented to the tracking container (<c>AutoHandPlayer.trackingContainer</c>,
-		/// "TrackerOffsets"), which is the <b>only</b> transform a snap/smooth turn rotates. The
-		/// <c>AutoHandPlayer</c> transform is the body capsule and keeps its yaw, so carrying it as the base
-		/// made the replayed body hold its old orientation while the head and hands (written in world space)
-		/// followed - the avatar's back ended up facing its own look direction after any turn.
-		/// </para>
-		/// <para>
-		/// The height is taken from the body capsule so the played-back root matches the local one, which
-		/// <c>AvatarSyncConnector.LateUpdate</c> clamps the same way (the tracking container's own Y carries
-		/// <c>AutoHandPlayer.heightOffset</c>, used to raise the view, not the body).
+		/// The avatar is parented to <see cref="avatarContainer"/>, a child of the AutoHandPlayer's container:
+		/// that node <b>is</b> the avatar root. It carries the container's locomotion and yaw - the only
+		/// transform a snap/smooth turn rotates - while the <c>AvatarSyncConnector</c> cancels the container's
+		/// vertical offset on it, so its pose is exactly the one the local avatar has (unlike the container's,
+		/// whose Y carries the view height, and unlike the body capsule, which keeps its own yaw).
 		/// </para>
 		/// </summary>
 		private TransformObject GetBasePart() {
@@ -184,13 +180,12 @@ namespace Nox.XR.Runtime {
 				return new TransformObject(transform, transform.TryGetComponent<Rigidbody>(out var own) ? own : null);
 
 			// Body transform supplies the scale and the body's velocity/angular velocity; the pose is then
-			// overridden with the tracking container's (avatar root).
+			// overridden with the avatar root's.
 			var tr = new TransformObject(player.transform, player.body);
 
-			var container = player.trackingContainer;
-			if (container) {
-				tr.SetPosition(new Vector3(container.position.x, player.transform.position.y, container.position.z));
-				tr.SetRotation(container.rotation);
+			if (avatarContainer) {
+				tr.SetPosition(avatarContainer.position);
+				tr.SetRotation(avatarContainer.rotation);
 			}
 
 			return tr;
@@ -199,6 +194,13 @@ namespace Nox.XR.Runtime {
 		public bool TryGetPart(ushort index, out TransformObject tr) {
 			if (index == PlayerRig.Base.ToIndex()) {
 				tr = GetBasePart();
+				return true;
+			}
+
+			// Full-body targets (hips, feet, ...) are controller parts too: the calibration publishes the very
+			// pose it applies locally, so a viewer replays the same target instead of guessing it.
+			if (FullBody.FullBodyCalibration.TryGetDriverTarget(index, out var fbtPart)) {
+				tr = fbtPart;
 				return true;
 			}
 
@@ -295,12 +297,11 @@ namespace Nox.XR.Runtime {
 		public Dictionary<ushort, Transform> GetParts() {
 			if (!player) return new Dictionary<ushort, Transform>();
 
-			// `PlayerRig.Base` is the avatar ROOT, i.e. the tracking container ("TrackerOffsets") the loaded
-			// avatar is parented to - the only transform a snap/smooth turn rotates. `player.transform` is the
-			// AutoHandPlayer (body capsule) and keeps its yaw, so using it as the base desynced the replayed
-			// body from the head/hands (cf. <see cref="GetBasePart"/>).
+			// `PlayerRig.Base` is the avatar ROOT: <see cref="avatarContainer"/>, the node the loaded avatar is
+			// parented to. `player.transform` is the AutoHandPlayer (body capsule) and keeps its own yaw, so using
+			// it as the base desynced the replayed body from the head/hands (cf. <see cref="GetBasePart"/>).
 			var parts = new Dictionary<ushort, Transform> {
-				{ PlayerRig.Base.ToIndex(), player.trackingContainer ? player.trackingContainer : player.transform },
+				{ PlayerRig.Base.ToIndex(), avatarContainer ? avatarContainer : player.transform },
 				{ PlayerRig.Head.ToIndex(), player.headCamera.transform }
 			};
 
@@ -337,6 +338,12 @@ namespace Nox.XR.Runtime {
 				head.SetPosition(headPosition);
 				head.SetRotation(headRotation);
 			}
+
+			// Full-body tracking targets enter the same dictionary (cf. TryGetPart): what the controller tracks
+			// is what travels, and the rig is written from this single source on both the owner and the viewers.
+			foreach (var id in FullBody.FullBodyCalibration.DriverTargetIds)
+				if (FullBody.FullBodyCalibration.TryGetDriverTarget(id, out var fbtTarget))
+					parts[id] = fbtTarget;
 
 			return parts;
 		}

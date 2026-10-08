@@ -12,9 +12,9 @@ namespace Nox.XR.Runtime.Settings {
 		private const string ConfigKey = "settings.xr.fbt_enabled";
 
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "full_body_tracking" };
+			=> new[] { "xr", "fbt", "full_body_tracking" };
 
-		public override int GetOrder() => 3;
+		public override int GetOrder() => 0;
 
 		public override bool IsActive()
 			=> Client.Instance != null
@@ -38,7 +38,12 @@ namespace Nox.XR.Runtime.Settings {
 			}
 		}
 
-		protected override void OnValueChanged(bool value)
-			=> Value = value;
+		protected override void OnValueChanged(bool value) {
+			Value = value;
+
+			// Le widget de calibration n'a de sens qu'avec le suivi activé *et* au moins un tracker : c'est ici
+			// que la première moitié de la condition peut changer sans événement de device.
+			Widgets.FullBodyCalibrationWidget.Refresh();
+		}
 	}
 }

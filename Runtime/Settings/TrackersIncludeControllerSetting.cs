@@ -18,9 +18,9 @@ namespace Nox.XR.Runtime.Settings {
 		private const string ConfigKey = "settings.xr.trackers_include_controller";
 
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "trackers_include_controller" };
+			=> new[] { "xr", "fbt", "trackers_include_controller" };
 
-		public override int GetOrder() => 7;
+		public override int GetOrder() => 6;
 
 		public override bool IsActive()
 			=> Client.Instance != null

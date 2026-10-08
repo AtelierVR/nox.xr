@@ -10,9 +10,9 @@ namespace Nox.XR.Runtime.Settings {
 	/// </summary>
 	public sealed class CalibrateFullBodySetting : ButtonHandler {
 		public override string[] GetPath()
-			=> new[] { "xr", "general", "full_body_calibration" };
+			=> new[] { "xr", "fbt", "full_body_calibration" };
 
-		public override int GetOrder() => 4;
+		public override int GetOrder() => 1;
 
 		public override bool IsActive()
 			=> Client.Instance != null
