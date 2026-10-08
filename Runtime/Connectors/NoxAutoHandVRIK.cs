@@ -308,11 +308,17 @@ namespace Nox.XR.Runtime.Connectors {
 					indexLocal.z
 				);
 
-				// Orientation : dérivée de l'orientation de l'extrémité de l'index.
-				var indexLocalRotation = Quaternion.Inverse(parent.rotation) * endIndex.rotation;
-				var dir   = indexLocalRotation * Vector3.up;
-				var pitch = Mathf.Atan2(-dir.y, -dir.x) * Mathf.Rad2Deg;
-				rotation = Quaternion.Euler(pitch, 270f, 0f);
+				// Orientation : la raie part du point pouce/index et suit l'index (direction poignet ->
+				// bout de l'index), l'"up" de l'index servant de roulis. La projection XY + yaw fixe (270°)
+				// donnait une raie correcte à gauche mais inversée à droite (167° d'écart mesuré) : elle
+				// dépendait de l'orientation locale de l'index, qui n'est pas la même d'une main à l'autre.
+				var localForward = Quaternion.Inverse(parent.rotation) * (endIndex.position - parent.position);
+				var localUp      = Quaternion.Inverse(parent.rotation) * endIndex.up;
+				if (localForward.sqrMagnitude < 1e-8f)
+					localForward = Vector3.forward;
+				if (Vector3.Cross(localForward, localUp).sqrMagnitude < 1e-8f)
+					localUp = Vector3.up;
+				rotation = Quaternion.LookRotation(localForward, localUp);
 			}
 
 			var instance = prefab.Instantiate<NearFarInteractor>(parent);
