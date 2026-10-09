@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using System.Reflection;
 using Autohand;
 using Nox.Avatars.AutoHand;
@@ -156,16 +157,26 @@ namespace Nox.XR.Runtime.Connectors {
 		/// follow the same rule, handled by <see cref="HandPokeConnector"/>.
 		/// </summary>
 		private void UpdateInteractors() {
-			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical));
-			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical));
+			var module = XRUIInteractorBinder.Current();
+
+			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical), module);
+			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical),  module);
 		}
 
 		private static bool IsGrabbing(Hand hand)
 			=> hand != null && (hand.IsGrabbing() || hand.IsHolding());
 
-		private static void SetNearFar(NearFarInteractor nearFar, bool enable) {
-			if (nearFar != null && nearFar.Enable != enable)
+		private static void SetNearFar(NearFarInteractor nearFar, bool enable, XRUIInputModule module) {
+			if (nearFar == null)
+				return;
+
+			if (nearFar.Enable != enable)
 				nearFar.Enable = enable;
+
+			// The module has to be picked up while the ray is on: binding a disabled interactor would leave a
+			// UI pointer alive on it (the module only follows the interactor's own enable/disable calls).
+			if (enable)
+				XRUIInteractorBinder.Bind(nearFar, module);
 		}
 
 		/// <summary>
