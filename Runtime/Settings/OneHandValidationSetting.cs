@@ -11,12 +11,12 @@ namespace Nox.XR.Runtime.Settings {
 	public sealed class OneHandValidationSetting : ToggleHandler {
 		private const string ConfigKey = "settings.xr.one_hand_validation";
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "interaction", "one_hand_validation" };
 
-		public override int GetOrder() => 2;
+		public override int Order => 60002;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && EnableXRSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

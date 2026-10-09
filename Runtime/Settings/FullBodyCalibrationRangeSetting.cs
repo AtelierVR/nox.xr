@@ -13,12 +13,12 @@ namespace Nox.XR.Runtime.Settings {
 		/// <summary>Default calibration range (metres). Kept at 0.60 or below.</summary>
 		public const float DefaultRange = 0.5f;
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "full_body_calibration_range" };
 
-		public override int GetOrder() => 5;
+		public override int Order => 60005;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

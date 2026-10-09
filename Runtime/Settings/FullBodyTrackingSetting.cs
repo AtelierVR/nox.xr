@@ -11,12 +11,12 @@ namespace Nox.XR.Runtime.Settings {
 	public sealed class FullBodyTrackingSetting : ToggleHandler {
 		private const string ConfigKey = "settings.xr.fbt_enabled";
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "full_body_tracking" };
 
-		public override int GetOrder() => 0;
+		public override int Order => 60000;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && EnableXRSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

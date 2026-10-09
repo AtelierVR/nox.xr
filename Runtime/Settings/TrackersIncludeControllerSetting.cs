@@ -17,12 +17,12 @@ namespace Nox.XR.Runtime.Settings {
 	public sealed class TrackersIncludeControllerSetting : ToggleHandler {
 		private const string ConfigKey = "settings.xr.trackers_include_controller";
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "trackers_include_controller" };
 
-		public override int GetOrder() => 6;
+		public override int Order => 60006;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && EnableXRSetting.Value
 			   && FullBodyTrackingSetting.Value

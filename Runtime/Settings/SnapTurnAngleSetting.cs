@@ -7,13 +7,13 @@ namespace Nox.XR.Runtime.Settings {
 		/// <see cref="XRTurnMode.Snap"/>.
 	/// </summary>
 	public sealed class SnapTurnAngleSetting : RangeHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "movement", "snap_turn_angle" };
 
-		public override int GetOrder()
-			=> 1;
+		public override int Order
+			=> 60001;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> MovementSettings.TurnMode == XRTurnMode.Snap;
 
 		public SnapTurnAngleSetting() {

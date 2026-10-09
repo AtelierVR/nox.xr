@@ -12,12 +12,12 @@ namespace Nox.XR.Runtime.Settings {
 	public sealed class EnableXRSetting : ToggleHandler {
 		private const string ConfigKey = "settings.xr.enabled";
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "general", "enable_xr" };
 
-		public override int GetOrder() => -1;
+		public override int Order => 59999;
 
-		public override bool IsActive() => true;
+		public override bool IsActive => true;
 
 		public EnableXRSetting() {
 			SetValue(Value, notify: false);

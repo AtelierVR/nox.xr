@@ -19,12 +19,12 @@ namespace Nox.XR.Runtime.Settings {
 		/// <summary>0 = no arm span set.</summary>
 		public const float Automatic = 0f;
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "player_arm_span" };
 
-		public override int GetOrder() => 4;
+		public override int Order => 60004;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

@@ -1,6 +1,5 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
-using Nox.UI;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -11,12 +10,12 @@ namespace Nox.XR.Runtime.Settings {
 		private const string ConfigKey = "settings.xr.ipd";
 		public const float DefaultIPD = 0.064f; // 64mm
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "general", "ipd" };
 
-		public override int GetOrder() => 2;
+		public override int Order => 60002;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance?.IsReady() ?? false;
 
 		public IPDSetting() {

@@ -11,12 +11,12 @@ namespace Nox.XR.Runtime.Settings {
 	/// is the reference the player's container is fitted to).
 	/// </summary>
 	public sealed class EstimatePlayerMetricsSetting : ButtonHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "estimate_player_metrics" };
 
-		public override int GetOrder() => 2;
+		public override int Order => 60002;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

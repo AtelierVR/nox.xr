@@ -23,12 +23,12 @@ namespace Nox.XR.Runtime.Settings {
 		/// <summary>0 = no height set: no fitting applied.</summary>
 		public const float Automatic = 0f;
 
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "real_height" };
 
-		public override int GetOrder() => 3;
+		public override int Order => 60003;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

@@ -114,7 +114,7 @@ namespace Nox.XR.Runtime {
 				XRInputs.DefaultProvider = null;
 
 			foreach (var setting in _settings)
-				SettingAPI?.Remove(setting.GetPath());
+				SettingAPI?.Remove(setting.Path);
 			_settings = Array.Empty<IHandler>();
 
 			LanguageManager.RemovePack(_lang);

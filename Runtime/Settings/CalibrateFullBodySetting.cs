@@ -9,12 +9,12 @@ namespace Nox.XR.Runtime.Settings {
 	/// calibration-only pose with the trackers displayed); the next click confirms and saves it.
 	/// </summary>
 	public sealed class CalibrateFullBodySetting : ButtonHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "fbt", "full_body_calibration" };
 
-		public override int GetOrder() => 1;
+		public override int Order => 60001;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
 			   && FullBodyCalibration.IsXRControllerActive;

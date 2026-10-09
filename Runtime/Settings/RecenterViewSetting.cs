@@ -10,13 +10,13 @@ namespace Nox.XR.Runtime.Settings {
 	/// widget, available from the settings without a widget on screen.
 	/// </summary>
 	public sealed class RecenterViewSetting : ButtonHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "general", "recenter" };
 
 		/// <summary>Between "Start VR" (0) and the IPD (2): a comfort setting, not a hardware one.</summary>
-		public override int GetOrder() => 1;
+		public override int Order => 60001;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> Client.ControllerAPI?.Current is IXRController;
 
 		public RecenterViewSetting() {

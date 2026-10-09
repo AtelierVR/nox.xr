@@ -10,17 +10,17 @@ namespace Nox.XR.Runtime.Settings {
 		/// and read through <see cref="MovementSettings"/>.
 	/// </summary>
 	public sealed class TurnModeSetting : DropdownHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "movement", "turn_mode" };
 
-		public override int GetOrder()
-			=> 0;
+		public override int Order
+			=> 60000;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> true;
 
 		public TurnModeSetting() {
-			SetLabel($"settings.entry.{string.Join(".", GetPath())}.label");
+			SetLabel($"settings.entry.{string.Join(".", Path)}.label");
 			SetOptions(GetOptions());
 			SetValue(MovementSettings.Key(MovementSettings.TurnMode), notify: false);
 		}

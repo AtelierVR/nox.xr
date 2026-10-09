@@ -3,12 +3,12 @@ using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
 	public sealed class PokeDisablePercentSetting : RangeHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "interaction", "poke_disable_percent" };
 
-		public override int GetOrder() => 1;
+		public override int Order => 60001;
 
-		public override bool IsActive() => true;
+		public override bool IsActive => true;
 
 		public PokeDisablePercentSetting() {
 			SetRange(0f, 1f);

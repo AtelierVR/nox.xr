@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Settings;
 using Nox.Settings;
-using Nox.UI;
 using Nox.XR.Runtime.Loaders;
 using UnityEngine;
 
@@ -10,12 +9,12 @@ namespace Nox.XR.Runtime.Settings {
 	/// Button to start or stop XR at runtime.
 	/// </summary>
 	public sealed class StartVRSetting : ButtonHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "general", "start_vr" };
 
-		public override int GetOrder() => 0;
+		public override int Order => 60000;
 
-		public override bool IsActive() => true;
+		public override bool IsActive => true;
 
 		/// <summary>
 		/// Le texte dépend de <see cref="XRLoaderManager.IsRunning"/>, qui change aussi sans passer par ce

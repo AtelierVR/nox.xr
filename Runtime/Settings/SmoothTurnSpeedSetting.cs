@@ -7,13 +7,13 @@ namespace Nox.XR.Runtime.Settings {
 		/// <see cref="XRTurnMode.Smooth"/>.
 	/// </summary>
 	public sealed class SmoothTurnSpeedSetting : RangeHandler {
-		public override string[] GetPath()
+		public override string[] Path
 			=> new[] { "xr", "movement", "smooth_turn_speed" };
 
-		public override int GetOrder()
-			=> 2;
+		public override int Order
+			=> 60002;
 
-		public override bool IsActive()
+		public override bool IsActive
 			=> MovementSettings.TurnMode == XRTurnMode.Smooth;
 
 		public SmoothTurnSpeedSetting() {
