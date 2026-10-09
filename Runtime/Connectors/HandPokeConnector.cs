@@ -65,7 +65,7 @@ namespace Nox.XR.Runtime.Connectors {
 
 		private void RefreshAllPokes() {
 			var threshold = PokeSettings.DisablePokePercent;
-			var module    = XRUIInteractorBinder.Current();
+			var module    = XRInteractorBinder.Current();
 
 			// Read every finger and detect a "fully open" hand: NO finger bent past the threshold.
 			// In that case the hand would poke with all of its fingers -> we cut them all.
@@ -90,10 +90,9 @@ namespace Nox.XR.Runtime.Connectors {
 				if (poke.Enable != enabled)
 					poke.Enable = enabled;
 
-				// Bound while it is on, see XRUIInteractorBinder: a poke created before the current UI module
-				// (desktop -> VR) stays on the module of the previous controller and never reaches the UI.
-				if (enabled)
-					XRUIInteractorBinder.Bind(poke, module);
+				// Keeps the poke on the rig's manager and on the UI module in use: a poke built before the
+				// desktop -> VR switch keeps the module of the previous controller and never reaches the UI.
+				XRInteractorBinder.Bind(poke, module);
 			}
 		}
 

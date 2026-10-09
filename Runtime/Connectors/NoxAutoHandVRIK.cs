@@ -157,7 +157,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// follow the same rule, handled by <see cref="HandPokeConnector"/>.
 		/// </summary>
 		private void UpdateInteractors() {
-			var module = XRUIInteractorBinder.Current();
+			var module = XRInteractorBinder.Current();
 
 			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical), module);
 			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical),  module);
@@ -166,6 +166,8 @@ namespace Nox.XR.Runtime.Connectors {
 		private static bool IsGrabbing(Hand hand)
 			=> hand != null && (hand.IsGrabbing() || hand.IsHolding());
 
+		/// <summary>Cuts a hand's near/far ray while it is grabbing something and keeps it bound to the rig (see
+		/// <see cref="XRInteractorBinder"/>).</summary>
 		private static void SetNearFar(NearFarInteractor nearFar, bool enable, XRUIInputModule module) {
 			if (nearFar == null)
 				return;
@@ -173,10 +175,7 @@ namespace Nox.XR.Runtime.Connectors {
 			if (nearFar.Enable != enable)
 				nearFar.Enable = enable;
 
-			// The module has to be picked up while the ray is on: binding a disabled interactor would leave a
-			// UI pointer alive on it (the module only follows the interactor's own enable/disable calls).
-			if (enable)
-				XRUIInteractorBinder.Bind(nearFar, module);
+			XRInteractorBinder.Bind(nearFar, module);
 		}
 
 		/// <summary>
