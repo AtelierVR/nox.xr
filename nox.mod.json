@@ -91,6 +91,21 @@
       "id": "com.unity.xr.management",
       "type": "depends",
       "register": "upm+com.unity.xr.management@4.5.4"
+    },
+    {
+      "id": "com.unity.xr.interaction.toolkit",
+      "type": "depends",
+      "register": "upm+com.unity.xr.interaction.toolkit@3.4.0"
+    },
+    {
+      "id": "com.unity.xr.core-utils",
+      "type": "depends",
+      "register": "upm+com.unity.xr.core-utils@2.5.3"
+    },
+    {
+      "id": "com.unity.inputsystem",
+      "type": "depends",
+      "register": "upm+com.unity.inputsystem@1.19.0"
     }
   ],
   "constraints": [
