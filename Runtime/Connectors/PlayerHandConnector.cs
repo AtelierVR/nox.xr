@@ -127,7 +127,8 @@ namespace Nox.XR.Runtime.Connectors
 				if (finger.tip == null) continue;
 
 				var poke = finger.tip.gameObject.GetOrAddComponent<PokeInteractor>();
-				poke.Radius = finger.tipRadius;
+				poke.localRadius = finger.tipRadius;
+				poke.Radius      = finger.tipRadius * Mathf.Abs(finger.tip.lossyScale.x);
 				pokes.Add((GetBindKey(hand, finger), poke));
 			}
 
