@@ -86,6 +86,11 @@
       "type": "depends",
       "version": ">=1.0.0",
       "register": "git+https://github.com/AtelierVR/nox.nameplate.git"
+    },
+    {
+      "id": "com.unity.xr.management",
+      "type": "depends",
+      "register": "upm+com.unity.xr.management@4.5.4"
     }
   ],
   "constraints": [
