@@ -121,6 +121,76 @@
       "id": "rootmotion.finalik",
       "type": "depends",
       "register": "git+https://github.com/AtelierVR/nox.finalik.git"
+    },
+    {
+      "id": "com.unity.modules.ai",
+      "type": "depends",
+      "register": "upm+com.unity.modules.ai@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.animation",
+      "type": "depends",
+      "register": "upm+com.unity.modules.animation@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.audio",
+      "type": "depends",
+      "register": "upm+com.unity.modules.audio@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.cloth",
+      "type": "depends",
+      "register": "upm+com.unity.modules.cloth@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.director",
+      "type": "depends",
+      "register": "upm+com.unity.modules.director@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.imgui",
+      "type": "depends",
+      "register": "upm+com.unity.modules.imgui@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.particlesystem",
+      "type": "depends",
+      "register": "upm+com.unity.modules.particlesystem@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.physics",
+      "type": "depends",
+      "register": "upm+com.unity.modules.physics@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.terrain",
+      "type": "depends",
+      "register": "upm+com.unity.modules.terrain@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.ui",
+      "type": "depends",
+      "register": "upm+com.unity.modules.ui@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.uielements",
+      "type": "depends",
+      "register": "upm+com.unity.modules.uielements@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.unitywebrequest",
+      "type": "depends",
+      "register": "upm+com.unity.modules.unitywebrequest@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.vehicles",
+      "type": "depends",
+      "register": "upm+com.unity.modules.vehicles@1.0.0"
+    },
+    {
+      "id": "com.unity.modules.video",
+      "type": "depends",
+      "register": "upm+com.unity.modules.video@1.0.0"
     }
   ],
   "constraints": [
