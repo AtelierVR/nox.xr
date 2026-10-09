@@ -72,7 +72,7 @@ namespace Nox.XR.Runtime.Widgets {
 
 			var button = Reference.GetComponent<Button>("button", instance);
 			button.onClick.AddListener(component.OnClick);
-			instance.name = $"[{component.GetKey()}_{instance.GetEntityId().GetHashCode()}]";
+			instance.name = $"[{component.GetKey()}_{instance.GetId()}]";
 			values        = (instance, component);
 
 			prefab             = Client.CoreAPI.AssetAPI.GetAsset<GameObject>("ui:prefabs/widget.prefab");

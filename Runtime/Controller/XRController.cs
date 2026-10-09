@@ -99,7 +99,7 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 				return false;
 			}
 
-			xr.gameObject.name = $"[{xr.GetType().Name}_{xr.GetEntityId().GetHashCode()}]";
+			xr.gameObject.name = $"[{xr.GetType().Name}_{ComponentExtension.GetId(xr)}]";
 
 			if (xr.eventSystem)
 				xr.eventSystem.enabled = false;

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Autohand;
-using Nox.CCK.XR;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars.Camera;
 using Nox.Avatars.Controllers;
