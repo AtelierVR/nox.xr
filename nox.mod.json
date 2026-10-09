@@ -108,19 +108,14 @@
       "register": "upm+com.unity.inputsystem@1.19.0"
     },
     {
-      "id": "com.earnestrobot.autohand",
-      "type": "depends",
-      "register": "git+https://github.com/AtelierVR/nox.autohand.git"
-    },
-    {
       "id": "nox.avatars.autohand",
       "type": "depends",
       "register": "git+https://github.com/AtelierVR/nox.avatars.autohand.git"
     },
     {
-      "id": "rootmotion.finalik",
+      "id": "nox.avatars.finalik",
       "type": "depends",
-      "register": "git+https://github.com/AtelierVR/nox.finalik.git"
+      "register": "git+https://github.com/AtelierVR/nox.avatars.finalik.git"
     },
     {
       "id": "com.unity.modules.ai",
