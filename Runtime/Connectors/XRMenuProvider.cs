@@ -19,6 +19,29 @@ namespace Nox.XR.Runtime.Connectors {
 
 		public IMenu Menu;
 
+		/// <summary>
+		/// Use the menu's authored AutoHand grab pose (the <c>GrabbablePose</c> on the menu prefab).
+		/// <para>
+		/// Off by default: that pose was captured with the AutoHand <c>RobotHand</c> prefab, and applying
+		/// it to an avatar hand (different finger local frames and hand pivot) twists the fingers and
+		/// mis-orients the panel. With it off, AutoHand wraps the fingers around the panel procedurally
+		/// (see <c>Hand.AutoPose</c>), which adapts to any hand.
+		/// </para>
+		/// </summary>
+		[Tooltip("Use the menu's authored AutoHand grab pose. Off: the fingers wrap procedurally.")]
+		public bool useGrabPose = false;
+
+		/// <summary>
+		/// The menu is grabbed with the player's hands, so a pose authored for the AutoHand RobotHand
+		/// cannot be reused: clear it before any grab (the pose is only read on grab, so doing it once
+		/// at spawn is enough).
+		/// </summary>
+		private void Awake() {
+			if (!useGrabPose && Grabbable != null)
+				foreach (var pose in Grabbable.GetComponentsInChildren<GrabbablePose>(true))
+					pose.poseEnabled = false;
+		}
+
 		RectTransform IMenuProvider.Container
 			=> Container;
 

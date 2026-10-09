@@ -143,10 +143,29 @@ namespace Nox.XR.Runtime.Connectors {
 		private void Update() {
 			// Must run before VRIK, which solves in LateUpdate.
 			ApplyHeadWeights();
+			UpdateInteractors();
 
 			if (!_resetQueued) return;
 			vrik.solver.Reset();
 			_resetQueued = false;
+		}
+
+		/// <summary>
+		/// Cuts a hand's near/far ray while it is grabbing something: the ray would otherwise compete
+		/// with the AutoHand grab (and jump around while the hand bends toward the object). The pokes
+		/// follow the same rule, handled by <see cref="HandPokeConnector"/>.
+		/// </summary>
+		private void UpdateInteractors() {
+			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical));
+			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical));
+		}
+
+		private static bool IsGrabbing(Hand hand)
+			=> hand != null && (hand.IsGrabbing() || hand.IsHolding());
+
+		private static void SetNearFar(NearFarInteractor nearFar, bool enable) {
+			if (nearFar != null && nearFar.Enable != enable)
+				nearFar.Enable = enable;
 		}
 
 		/// <summary>
@@ -252,6 +271,26 @@ namespace Nox.XR.Runtime.Connectors {
 			// rebuilt exactly when the hands are and never lost by an avatar reload (the loader used to
 			// create them on a fire-and-forget async chain that a reload could interrupt).
 			SetupNearFarInteractors();
+
+			// Pokes live on the ARM hand; the grab happens on the physical duplicate. Point the poke
+			// drivers at the duplicates so they can cut the pokes while an object is held.
+			LinkPokeConnector(rightSource?.Anchor, rightPhysical);
+			LinkPokeConnector(leftSource?.Anchor,  leftPhysical);
+		}
+
+		/// <summary>
+		/// Finds the poke driver of an arm hand and points it at the physical duplicate that actually
+		/// grabs, so its pokes are cut while an object is held.
+		/// </summary>
+		private static HandPokeConnector LinkPokeConnector(Transform anchor, Hand physical) {
+			if (anchor == null)
+				return null;
+
+			var poke = anchor.GetComponent<HandPokeConnector>()
+			           ?? anchor.GetComponentInChildren<HandPokeConnector>(true);
+			if (poke != null)
+				poke.physicalHand = physical;
+			return poke;
 		}
 
 		/// <summary>
@@ -464,6 +503,11 @@ namespace Nox.XR.Runtime.Connectors {
 				// the armature every frame: the finger drivers must live here, not only on the armature hand
 				// (whose copies were stripped by `StripToBones`). Without this the fingers never bend.
 				PlayerHandConnector.SetupFingerBindings(hand);
+
+				// The duplicate is also the hand the player grabs with: the AutoHand input link of the
+				// package lives on the (disabled) fallback RobotHand and targets it, so the grab input has
+				// to be wired here, on the hand `AutoHandPlayer` actually drives.
+				hand.gameObject.GetOrAddComponent<HandGrabConnector>();
 			} else {
 				Logger.LogError(
 					$"{nameof(NoxAutoHandVRIK)}: the duplicate of the {side} hand has no Autohand.Hand component.",

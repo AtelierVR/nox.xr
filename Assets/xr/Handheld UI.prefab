@@ -2957,6 +2957,7 @@ GameObject:
   - component: {fileID: 1598948403408837486}
   - component: {fileID: 8563147187270507210}
   - component: {fileID: 4782378138951880538}
+  - component: {fileID: -3809683035308441587}
   m_Layer: 0
   m_Name: Handheld UI
   m_TagString: Untagged
@@ -2984,6 +2985,24 @@ Transform:
   - {fileID: 4256583707937893392}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 20.068, y: 6.873, z: 0}
+--- !u!114 &-3809683035308441587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7439882295212036103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 357cf98690e614943b159a3c8d3811bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  conditionCollider: {fileID: 0}
+  allowedSide: {x: 0, y: 0, z: 1}
+  sideTolerance: 0.02
+  maxDistance: 0
+  allowedForward: {x: 0, y: 0, z: 0}
+  maxAngle: 45
 --- !u!114 &8563147187270507210
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3556,7 +3575,7 @@ GameObject:
   - component: {fileID: 1139207939856232370}
   - component: {fileID: 7098199360533121603}
   - component: {fileID: 1224216682079237572}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Cube (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
