@@ -44,7 +44,7 @@
       "id": "control",
       "type": "depends",
       "version": ">=1.0.0",
-      "register": "git+https://github.com/AtelierVR/api.nox.control.git"
+      "register": "git+https://github.com/AtelierVR/nox.control.git"
     },
     {
       "id": "terminal",
