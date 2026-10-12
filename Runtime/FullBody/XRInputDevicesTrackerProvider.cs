@@ -17,9 +17,27 @@ namespace Nox.XR.Runtime.FullBody {
 		public static readonly XRInputDevicesTrackerProvider Instance = new();
 
 		private readonly List<InputDevice> _devices = new();
+		private readonly List<string> _deviceIds = new();
 		private readonly List<InputDevice> _hardwareTrackers = new();
 
-		private XRInputDevicesTrackerProvider() { }
+		/// <summary>
+		/// XR devices are re-enumerated at most this often. <see cref="InputDevices.GetDevices"/> reads the
+		/// characteristics of every device (one native call each) and the callers rebuild every id string,
+		/// while the tracker providers poll several times per frame: one capture showed ~280
+		/// <c>get_characteristics</c> and ~270 id strings per frame. A connect/disconnect invalidates the
+		/// list immediately.
+		/// </summary>
+		private const float DeviceRefreshInterval = 0.25f;
+
+		private float _devicesRefreshedAt = float.NegativeInfinity;
+
+		private XRInputDevicesTrackerProvider() {
+			InputDevices.deviceConnected    += OnDeviceChanged;
+			InputDevices.deviceDisconnected += OnDeviceChanged;
+		}
+
+		private void OnDeviceChanged(InputDevice device)
+			=> _devicesRefreshedAt = float.NegativeInfinity;
 
 		public string Id
 			=> "xr";
@@ -97,8 +115,7 @@ namespace Nox.XR.Runtime.FullBody {
 			=> IsCandidate(device, excludeHanded, true, out reason);
 
 		public void Get(List<TrackerPose> into, bool excludeHanded, bool excludeControllers) {
-			_devices.Clear();
-			InputDevices.GetDevices(_devices);
+			RefreshDevices();
 
 			for (var i = 0; i < _devices.Count; i++) {
 				var device = _devices[i];
@@ -115,12 +132,30 @@ namespace Nox.XR.Runtime.FullBody {
 
 				// Tracking-space poses: nox.xr applies the XR origin to every provider.
 				into.Add(new TrackerPose {
-					Id              = string.IsNullOrEmpty(device.serialNumber) ? $"{device.name}#{i}" : device.serialNumber,
+					Id              = _deviceIds[i],
 					Position        = position,
 					Rotation        = rotation,
 					Velocity        = velocity,
 					AngularVelocity = angularVelocity
 				});
+			}
+		}
+
+		/// <summary>
+		/// Refreshes the cached device list and ids when needed (see <see cref="DeviceRefreshInterval"/>).
+		/// </summary>
+		private void RefreshDevices() {
+			if (UnityEngine.Time.unscaledTime - _devicesRefreshedAt < DeviceRefreshInterval)
+				return;
+
+			_devicesRefreshedAt = UnityEngine.Time.unscaledTime;
+			_devices.Clear();
+			_deviceIds.Clear();
+			InputDevices.GetDevices(_devices);
+
+			for (var i = 0; i < _devices.Count; i++) {
+				var device = _devices[i];
+				_deviceIds.Add(string.IsNullOrEmpty(device.serialNumber) ? $"{device.name}#{i}" : device.serialNumber);
 			}
 		}
 	}

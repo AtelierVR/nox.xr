@@ -277,13 +277,18 @@ namespace Nox.XR.Runtime {
 		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Autohand.Hand hand,
 			(FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] map) {
 			if (hand == null || hand.fingers == null || hand.fingers.Length == 0) return;
-			foreach (var entry in map) {
-				var finger = System.Array.Find(hand.fingers, f => f.fingerType == entry.finger);
-				if (finger == null) continue;
-				if (finger.knuckleJoint) parts[entry.proximal.ToIndex()]     = finger.knuckleJoint;
-				if (finger.middleJoint)  parts[entry.intermediate.ToIndex()] = finger.middleJoint;
-				if (finger.distalJoint)  parts[entry.distal.ToIndex()]       = finger.distalJoint;
-			}
+			foreach (var (finger, proximal, intermediate, distal) in map)
+				// Plain loop instead of Array.Find with a capturing lambda: the lambda allocated a closure
+				// and a delegate per finger, ten times per GetParts call.
+				foreach (var f in hand.fingers) {
+					if (f == null || f.fingerType != finger)
+						continue;
+
+					if (f.knuckleJoint) parts[proximal.ToIndex()]     = f.knuckleJoint;
+					if (f.middleJoint)  parts[intermediate.ToIndex()] = f.middleJoint;
+					if (f.distalJoint)  parts[distal.ToIndex()]       = f.distalJoint;
+					break;
+				}
 		}
 
 		public Dictionary<ushort, Transform> GetParts() {
@@ -311,10 +316,17 @@ namespace Nox.XR.Runtime {
 		}
 
 		IReadOnlyDictionary<ushort, TransformObject> IController.GetParts() {
-			var parts = GetParts().ToDictionary(
-				kv => kv.Key,
-				kv => new TransformObject(kv.Value, kv.Value.GetComponent<Rigidbody>())
-			);
+			// Built with a plain loop rather than ToDictionary (which allocated an enumerator and a closure),
+			// and every part is wrapped without a GetComponent<Rigidbody> call: almost no part of a rig
+			// carries a Rigidbody, and a failing GetComponent builds a "missing component" message that is
+			// logged and thrown away. That single call was 45 % of a steady-state frame's allocations
+			// (GetComponentNullErrorMessage, 1.28 MB over 71 frames in one capture).
+			var source = GetParts();
+			var parts  = new Dictionary<ushort, TransformObject>(source.Count);
+			foreach (var kv in source)
+				parts[kv.Key] = kv.Value.TryGetComponent(out Rigidbody rb)
+					? new TransformObject(kv.Value, rb)
+					: new TransformObject(kv.Value);
 
 			// `PlayerRig.Base` is the avatar root pose (tracking container), NOT the AutoHandPlayer body:
 			// replace the raw entry so the sent values carry the container pose and the body velocity.
@@ -390,28 +402,27 @@ namespace Nox.XR.Runtime {
 				return;
 			}
 
-			var part = GetParts()
-				.FirstOrDefault(p => p.Key == index);
-
-			if (!part.Value)
+			// Dictionary lookup instead of a LINQ FirstOrDefault: the predicate captured `index` and the
+			// enumerator allocated on every call, once per part and per incoming update.
+			if (!GetParts().TryGetValue(index, out var part) || !part)
 				return;
 
-			var hasRb = part.Value.TryGetComponent<Rigidbody>(out rb);
+			var hasRb = part.TryGetComponent<Rigidbody>(out rb);
 
-			if (tr.Flags.HasFlag(TransformFlags.Position) && !tr.IsSamePosition(part.Value.position)) {
-				part.Value.position = tr.GetPosition();
+			if (tr.Flags.HasFlag(TransformFlags.Position) && !tr.IsSamePosition(part.position)) {
+				part.position = tr.GetPosition();
 				if (hasRb && rb)
 					rb.position = tr.GetPosition();
 			}
 
-			if (tr.Flags.HasFlag(TransformFlags.Rotation) && !tr.IsSameRotation(part.Value.rotation)) {
-				part.Value.rotation = tr.GetRotation();
+			if (tr.Flags.HasFlag(TransformFlags.Rotation) && !tr.IsSameRotation(part.rotation)) {
+				part.rotation = tr.GetRotation();
 				if (hasRb && rb)
 					rb.rotation = tr.GetRotation();
 			}
 
-			if (tr.Flags.HasFlag(TransformFlags.Scale) && !tr.IsSameScale(part.Value.localScale))
-				part.Value.localScale = tr.GetScale();
+			if (tr.Flags.HasFlag(TransformFlags.Scale) && !tr.IsSameScale(part.localScale))
+				part.localScale = tr.GetScale();
 
 			if (hasRb && rb) {
 				if (tr.Flags.HasFlag(TransformFlags.Velocity) && !tr.IsSameVelocity(rb.linearVelocity))
