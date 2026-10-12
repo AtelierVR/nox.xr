@@ -50,6 +50,8 @@ namespace Nox.XR.Runtime {
 				new RecenterViewSetting(),				
 				new PokeEnabledSetting(),
 				new PokeDisablePercentSetting(),
+				new PokeDisableNearFarSetting(),
+				new PokeOpenHandIndexSetting(),
 				new IPDSetting(),
 				new FullBodyTrackingSetting(),
 				new CalibrateFullBodySetting(),

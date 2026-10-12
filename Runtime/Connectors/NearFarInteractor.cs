@@ -15,9 +15,30 @@ namespace Nox.XR.Runtime.Connectors {
 			set => handedness = value;
 		}
 
+		private bool _interactive = true;
+
+		/// <summary>
+		/// Whether the ray may interact with anything.
+		/// <para>
+		/// Off <b>disables the component</b>, which is the only thing that really takes the ray out. XRI's
+		/// <c>isCurveActive</c> - the value the line visual reads to decide whether to draw - is derived from
+		/// <c>isActiveAndEnabled</c> and <c>enableFarCasting</c>, never from the interaction layers. Cutting
+		/// the layers, <c>allowHover</c> and <c>allowSelect</c> alone therefore left the ray drawn (and the
+		/// casters casting) while a poke owned the gesture: measured live, the <c>LineRenderer</c> stayed
+		/// enabled with the layers at 0, and went off on the next render only once the component was
+		/// disabled. A real disable also unregisters the interactor from the interaction manager and from the
+		/// UI module, so it can neither hover, select nor click at a distance until it is enabled again.
+		/// </para>
+		/// </summary>
 		public bool Enable {
-			get => enabled;
-			set => enabled = value;
+			get => _interactive;
+			set {
+				if (_interactive == value)
+					return;
+
+				_interactive = value;
+				enabled = value;
+			}
 		}
 
 		protected override void Awake() {
@@ -49,10 +70,12 @@ namespace Nox.XR.Runtime.Connectors {
 					InteractorHandedness.Right => "right",
 					_ => null
 				};
-				UpdateButton(selectInput, side == null ? 0f : Keybindings.GetFloatValue($"select.{side}"));
-				UpdateButton(activateInput, side == null ? 0f : Keybindings.GetFloatValue($"activate.{side}"));
-				UpdateButton(uiPressInput, side == null ? 0f : Keybindings.GetFloatValue($"press.{side}"));
-				uiScrollInput.manualValue = side == null ? Vector2.zero : Keybindings.GetVector2Value($"scroll.{side}");
+				// A ray that must not interact eats no input either: its buttons stay released, so neither the
+				// toolkit nor the UI module can act through it while a poke owns the gesture.
+				UpdateButton(selectInput, _interactive && side != null ? Keybindings.GetFloatValue($"select.{side}") : 0f);
+				UpdateButton(activateInput, _interactive && side != null ? Keybindings.GetFloatValue($"activate.{side}") : 0f);
+				UpdateButton(uiPressInput, _interactive && side != null ? Keybindings.GetFloatValue($"press.{side}") : 0f);
+				uiScrollInput.manualValue = _interactive && side != null ? Keybindings.GetVector2Value($"scroll.{side}") : Vector2.zero;
 			}
 
 			// The base class consumes button states during Dynamic preprocessing.

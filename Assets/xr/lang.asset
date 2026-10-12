@@ -35,6 +35,10 @@ MonoBehaviour:
       value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Poke Disable Threshold"
+    - key: settings.entry.xr.general.poke_disable_near_far.label
+      value: "Disable Ray While Poking"
+    - key: settings.entry.xr.general.poke_open_hand_index.label
+      value: "Index Poke With Open Hand"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Full-Body Tracking"
     - key: settings.entry.xr.general.full_body_calibration.label
@@ -109,6 +113,10 @@ MonoBehaviour:
       value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Seuil de désactivation du poke"
+    - key: settings.entry.xr.general.poke_disable_near_far.label
+      value: "Désactiver la raie pendant le poke"
+    - key: settings.entry.xr.general.poke_open_hand_index.label
+      value: "Poke index avec la main ouverte"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Suivi du corps entier"
     - key: settings.entry.xr.general.full_body_calibration.label

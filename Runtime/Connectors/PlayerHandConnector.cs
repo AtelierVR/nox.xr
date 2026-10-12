@@ -115,7 +115,19 @@ namespace Nox.XR.Runtime.Connectors
 				finger.gameObject.GetOrAddComponent<FingerKeybindConnector>().BindKey = GetBindKey(hand, finger);
 		}
 
-		private void SetupFingers(Hand hand)
+		/// <summary>
+		/// Equips a hand with the finger bend drivers (<see cref="FingerKeybindConnector"/>) and one
+		/// <see cref="PokeInteractor"/> per fingertip, plus the <see cref="HandPokeConnector"/> that drives
+		/// them.
+		///
+		/// <para>
+		/// This is the <b>physical</b> hand's equipment: the colliders and the pokes belong to the body that
+		/// collides and grabs, i.e. the duplicate <c>NoxAutoHandVRIK</c> builds. It is called on that duplicate
+		/// there - and on the avatar hand itself only when no duplicate is built (no FinalIK), the avatar hand
+		/// then being the physical body.
+		/// </para>
+		/// </summary>
+		public static void SetupFingers(Hand hand)
 		{
 			if (hand == null) return;
 

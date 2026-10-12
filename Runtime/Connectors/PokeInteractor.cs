@@ -1,8 +1,6 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
-using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace Nox.XR.Runtime.Connectors {
 	/// <summary>
@@ -13,6 +11,12 @@ namespace Nox.XR.Runtime.Connectors {
 	/// fingertip radius (<see cref="localRadius"/>) and the tip's world scale, so the poke stays finger-sized
 	/// whatever the avatar scale: an absolute metre value would be too small on a big avatar (the finger
 	/// colliders then keep the poke away from the surface) and too big on a small one.
+	/// </para>
+	/// <para>
+	/// The UI click is left to XRI (the tracked-device poke dispatches down/up/click itself), on the
+	/// <b>release</b>: the button stays pressed while the finger is in and fires when it comes out. The
+	/// drag that would otherwise swallow that click on a moving poke is compensated on the UI module's
+	/// tracked drag threshold (see <see cref="XRInteractorBinder"/>).
 	/// </para>
 	/// </summary>
 	public class PokeInteractor : XRPokeInteractor {
@@ -30,13 +34,24 @@ namespace Nox.XR.Runtime.Connectors {
 		public float radiusMultiplier = 2f;
 
 		/// <summary>
+		/// Multiplier applied to the poke's <b>world radius</b> to size its <c>pokeDepth</c>. The world radius
+		/// already follows the avatar scale (<c>localRadius * radiusMultiplier * lossyScale</c>), so the depth
+		/// does too and always stays above the finger colliders whatever the avatar size.
+		/// </summary>
+		[Tooltip("Multiplier applied to the poke's world radius to size its detection depth.")]
+		public float depthMultiplier = 12f;
+
+		/// <summary>Lower bound of the poke depth (world metres), so a small avatar still detects from a hand's length.</summary>
+		[Tooltip("Lower bound of the poke depth, in world metres.")]
+		public float minPokeDepth = 0.15f;
+
+		/// <summary>
 		/// Fraction of the fingertip radius (<see cref="localRadius"/>) the poke point is pushed along the
 		/// finger so it sits on the fingertip surface instead of the bone centre.
 		/// <para>
-		/// XRI only presses a UI element once the poke point is <c>2.5% * pokeDepth</c> past the target
-		/// plane (about 2.5 mm with the default depth). The finger colliders stop the hand before the tip
-		/// bone can get that close to a panel, so the poke has to start ahead of the bone to ever press:
-		/// the button hovers (it is detected) but never plays its press animation.
+		/// The finger colliders stop the hand a few mm short of a surface, so a poke point left at the bone
+		/// centre never reaches what the finger is visibly touching; <c>localRadius</c> (the fingertip
+		/// radius) places it on the surface instead.
 		/// </para>
 		/// <para>
 		/// The offset is proportional to the fingertip so it keeps working at any avatar scale, and it is
@@ -45,38 +60,6 @@ namespace Nox.XR.Runtime.Connectors {
 		/// </summary>
 		[Tooltip("Fraction of the fingertip radius the poke point is pushed along the finger, so it presses from the fingertip surface instead of the bone centre.")]
 		public float pokeOffsetRatio = 1f;
-
-		/// <summary>
-		/// World distance (metres) the poke point is pulled back for a couple of frames to force a UI release
-		/// (see <see cref="UpdateUITarget"/>).
-		/// </summary>
-		[Tooltip("World distance (metres) the poke point is pulled back to force a UI release.")]
-		public float releaseDistance = 0.5f;
-
-		/// <summary>Seconds between two forced releases used to unblock a press that XRI failed to arm.</summary>
-		[Tooltip("Seconds between two forced releases used to unblock a press that failed to arm.")]
-		public float assistCooldown = 0.25f;
-
-		/// <summary>Frames a failed press is given to arm by itself before it is forced.</summary>
-		[Tooltip("Frames a failed press is given to arm by itself before it is forced.")]
-		public int assistDelayFrames = 3;
-
-		/// <summary>Frames the poke point stays pulled back to force a UI release.</summary>
-		private int _releaseFrames;
-
-		/// <summary>Time before another fallback release may be forced.</summary>
-		private float _nextAssistTime;
-
-		/// <summary>Consecutive frames where the press was required but did not happen.</summary>
-		private int _blockedFrames;
-
-		/// <summary>Whether the pointer was pressing on the previous frame.</summary>
-		private bool _wasSelecting;
-
-		/// <summary>UI element the pointer was on last frame.</summary>
-		private GameObject _uiTarget;
-
-		private XRUIInputModule _inputModule;
 
 		public bool Enable {
 			get => enabled;
@@ -96,11 +79,8 @@ namespace Nox.XR.Runtime.Connectors {
 		public override void ProcessInteractor(XRInteractionUpdateOrder.UpdatePhase updatePhase) {
 			if (updatePhase == XRInteractionUpdateOrder.UpdatePhase.Dynamic) {
 				ApplyRadius();
-				UpdateUITarget();
+				ApplyDepth();
 				ApplyOffset();
-
-				if (_releaseFrames > 0)
-					_releaseFrames--;
 			}
 
 			base.ProcessInteractor(updatePhase);
@@ -109,15 +89,17 @@ namespace Nox.XR.Runtime.Connectors {
 		protected override void Awake() {
 			base.Awake();
 			ApplyRadius();
+			ApplyDepth();
 			ApplyOffset();
+			ApplyClick();
 		}
 
 		protected override void OnEnable() {
 			base.OnEnable();
-			_blockedFrames = 0;
-			_wasSelecting = false;
 			ApplyRadius();
+			ApplyDepth();
 			ApplyOffset();
+			ApplyClick();
 		}
 
 		/// <summary>
@@ -131,10 +113,46 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
+		/// Sizes the poke's detection depth from its world radius, so it follows the avatar scale and stays
+		/// above the finger colliders: <c>pokeDepth = pokeRadius * depthMultiplier</c>, with a floor for small
+		/// avatars.
+		/// <para>
+		/// XRI uses <c>pokeDepth</c> both as the UI detection range (the raycaster spherecasts with that
+		/// radius, so a depth left at XRI's default 0.1 m only detected a button from ~10 cm) and as the base
+		/// of the press window (<c>2.5% * pokeDepth</c>).
+		/// </para>
+		/// </summary>
+		public void ApplyDepth() {
+			var world = Mathf.Max(minPokeDepth, pokeWidth * depthMultiplier);
+			if (!Mathf.Approximately(world, pokeDepth))
+				pokeDepth = world;
+		}
+
+		/// <summary>
+		/// Clicks the UI on the <b>release</b>, like a mouse: the button stays pressed as long as the finger
+		/// is in, and its event fires when the finger is pulled out.
+		/// <para>
+		/// Clicking on the press instead (XRI's <c>clickUIOnDown</c>) sends down, up and click in a single
+		/// frame, so the button visually un-presses while the finger is still in - measured live as "the
+		/// button releases although I am still pressing". The release click only needs the pointer not to
+		/// have dragged; <see cref="XRInteractorBinder"/> raises the module's tracked drag threshold for
+		/// exactly that reason, a poke following the finger.
+		/// </para>
+		/// </summary>
+		public void ApplyClick()
+			=> clickUIOnDown = false;
+
+		/// <summary>
 		/// Moves the auto-created attach transform onto the fingertip surface.
 		/// The finger axis is the tip bone's <c>up</c> axis (AutoHand convention), and the attach
 		/// transform is a child with an identity rotation, so a local <c>up</c> offset follows the finger
 		/// and is scaled with the avatar.
+		/// <para>
+		/// The push (<c>localRadius</c>) is what lets the poke point reach the target: the finger colliders
+		/// stop the hand short of the surface, so the bone centre never gets close enough on its own. It is
+		/// applied everywhere, UI included - a poke point left at the bone centre hovers a UI element but
+		/// never enters the depth window XRI needs to press it.
+		/// </para>
 		/// </summary>
 		public void ApplyOffset() {
 			var attach = attachTransform;
@@ -142,75 +160,10 @@ namespace Nox.XR.Runtime.Connectors {
 				return;
 
 			var distance = localRadius * pokeOffsetRatio;
-			if (_releaseFrames > 0)
-				distance = -releaseDistance / Mathf.Max(Mathf.Abs(transform.lossyScale.y), 1e-5f);
 
 			var local = Vector3.up * distance;
 			if (attach.localPosition != local)
 				attach.localPosition = local;
-		}
-
-		/// <summary>
-		/// Keeps the UI pointer usable while the finger stays on the panel. XRI releases the pointer only when
-		/// the poke leaves the surface and caches the poked element, so the press has to be forced open again
-		/// (by pulling the poke point out of the panel for a couple of frames) in three cases: right after a
-		/// press ended - the invisible moment, so the next press arms on its very first frame - when sliding
-		/// from one element to the next, and when a met depth requirement stays without a press.
-		/// </summary>
-		private void UpdateUITarget() {
-			var target = CurrentUITarget();
-			var selecting = TrackedDeviceGraphicRaycaster.IsPokeSelectingWithUI(this);
-			var interacting = TrackedDeviceGraphicRaycaster.IsPokeInteractingWithUI(this);
-
-			_blockedFrames = !selecting && interacting && pokeStateData.Value.meetsRequirements ? _blockedFrames + 1 : 0;
-
-			if (_releaseFrames == 0) {
-				// The press just ended: drop what XRI cached for the pointer. Doing it here (and not when a
-				// press is needed) is invisible, and the next press can then arm on its very first frame -
-				// a fast poke would otherwise be swallowed by the forced release.
-				if (_wasSelecting && !selecting && interacting) {
-					_releaseFrames = 2;
-				}
-				// Sliding from one element to the next keeps the pointer down in XRI, so the new
-				// element never gets its own press.
-				else if (selecting && target != null && target != _uiTarget && _uiTarget != null) {
-					_releaseFrames = 2;
-				}
-				// The depth requirement is met but the press does not come: XRI is holding a stale
-				// cached target. Give it a few frames first, so a quick poke is never cut short.
-				else if (_blockedFrames >= assistDelayFrames && Time.unscaledTime >= _nextAssistTime) {
-					_releaseFrames = 2;
-					_nextAssistTime = Time.unscaledTime + assistCooldown;
-				}
-			}
-
-			if (target != null)
-				_uiTarget = target;
-
-			_wasSelecting = selecting;
-		}
-
-		/// <summary>
-		/// UI element the pointer of this poke is currently on, or <c>null</c>.
-		/// The press target is the one uGUI would press (the hierarchy root handling the pointer), so a
-		/// graphic layer change inside the same button does not count as a change.
-		/// </summary>
-		private GameObject CurrentUITarget() {
-			var eventSystem = EventSystem.current;
-			if (eventSystem == null)
-				return null;
-
-			if (_inputModule == null || _inputModule.gameObject != eventSystem.gameObject) {
-				_inputModule = eventSystem.GetComponent<XRUIInputModule>();
-				if (_inputModule == null)
-					return null;
-			}
-
-			if (!TryGetUIModel(out var model))
-				return null;
-
-			var hovered = _inputModule.GetCurrentGameObject(model.pointerId);
-			return hovered != null ? ExecuteEvents.GetEventHandler<IPointerDownHandler>(hovered) : null;
 		}
 
 		private void OnDrawGizmos() {

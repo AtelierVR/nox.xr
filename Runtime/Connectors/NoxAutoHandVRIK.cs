@@ -1,13 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine.XR.Interaction.Toolkit.UI;
 using System.Reflection;
 using Autohand;
 using Nox.Avatars.AutoHand;
 using Nox.Avatars.Hand;
 using Nox.Avatars.Rigging;
 using Nox.CCK.Utils;
+using Nox.XR.Runtime.Settings;
 using RootMotion.FinalIK;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -46,6 +46,25 @@ namespace Nox.XR.Runtime.Connectors {
 		/// <summary>Near/far interactors created on the physical hands, one per side (rebuilt with the hands).</summary>
 		private NearFarInteractor _rightNearFar;
 		private NearFarInteractor _leftNearFar;
+
+		/// <summary>Pokes of each armature hand; their state gates the near/far ray.</summary>
+		private PokeInteractor[] _rightPokes = System.Array.Empty<PokeInteractor>();
+		private PokeInteractor[] _leftPokes  = System.Array.Empty<PokeInteractor>();
+
+		/// <summary>
+		/// Distance (world metres) between a fingertip and its poke target under which the near/far ray
+		/// stops interacting: close enough that the finger is what the user is aiming with.
+		/// </summary>
+		[Tooltip("Distance (world metres) between a fingertip and its poke target under which the near/far ray stops interacting.")]
+		public float pokeRayStopDistance = 0.075f;
+
+		/// <summary>Factor over <see cref="pokeRayStopDistance"/> before the ray is allowed back.</summary>
+		[Tooltip("The ray only comes back past pokeRayStopDistance times this factor, so it cannot blink at the threshold.")]
+		public float pokeRayReleaseFactor = 1.6f;
+
+		/// <summary>Whether each side's ray is currently held off by a poke (hysteresis state).</summary>
+		private bool _rightRayHeld;
+		private bool _leftRayHeld;
 
 		/// <summary>Physical AutoHand duplicate, right side.</summary>
 		public Hand rightPhysical { get; private set; }
@@ -152,30 +171,81 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		/// <summary>
-		/// Cuts a hand's near/far ray while it is grabbing something: the ray would otherwise compete
-		/// with the AutoHand grab (and jump around while the hand bends toward the object). The pokes
-		/// follow the same rule, handled by <see cref="HandPokeConnector"/>.
+		/// Puts a hand's near/far ray out of action while it is grabbing something - the ray would otherwise
+		/// compete with the AutoHand grab (and jump around while the hand bends toward the object) - and,
+		/// unless <see cref="PokeSettings.DisableNearFar"/> is off, while one of its pokes is within
+		/// <see cref="pokeRayStopDistance"/> of its target: close enough that the finger is what the user is
+		/// aiming with, so the ray would only get in the way. The release factor stops the ray from blinking
+		/// at the threshold.
 		/// </summary>
 		private void UpdateInteractors() {
-			var module = XRInteractorBinder.Current();
+			var rightPoke = PokeHoldsRay(_rightPokes, ref _rightRayHeld);
+			var leftPoke  = PokeHoldsRay(_leftPokes,  ref _leftRayHeld);
 
-			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical), module);
-			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical),  module);
+			SetNearFar(_rightNearFar, !IsGrabbing(rightPhysical) && !(rightPoke && PokeSettings.DisableNearFar));
+			SetNearFar(_leftNearFar,  !IsGrabbing(leftPhysical)  && !(leftPoke  && PokeSettings.DisableNearFar));
 		}
+
+		/// <summary>
+		/// Whether a hand's pokes keep its ray off: one of them stands closer than
+		/// <see cref="pokeRayStopDistance"/> from its target. <paramref name="held"/> carries the
+		/// hysteresis - once held, the ray only comes back past
+		/// <see cref="pokeRayStopDistance"/> * <see cref="pokeRayReleaseFactor"/>.
+		/// </summary>
+		private bool PokeHoldsRay(PokeInteractor[] pokes, ref bool held) {
+			var stop = held ? pokeRayStopDistance * Mathf.Max(pokeRayReleaseFactor, 1f) : pokeRayStopDistance;
+			held = PokeTargetDistance(pokes) <= stop;
+			return held;
+		}
+
+		/// <summary>
+		/// Smallest distance (metres) between one of a hand's pokes and the surface it pokes, or positive
+		/// infinity when no poke has a target.
+		/// <para>
+		/// Measured from the fingertip (the poke's attach point) to
+		/// <see cref="UnityEngine.XR.Interaction.Toolkit.Filtering.PokeStateData.axisAlignedPokeInteractionPoint"/>,
+		/// the point on the target surface along the poke axis - i.e. the gap the user sees between the
+		/// finger and what it is about to poke.
+		/// </para>
+		/// <para>
+		/// The distance to <see cref="UnityEngine.XR.Interaction.Toolkit.Filtering.PokeStateData.target"/>
+		/// must NOT be used: it is the interactable's <b>transform origin</b>, and a panel or a scrollbar
+		/// pivot sits far from where the finger touches it - the distance then stays above the stop
+		/// distance, so the ray kept interacting while the finger was visibly on the element.
+		/// </para>
+		/// </summary>
+		private static float PokeTargetDistance(PokeInteractor[] pokes) {
+			var nearest = float.PositiveInfinity;
+
+			foreach (var poke in pokes) {
+				if (poke == null || !poke.isActiveAndEnabled)
+					continue;
+
+				var data = poke.pokeStateData.Value;
+				if (data.target == null)
+					continue;
+
+				// A poke that already selects something is as close as it gets.
+				if (poke.hasSelection)
+					return 0f;
+
+				var point = poke.attachTransform != null ? poke.attachTransform.position : poke.transform.position;
+				nearest = Mathf.Min(nearest, Vector3.Distance(point, data.axisAlignedPokeInteractionPoint));
+			}
+
+			return nearest;
+		}
+
+		/// <summary>Pokes of a hand's armature anchor (empty when the hand has none).</summary>
+		private static PokeInteractor[] CollectPokes(Transform anchor)
+			=> anchor == null ? System.Array.Empty<PokeInteractor>() : anchor.GetComponentsInChildren<PokeInteractor>(true);
 
 		private static bool IsGrabbing(Hand hand)
 			=> hand != null && (hand.IsGrabbing() || hand.IsHolding());
 
-		/// <summary>Cuts a hand's near/far ray while it is grabbing something and keeps it bound to the rig (see
-		/// <see cref="XRInteractorBinder"/>).</summary>
-		private static void SetNearFar(NearFarInteractor nearFar, bool enable, XRUIInputModule module) {
-			if (nearFar == null)
-				return;
-
-			if (nearFar.Enable != enable)
+		private static void SetNearFar(NearFarInteractor nearFar, bool enable) {
+			if (nearFar != null && nearFar.Enable != enable)
 				nearFar.Enable = enable;
-
-			XRInteractorBinder.Bind(nearFar, module);
 		}
 
 		/// <summary>
@@ -282,25 +352,26 @@ namespace Nox.XR.Runtime.Connectors {
 			// create them on a fire-and-forget async chain that a reload could interrupt).
 			SetupNearFarInteractors();
 
-			// Pokes live on the ARM hand; the grab happens on the physical duplicate. Point the poke
-			// drivers at the duplicates so they can cut the pokes while an object is held.
-			LinkPokeConnector(rightSource?.Anchor, rightPhysical);
-			LinkPokeConnector(leftSource?.Anchor,  leftPhysical);
+			// The pokes live on the physical duplicates (built by `CreatePhysicalHand`), next to the colliders
+			// they belong with. The near/far ray is gated on them below, and the armature hands - stripped to
+			// their bones just after - only carry the pose mirrored from the duplicates.
+			_rightPokes = CollectPokes(rightPhysical != null ? rightPhysical.transform : null);
+			_leftPokes  = CollectPokes(leftPhysical  != null ? leftPhysical.transform  : null);
+
+			// The armature hands keep only their bones: the AutoHand rig (kinematic body, colliders, pokes)
+			// `HandToAutoHand.Convert` left on them was only ever there to be duplicated. Left in place it
+			// would be a second, kinematic copy of the hand - with its own colliders and pokes - competing
+			// with the physical duplicate for the same world and UI, while only the duplicate is the body
+			// `AutoHandPlayer` drives.
+			StripArmatureHand(rightSource);
+			StripArmatureHand(leftSource);
 		}
 
-		/// <summary>
-		/// Finds the poke driver of an arm hand and points it at the physical duplicate that actually
-		/// grabs, so its pokes are cut while an object is held.
-		/// </summary>
-		private static HandPokeConnector LinkPokeConnector(Transform anchor, Hand physical) {
-			if (anchor == null)
-				return null;
-
-			var poke = anchor.GetComponent<HandPokeConnector>()
-			           ?? anchor.GetComponentInChildren<HandPokeConnector>(true);
-			if (poke != null)
-				poke.physicalHand = physical;
-			return poke;
+		/// <summary>Strips an avatar hand down to its bones (see <see cref="StripToBones"/>).</summary>
+		private static void StripArmatureHand(IHand source) {
+			var anchor = source?.Anchor;
+			if (anchor != null)
+				StripToBones(anchor.gameObject);
 		}
 
 		/// <summary>
@@ -512,11 +583,14 @@ namespace Nox.XR.Runtime.Connectors {
 				// The duplicate is the physical body, and `MirrorFingers` copies ITS finger rotations onto
 				// the armature every frame: the finger drivers must live here, not only on the armature hand
 				// (whose copies were stripped by `StripToBones`). Without this the fingers never bend.
-				PlayerHandConnector.SetupFingerBindings(hand);
+				// The pokes are built here too, next to the colliders they belong with: the armature hands
+				// are stripped to their bones and get the duplicate's pose mirrored on them, so a poke on the
+				// duplicate sits exactly where the user sees the finger.
+				PlayerHandConnector.SetupFingers(hand);
 
-				// The duplicate is also the hand the player grabs with: the AutoHand input link of the
-				// package lives on the (disabled) fallback RobotHand and targets it, so the grab input has
-				// to be wired here, on the hand `AutoHandPlayer` actually drives.
+				// The grab input: the replacement hands carry Autohand's own input link, but the duplicate
+				// has none - without this connector nothing ever calls `Hand.Grab()` on the hand the
+				// AutoHandPlayer drives, so the hand could not grab anything.
 				hand.gameObject.GetOrAddComponent<HandGrabConnector>();
 			} else {
 				Logger.LogError(
