@@ -252,7 +252,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// Keeps the head weights open, so the head target is actually applied.
 		/// <para>
 		/// The target itself is written by the rig parts driver (<c>AvatarSyncConnector.DriveRigParts</c>),
-		/// which is also what a remote client replays - the `PlayerRig.Head` part carries the headset pose
+		/// which is also what a remote client replays - the `EntityRig.Head` part carries the headset pose
 		/// moved onto the head bone (see <c>XRController.GetParts</c>).
 		/// </para>
 		/// <para>

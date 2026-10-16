@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Nox.CCK",
+        "Nox.CCK.Entities",
         "UniTask",
         "Nox.XR",
         "Nox.XR.Runtime",

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
-using Nox.CCK.Players;
+using Nox.CCK.Entities;
 using Nox.CCK.XR;
 using Nox.XR.Runtime.FullBody;
 using Nox.XR.Runtime.Loaders;
@@ -566,7 +566,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 		}
 
 		public static string HumanBodyBone(ushort rigIndex)
-			=> rigIndex.ToPlayerRig().ToString();
+			=> rigIndex.ToEntityRig().ToString();
 
 		#endregion
 	}

@@ -4,7 +4,7 @@ using Autohand;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars.Camera;
 using Nox.Avatars.Controllers;
-using Nox.CCK.Players;
+using Nox.CCK.Entities;
 using Nox.CCK.Utils;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
@@ -158,7 +158,7 @@ namespace Nox.XR.Runtime {
 		}
 
 		/// <summary>
-		/// <c>PlayerRig.Base</c> part of this controller: the pose of the avatar's root.
+		/// <c>EntityRig.Base</c> part of this controller: the pose of the avatar's root.
 		/// <para>
 		/// The avatar is parented to <see cref="avatarContainer"/>, a child of the AutoHandPlayer's container:
 		/// that node <b>is</b> the avatar root. It carries the container's locomotion and yaw - the only
@@ -184,7 +184,7 @@ namespace Nox.XR.Runtime {
 		}
 
 		public bool TryGetPart(ushort index, out TransformObject tr) {
-			if (index == PlayerRig.Base.ToIndex()) {
+			if (index == EntityRig.Base.ToIndex()) {
 				tr = GetBasePart();
 				return true;
 			}
@@ -201,7 +201,7 @@ namespace Nox.XR.Runtime {
 				var rb = t.TryGetComponent<Rigidbody>(out var r) ? r : null;
 				tr = new TransformObject(t, rb);
 
-				if (index == PlayerRig.Head.ToIndex()
+				if (index == EntityRig.Head.ToIndex()
 				    && TryGetHeadTargetPose(out var headPosition, out var headRotation)) {
 					tr.SetPosition(headPosition);
 					tr.SetRotation(headRotation);
@@ -258,24 +258,24 @@ namespace Nox.XR.Runtime {
 			}
 		}
 
-		private static readonly (FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] _fingerMap = {
-			(FingerEnum.thumb,  PlayerRig.LeftThumb,  PlayerRig.LeftThumbNail,  PlayerRig.LeftThumbTip),
-			(FingerEnum.index,  PlayerRig.LeftIndex,  PlayerRig.LeftIndexNail,  PlayerRig.LeftIndexTip),
-			(FingerEnum.middle, PlayerRig.LeftMiddle, PlayerRig.LeftMiddleNail, PlayerRig.LeftMiddleTip),
-			(FingerEnum.ring,   PlayerRig.LeftRing,   PlayerRig.LeftRingNail,   PlayerRig.LeftRingTip),
-			(FingerEnum.pinky,  PlayerRig.LeftPinky,  PlayerRig.LeftPinkyNail,  PlayerRig.LeftPinkyTip),
+		private static readonly (FingerEnum finger, EntityRig proximal, EntityRig intermediate, EntityRig distal)[] _fingerMap = {
+			(FingerEnum.thumb,  EntityRig.LeftThumb,  EntityRig.LeftThumbNail,  EntityRig.LeftThumbTip),
+			(FingerEnum.index,  EntityRig.LeftIndex,  EntityRig.LeftIndexNail,  EntityRig.LeftIndexTip),
+			(FingerEnum.middle, EntityRig.LeftMiddle, EntityRig.LeftMiddleNail, EntityRig.LeftMiddleTip),
+			(FingerEnum.ring,   EntityRig.LeftRing,   EntityRig.LeftRingNail,   EntityRig.LeftRingTip),
+			(FingerEnum.pinky,  EntityRig.LeftPinky,  EntityRig.LeftPinkyNail,  EntityRig.LeftPinkyTip),
 		};
 
-		private static readonly (FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] _fingerMapRight = {
-			(FingerEnum.thumb,  PlayerRig.RightThumb,  PlayerRig.RightThumbNail,  PlayerRig.RightThumbTip),
-			(FingerEnum.index,  PlayerRig.RightIndex,  PlayerRig.RightIndexNail,  PlayerRig.RightIndexTip),
-			(FingerEnum.middle, PlayerRig.RightMiddle, PlayerRig.RightMiddleNail, PlayerRig.RightMiddleTip),
-			(FingerEnum.ring,   PlayerRig.RightRing,   PlayerRig.RightRingNail,   PlayerRig.RightRingTip),
-			(FingerEnum.pinky,  PlayerRig.RightPinky,  PlayerRig.RightPinkyNail,  PlayerRig.RightPinkyTip),
+		private static readonly (FingerEnum finger, EntityRig proximal, EntityRig intermediate, EntityRig distal)[] _fingerMapRight = {
+			(FingerEnum.thumb,  EntityRig.RightThumb,  EntityRig.RightThumbNail,  EntityRig.RightThumbTip),
+			(FingerEnum.index,  EntityRig.RightIndex,  EntityRig.RightIndexNail,  EntityRig.RightIndexTip),
+			(FingerEnum.middle, EntityRig.RightMiddle, EntityRig.RightMiddleNail, EntityRig.RightMiddleTip),
+			(FingerEnum.ring,   EntityRig.RightRing,   EntityRig.RightRingNail,   EntityRig.RightRingTip),
+			(FingerEnum.pinky,  EntityRig.RightPinky,  EntityRig.RightPinkyNail,  EntityRig.RightPinkyTip),
 		};
 
 		private static void AddFingerParts(Dictionary<ushort, Transform> parts, Autohand.Hand hand,
-			(FingerEnum finger, PlayerRig proximal, PlayerRig intermediate, PlayerRig distal)[] map) {
+			(FingerEnum finger, EntityRig proximal, EntityRig intermediate, EntityRig distal)[] map) {
 			if (hand == null || hand.fingers == null || hand.fingers.Length == 0) return;
 			foreach (var (finger, proximal, intermediate, distal) in map)
 				// Plain loop instead of Array.Find with a capturing lambda: the lambda allocated a closure
@@ -294,21 +294,21 @@ namespace Nox.XR.Runtime {
 		public Dictionary<ushort, Transform> GetParts() {
 			if (!player) return new Dictionary<ushort, Transform>();
 
-			// `PlayerRig.Base` is the avatar ROOT: <see cref="avatarContainer"/>, the node the loaded avatar is
+			// `EntityRig.Base` is the avatar ROOT: <see cref="avatarContainer"/>, the node the loaded avatar is
 			// parented to. `player.transform` is the AutoHandPlayer (body capsule) and keeps its own yaw, so using
 			// it as the base desynced the replayed body from the head/hands (cf. <see cref="GetBasePart"/>).
 			var parts = new Dictionary<ushort, Transform> {
-				{ PlayerRig.Base.ToIndex(), avatarContainer ? avatarContainer : player.transform },
-				{ PlayerRig.Head.ToIndex(), player.headCamera.transform }
+				{ EntityRig.Base.ToIndex(), avatarContainer ? avatarContainer : player.transform },
+				{ EntityRig.Head.ToIndex(), player.headCamera.transform }
 			};
 
 			if (player.handLeft) {
-				parts.Add(PlayerRig.LeftHand.ToIndex(), player.handLeft.transform);
+				parts.Add(EntityRig.LeftHand.ToIndex(), player.handLeft.transform);
 				AddFingerParts(parts, player.handLeft, _fingerMap);
 			}
 
 			if (player.handRight) {
-				parts.Add(PlayerRig.RightHand.ToIndex(), player.handRight.transform);
+				parts.Add(EntityRig.RightHand.ToIndex(), player.handRight.transform);
 				AddFingerParts(parts, player.handRight, _fingerMapRight);
 			}
 
@@ -328,15 +328,15 @@ namespace Nox.XR.Runtime {
 					? new TransformObject(kv.Value, rb)
 					: new TransformObject(kv.Value);
 
-			// `PlayerRig.Base` is the avatar root pose (tracking container), NOT the AutoHandPlayer body:
+			// `EntityRig.Base` is the avatar root pose (tracking container), NOT the AutoHandPlayer body:
 			// replace the raw entry so the sent values carry the container pose and the body velocity.
-			parts[PlayerRig.Base.ToIndex()] = GetBasePart();
+			parts[EntityRig.Base.ToIndex()] = GetBasePart();
 
-			// `PlayerRig.Head` carries the head TARGET pose, not the eye pose: it is written on the rig's
+			// `EntityRig.Head` carries the head TARGET pose, not the eye pose: it is written on the rig's
 			// head IK target (`VRIK_Head`), which expects the head bone position - the avatar's eye → head
 			// offset is what separates the two. The local and remote drivers therefore write the same thing,
 			// and the head bone lands on the head bone on every client.
-			var headId = PlayerRig.Head.ToIndex();
+			var headId = EntityRig.Head.ToIndex();
 			if (parts.TryGetValue(headId, out var head)
 			    && TryGetHeadTargetPose(out var headPosition, out var headRotation)) {
 				head.SetPosition(headPosition);
@@ -385,7 +385,7 @@ namespace Nox.XR.Runtime {
 		public void SetPart(ushort index, TransformObject tr) {
 			Rigidbody rb;
 
-			if (index == PlayerRig.Base.ToIndex()) {
+			if (index == EntityRig.Base.ToIndex()) {
 				if (tr.Flags.HasFlag(TransformFlags.Position) && !tr.IsSamePosition(player.transform.position))
 					player.SetPosition(tr.GetPosition());
 

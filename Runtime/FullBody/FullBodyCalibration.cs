@@ -7,7 +7,7 @@ using Nox.Avatars.Scale;
 using Nox.Avatars.StateMachines;
 using Nox.CCK.Avatars.Playable;
 using Nox.CCK.Avatars.Rigging;
-using Nox.CCK.Players;
+using Nox.CCK.Entities;
 using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.Settings;
@@ -45,7 +45,7 @@ namespace Nox.XR.Runtime.FullBody {
 			var parts = rig.GetParts();
 
 			for (var i = 0; i < parts.Length; i++) {
-				var bone = ((PlayerRig)parts[i].GetId()).ToHumanBodyBones();
+				var bone = parts[i].GetId().ToHumanBodyBones();
 				if (bone == HumanBodyBones.LastBone || bones.Contains(bone))
 					continue;
 				bones.Add(bone);

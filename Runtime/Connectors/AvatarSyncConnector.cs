@@ -5,7 +5,7 @@ using Nox.Avatars.Parameters;
 using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
 using Nox.CCK;
-using Nox.CCK.Players;
+using Nox.CCK.Entities;
 using Nox.CCK.XR;
 using Nox.Controllers;
 using UnityEngine;
@@ -34,7 +34,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// <summary>
 		/// Writes the tracked parts exposed by the controller onto the local rig every frame, with no
 		/// interpolation and no threshold. These are the values sent to the network, so a remote client replays
-		/// exactly what is written here. <c>PlayerRig.Base</c> is skipped: the local body is already driven by
+		/// exactly what is written here. <c>EntityRig.Base</c> is skipped: the local body is already driven by
 		/// the rig and the player's physics.
 		/// </summary>
 		private void DriveRigParts() {
@@ -47,7 +47,7 @@ namespace Nox.XR.Runtime.Connectors {
 				return;
 
 			foreach (var (partId, part) in controller.GetParts()) {
-				if (partId == PlayerRig.Base.ToIndex())
+				if (partId == EntityRig.Base.ToIndex())
 					continue;
 				RigPartDriver.Write(rig, partId, part.GetPosition(), part.GetRotation());
 			}
@@ -249,7 +249,7 @@ namespace Nox.XR.Runtime.Connectors {
 					}
 					case "tracking/head/position":
 					case "tracking/head/rotation":
-						// The head pose travels as the `PlayerRig.Head` part (see `XRController.GetParts`).
+						// The head pose travels as the `EntityRig.Head` part (see `XRController.GetParts`).
 						break;
 					case "tracking/left_hand/active": {
 						var active = XRInputs.HasHandLeft;

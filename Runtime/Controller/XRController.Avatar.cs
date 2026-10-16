@@ -1,28 +1,12 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using Autohand;
 using Nox.CCK.XR;
 using Cysharp.Threading.Tasks;
 using Nox.Avatars;
-using Nox.Avatars.Camera;
-using Nox.Avatars.Controllers;
-using Nox.CCK.Players;
 using Nox.CCK.Utils;
-using Nox.Audio.Players;
-using Nox.Sessions;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
-using Transform = UnityEngine.Transform;
-using Nox.Controllers;
-using Nox.Players;
-using Nox.XR.Runtime.Connectors;
 using Nox.XR.Runtime.Providers;
-using UnityEngine.EventSystems;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
-using UnityEngine.XR;
-using Unity.XR.CoreUtils;
 
 namespace Nox.XR.Runtime {
 	public partial class XRController {
@@ -146,8 +130,5 @@ namespace Nox.XR.Runtime {
 
 		public async UniTask<IRuntimeAvatar> ReloadAvatar(Action<string, float> progress = null)
 			=> avatarLoader != null ? await avatarLoader.ReloadAvatar(progress) : null;
-
-
-		// ReSharper disable Unity.PerformanceAnalysis
 	}
 }

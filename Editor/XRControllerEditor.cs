@@ -4,8 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using Nox.Avatars.Rigging;
 using Nox.CCK.Avatars.Rigging;
-using Nox.CCK.Players;
-using Nox.Controllers;
+using Nox.CCK.Entities;
 using Nox.XR.Runtime;
 using Nox.XR.Runtime.Settings;
 using Logger = Nox.CCK.Utils.Logger;
@@ -154,7 +153,7 @@ namespace Nox.XR.Editor {
 			foreach (var (partId, part) in parts) {
 				part.GetPositionAndRotation(out var position, out var rotation);
 
-				EditorGUILayout.LabelField($"{partId.ToPlayerRig()} ({partId})");
+				EditorGUILayout.LabelField($"{partId.ToEntityRig()} ({partId})");
 				EditorGUILayout.TextField(" - position", position.ToString("F3"));
 				EditorGUILayout.TextField(" - rotation", rotation.eulerAngles.ToString("F1"));
 
