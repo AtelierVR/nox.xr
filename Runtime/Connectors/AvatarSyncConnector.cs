@@ -6,6 +6,7 @@ using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
 using Nox.CCK;
 using Nox.CCK.Entities;
+using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.Controllers;
 using UnityEngine;
@@ -74,7 +75,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// </summary>
 		private IRigProvider RigProvider {
 			get {
-				if (!(_rigProvider is Object known) || !known)
+				if (_rigProvider is not Object known || known.IsDestroyed())
 					_rigProvider = avatarLoader?.GetAvatar()?.Descriptor?.Anchor
 						?.GetComponentInChildren<IRigProvider>(true);
 				return _rigProvider;
