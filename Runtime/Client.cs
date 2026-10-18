@@ -4,11 +4,13 @@ using Nox.CCK.Mods.Initializers;
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Nox.Audio;
 using Nox.Avatars;
 using Nox.Controllers;
 using Nox.UI;
 using Nox.CCK.XR;
 using Nox.Nameplate;
+using Nox.Sessions;
 using Nox.Settings;
 using Nox.Users;
 using UnityEngine;
@@ -34,9 +36,23 @@ namespace Nox.XR.Runtime {
 			=> CoreAPI.ModAPI.GetMod("users")
 				?.GetInstance<IUserAPI>();
 
+		static internal ISessionAPI SessionAPI
+			=> CoreAPI.ModAPI.GetMod("session")
+				?.GetInstance<ISessionAPI>();
+
 		static internal IControllerAPI ControllerAPI
 			=> CoreAPI.ModAPI.GetMod("controllers")
 				?.GetInstance<IControllerAPI>();
+
+		/// <summary>Microphone registry of the audio mod (self-mute state).</summary>
+		static internal IMicrophoneAPI MicrophoneAPI
+			=> CoreAPI.ModAPI.GetMod("audio")
+				?.GetInstance<IMicrophoneAPI>();
+
+		/// <summary>Audio API of the audio mod (channels, deafen state).</summary>
+		static internal IAudioAPI AudioAPI
+			=> CoreAPI.ModAPI.GetMod("audio")
+				?.GetInstance<IAudioAPI>();
 
 		/// <summary>
 		/// API of the optional <c>nox.nameplate</c> mod: null when the mod is not loaded.
