@@ -28,7 +28,7 @@ namespace Nox.XR.Bindings {
 	/// nox.xr ne connaît <b>aucun</b> chemin d'Input System : chaque mod de loader
 	/// (<c>nox.xr.openxr</c>, <c>nox.xr.openvr</c>, ...) enregistre lui-même les chemins qui
 	/// correspondent aux devices qu'il pilote et les expose aux consommateurs via l'<c>IBinding</c>
-	/// rendu par <c>IXRLoaderProvider.Binding</c>. Ajouter le support d'une manette = modifier les
+	/// rendu par <c>IXRLoaderProvider.Features.Binding</c>. Ajouter le support d'une manette = modifier les
 	/// chemins dans son propre mod, sans toucher à nox.xr.
 	/// </para>
 	/// </summary>

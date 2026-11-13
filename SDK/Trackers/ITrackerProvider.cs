@@ -1,44 +1,59 @@
+using System;
 using System.Collections.Generic;
+using Nox.CCK.Events;
 
 namespace Nox.XR.Trackers {
 	/// <summary>
-	/// Trackers d'un runtime XR, lus par nox.xr.
-	///
+	/// Trackers exposed by an XR loader, plus the free trackers of the generic XR device source.
 	/// <para>
-	/// C'est l'objet qu'un loader rend via <c>IXRLoaderProvider.Trackers</c>, exactement comme
-	/// <see cref="Bindings.IBinding"/> pour les entrées. Le <b>mod de loader en est le
-	/// propriétaire</b> : il sait quels trackers son runtime expose et comment les lire. nox.xr ne
-	/// fait que les relayer au suivi du corps entier — il ne connaît aucun runtime, ni OpenXR, ni
-	/// OpenVR, et c'est lui qui décide à quoi sert un tracker (calibration), jamais le provider.
-	/// </para>
-	///
-	/// <para>
-	/// Plusieurs loaders peuvent en fournir en même temps : les trackers de tous les loaders
-	/// chargés sont lus (celui du runtime actif d'abord), puis dédupliqués par
-	/// <see cref="TrackerPose.Id"/>. Un loader peut donc n'exposer que les trackers que les autres
-	/// ne voient pas.
+	/// A loader decides which trackers it can resolve (HMD, controllers, hardware trackers...),
+	/// owns them as <see cref="ITracker"/> objects and raises lifecycle events so nox.xr can react
+	/// without polling every device. The same interface is implemented by the internal generic
+	/// fallback, which reads the <c>InputDevice</c> list of the active runtime.
 	/// </para>
 	/// </summary>
-	public interface ITrackerProvider {
-		/// <summary>
-		/// Identifiant du runtime (ex. <c>"openvr"</c>), utilisé pour le log et les diagnostics.
-		/// </summary>
+	public interface ITrackerProvider : IDisposable {
+		/// <summary>Loader id (e.g. <c>openxr</c>, <c>openvr</c>), used for logs and diagnostics.</summary>
 		string Id { get; }
 
-		/// <summary>
-		/// Indique si ce runtime peut réellement fournir des trackers maintenant (session ouverte,
-		/// serveur joignable...). Un provider indisponible est ignoré.
-		/// </summary>
+		/// <summary>Whether this provider can answer right now (loader started, session open...).</summary>
 		bool IsAvailable { get; }
 
-		/// <summary>État en une ligne, pour les diagnostics (panneau, opérateurs, terminal).</summary>
+		/// <summary>One-line state, for diagnostics (panel, operators, terminal).</summary>
 		string Describe();
 
+		/// <summary>Trackers currently exposed by this provider.</summary>
+		IReadOnlyList<ITracker> Trackers { get; }
+
+		/// <summary>Find a tracker by rig slot (an <c>EntityRig</c> value or a custom id).</summary>
+		bool TryGet(ushort rig, out ITracker tracker);
+
+		/// <summary>Find a tracker by its stable identifier (<see cref="ITracker.Id"/>).</summary>
+		bool TryGet(string id, out ITracker tracker);
+
+		/// <summary>Find a tracker by rig slot and read its pose in the requested mode.</summary>
+		bool TryGetPose(ushort rig, TrackerPoseMode mode, out TrackerPose pose);
+
+		/// <summary>Find a tracker by its stable identifier and read its pose in the requested mode.</summary>
+		bool TryGetPose(string id, TrackerPoseMode mode, out TrackerPose pose);
+
+		/// <summary>Polls tracking states and raises <see cref="OnTracking"/> on changes.</summary>
+		void Poll();
+
 		/// <summary>
-		/// Ajoute les trackers utilisables à <paramref name="into"/>.
+		/// Adds the free trackers usable by full-body tracking to <paramref name="into"/>.
 		/// </summary>
-		/// <param name="excludeHanded">Ignorer les devices actuellement utilisés comme mains.</param>
-		/// <param name="excludeControllers">Ignorer les devices que le runtime signale comme manettes.</param>
+		/// <param name="excludeHanded">Skip devices currently used as hands.</param>
+		/// <param name="excludeControllers">Skip devices the runtime flags as controllers.</param>
 		void Get(List<TrackerPose> into, bool excludeHanded, bool excludeControllers);
+
+		/// <summary>A tracker was added.</summary>
+		NoxEvent<ITracker> OnRegistered { get; }
+
+		/// <summary>A tracker was removed/disconnected.</summary>
+		NoxEvent<ITracker> OnUnregistered { get; }
+
+		/// <summary>A tracker started or stopped tracking.</summary>
+		NoxEvent<ITracker, bool> OnTracking { get; }
 	}
 }

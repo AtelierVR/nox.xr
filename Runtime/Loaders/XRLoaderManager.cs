@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Events;
 using Nox.CCK.Mods.Mods;
 using Nox.XR.Loaders;
 using Nox.XR.Runtime.Settings;
@@ -28,10 +29,13 @@ namespace Nox.XR.Runtime.Loaders {
 		private static readonly IXRLoaderProvider Fallback = new XRManagementLoaderProvider();
 
 		/// <summary>Loader en cours d'utilisation, ou <c>null</c>.</summary>
-		public static IXRLoaderProvider Current { get; private set; }
+		public static IXRLoaderProvider Provider { get; private set; }
+
+		/// <summary>Raised when <see cref="Provider"/> changes (loader started or stopped).</summary>
+		public static readonly NoxEvent<IXRLoaderProvider> ProviderChanged = new();
 
 		public static bool IsRunning 
-			=> Current != null;
+			=> Provider != null;
 
 		/// <summary>
 		/// Fournisseurs connus, triés par priorité décroissante (repli inclus).
@@ -59,14 +63,14 @@ namespace Nox.XR.Runtime.Loaders {
 				return;
 
 			foreach (var mod in modAPI.GetMods()) {
-				if (mod == null || !mod.IsLoaded())
+				if (mod == null || !mod.IsLoaded)
 					continue;
 
 				IXRLoaderProvider[] found;
 				try {
 					found = mod.GetInstances<IXRLoaderProvider>();
 				} catch (Exception e) {
-					Logger.LogDebug($"Mod '{mod.GetMetadata()?.GetId() ?? "?"}' does not provide XR loaders: {e.Message}");
+					Logger.LogDebug($"Mod '{mod.Metadata?.Id ?? "?"}' does not provide XR loaders: {e.Message}");
 					continue;
 				}
 
@@ -120,7 +124,8 @@ namespace Nox.XR.Runtime.Loaders {
 					continue;
 				}
 
-				Current = provider;
+				Provider = provider;
+				ProviderChanged.Invoke(provider);
 				return true;
 			}
 
@@ -137,8 +142,9 @@ namespace Nox.XR.Runtime.Loaders {
 				return;
 			}
 
-			await Current.Deinitialize();
-			Current = null;
+			await Provider.Deinitialize();
+			Provider = null;
+			ProviderChanged.Invoke(null);
 		}
 	}
 }

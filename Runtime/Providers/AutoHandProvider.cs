@@ -40,7 +40,7 @@ namespace Nox.XR.Runtime.Providers {
 		/// <para>
 		/// AutoHand expose toujours ses mains (<c>Player.handLeft/handRight</c>) et sa caméra :
 		/// s'en servir comme test de présence rendait <c>XRInputs.HasHandLeft/HasHandRight</c>
-		/// toujours vrais. L'avatar gardait donc <c>tracking/*_hand/active</c> actif, les bras
+		/// toujours vrais. L'avatar gardait donc <c>Tracking/*Hand/Active</c> actif, les bras
 		/// suivaient les contrôleurs non-trackés — posés à l'origine du rig — au lieu de jouer
 		/// l'animation de locomotion.
 		/// </para>

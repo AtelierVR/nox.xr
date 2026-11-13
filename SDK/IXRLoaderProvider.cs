@@ -1,6 +1,4 @@
 using Cysharp.Threading.Tasks;
-using Nox.XR.Bindings;
-using Nox.XR.Trackers;
 
 namespace Nox.XR.Loaders {
 	/// <summary>
@@ -41,37 +39,10 @@ namespace Nox.XR.Loaders {
 		bool IsValid { get; }
 
 		/// <summary>
-		/// Bindings de ce runtime, lus par clé (<c>"move"</c>, <c>"jump"</c>, ...).
-		///
-		/// <para>
-		/// C'est le mod de loader qui les possède : il sait quels contrôles existent sur les devices
-		/// qu'il pilote, c'est donc lui qui les enregistre et qui les met à jour quand sa
-		/// configuration change (manette qui apparaît, modèle remplacé...). nox.xr ne fait que lire
-		/// les valeurs et les relayer aux consommateurs.
-		/// </para>
-		///
-		/// <para>
-		/// <c>null</c> tant que le loader n'a pas été initialisé (ou pour un loader qui ne
-		/// fournit pas de bindings, comme le repli générique de XR Plug-in Management).
-		/// </para>
+		/// Features of this loader (inputs, trackers, nodes). Missing features are <c>null</c> in the
+		/// container; the loader only fills what it actually implements.
 		/// </summary>
-		IBinding Binding { get; }
-
-		/// <summary>
-		/// Trackers (suivi du corps entier) de ce runtime, ou <c>null</c> quand il n'en fournit pas.
-		///
-		/// <para>
-		/// Même principe que <see cref="Binding"/> : c'est le mod de loader qui sait lire les trackers
-		/// de son runtime, c'est donc lui qui les expose. nox.xr interroge <b>tous</b> les loaders
-		/// chargés (pas seulement celui qui pilote la XR) et déduplique par numéro de série, ce qui
-		/// permet à un runtime de compléter les trackers qu'un autre ne voit pas.
-		/// </para>
-		///
-		/// <para>
-		/// <c>null</c> pour un loader qui n'apporte rien de plus que les devices du runtime XR actif.
-		/// </para>
-		/// </summary>
-		ITrackerProvider Trackers { get; }
+		XRLoaderFeatures Features { get; }
 
 		/// <summary>
 		/// Démarre le loader et ses sous-systèmes.

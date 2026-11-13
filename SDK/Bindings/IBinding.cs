@@ -3,7 +3,7 @@ namespace Nox.XR.Bindings {
 	/// Bindings d'un runtime XR (OpenXR, OpenVR, ...), lus par clé.
 	///
 	/// <para>
-	/// C'est l'objet que le loader actif rend via <c>IXRLoaderProvider.Binding</c>. Le <b>mod de
+	/// C'est l'objet que le loader actif rend via <c>IXRLoaderProvider.Features.Binding</c>. Le <b>mod de
 	/// loader en est le propriétaire</b> : il enregistre ses actions auprès du système de key
 	/// bindings, résout leurs chemins selon les devices réellement connectés, et répond aux
 	/// lectures. nox.xr ne fait que déclencher <see cref="Refresh"/> au bon moment et relayer les
