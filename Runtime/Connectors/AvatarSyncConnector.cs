@@ -39,7 +39,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// the rig and the player's physics.
 		/// </summary>
 		private void DriveRigParts() {
-			var rig = RigProvider?.GetRig();
+			var rig = RigProvider?.Rig;
 			if (rig == null)
 				return;
 
@@ -71,13 +71,14 @@ namespace Nox.XR.Runtime.Connectors {
 
 		/// <summary>
 		/// Rig provider of the current avatar, resolved on demand and re-resolved when the avatar is loaded
-		/// or swapped after us (the provider is a MonoBehaviour that can be destroyed).
+		/// or swapped after us (the provider is a module that can be destroyed).
 		/// </summary>
 		private IRigProvider RigProvider {
 			get {
 				if (_rigProvider is not Object known || known.IsDestroyed())
-					_rigProvider = avatarLoader?.GetAvatar()?.Descriptor?.Anchor
-						?.GetComponentInChildren<IRigProvider>(true);
+					_rigProvider = avatarLoader?.GetAvatar()?.Descriptor
+						?.GetModules<IRigProvider>()
+						.FirstOrDefault();
 				return _rigProvider;
 			}
 		}
@@ -240,7 +241,7 @@ namespace Nox.XR.Runtime.Connectors {
 						param.Value = worldVelocity.magnitude;
 						break;
 					}
-					case "tracking/head/active": {
+					case "Tracking/Head/Active": {
 						var active = XRInputs.HasHeadset;
 						var value  = param.Value.ToBool();
 						if (value == active)
@@ -248,11 +249,11 @@ namespace Nox.XR.Runtime.Connectors {
 						param.Value = active;
 						break;
 					}
-					case "tracking/head/position":
-					case "tracking/head/rotation":
+					case "Tracking/Head/Position":
+					case "Tracking/Head/Rotation":
 						// The head pose travels as the `EntityRig.Head` part (see `XRController.GetParts`).
 						break;
-					case "tracking/left_hand/active": {
+					case "Tracking/LeftHand/Active": {
 						var active = XRInputs.HasHandLeft;
 						var value  = param.Value.ToBool();
 						if (value == active)
@@ -260,12 +261,12 @@ namespace Nox.XR.Runtime.Connectors {
 						param.Value = active;
 						break;
 					}
-					case "tracking/left_hand/position":
-					case "tracking/left_hand/rotation":
-					case "tracking/right_hand/position":
-					case "tracking/right_hand/rotation":
+					case "Tracking/LeftHand/Position":
+					case "Tracking/LeftHand/Rotation":
+					case "Tracking/RightHand/Position":
+					case "Tracking/RightHand/Rotation":
 						break;
-					case "tracking/right_hand/active": {
+					case "Tracking/RightHand/Active": {
 						var active = XRInputs.HasHandRight;
 						var value  = param.Value.ToBool();
 						if (value == active)

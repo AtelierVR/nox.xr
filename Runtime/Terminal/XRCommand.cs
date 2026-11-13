@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 using Nox.CCK.Language;
 using Nox.Terminal;
 using Nox.XR.Runtime.Diagnostics;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using Nox.XR.Runtime.Operators;
 
 namespace Nox.XR.Runtime.Terminal {
@@ -136,7 +136,7 @@ namespace Nox.XR.Runtime.Terminal {
 				case "fbt":
 				case "fullbody": {
 					var withRig  = parts.Contains("--rig") || parts.Contains("-r");
-					var snapshot = XRDiagnostics.FullBody(withRig);
+					var snapshot = XRDiagnostics.Tracking(withRig);
 
 					Print(snapshot.Describe("  "));
 
@@ -159,7 +159,7 @@ namespace Nox.XR.Runtime.Terminal {
 				}
 
 				case "calibrate": {
-					var calibration = FullBodyCalibration.Instance;
+					var calibration = CalibrationManager.Instance;
 					if (calibration == null) {
 						Print("  full-body calibration is unavailable: the XR proxy is not created.");
 						context?.SetResult(false);
@@ -181,7 +181,7 @@ namespace Nox.XR.Runtime.Terminal {
 							return true;
 					}
 
-					var snapshot = XRDiagnostics.FullBody();
+					var snapshot = XRDiagnostics.Tracking();
 					Print(snapshot.Describe("  "));
 					context?.SetResult(snapshot);
 					break;

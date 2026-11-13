@@ -9,7 +9,7 @@ namespace Nox.XR.Runtime {
 	/// <para>
 	/// Façade de lecture uniquement : les bindings appartiennent au mod de loader actif, qui les
 	/// enregistre et les met à jour selon les devices qu'il pilote (voir
-	/// <see cref="IXRLoaderProvider.Binding"/>). Ici, on ne fait que relayer les valeurs.
+	/// <see cref="IXRLoaderProvider.Features"/><c>.Binding</c>). Ici, on ne fait que relayer les valeurs.
 	/// </para>
 	///
 	/// <para>
@@ -22,7 +22,7 @@ namespace Nox.XR.Runtime {
 		/// Bindings du runtime XR actif, ou <c>null</c> si aucun loader n'est démarré.
 		/// </summary>
 		private static IBinding Binding
-			=> XRLoaderManager.Current?.Binding;
+			=> XRLoaderManager.Provider?.Features?.Binding;
 
 		/// <summary>
 		/// Gets the value of a specific key binding, read live from the running XR runtime.

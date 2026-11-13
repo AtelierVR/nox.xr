@@ -1,12 +1,12 @@
 using Nox.CCK.Settings;
 using Nox.Settings;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
 	/// <summary>
 	/// "Calibrate" button that estimates the player's real height and arm span: stay in T-pose and don't move for
-	/// <see cref="FullBodyCalibration.MetricsEstimateDelay"/> seconds, the values are then written to
+	/// <see cref="CalibrationManager.MetricsEstimateDelay"/> seconds, the values are then written to
 	/// <see cref="RealHeightSetting"/> / <see cref="PlayerArmSpanSetting"/> (the avatar is never rescaled, its size
 	/// is the reference the player's container is fitted to).
 	/// </summary>
@@ -19,7 +19,7 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
 		public EstimatePlayerMetricsSetting() {
 			SetLabel("settings.entry.xr.general.estimate_player_metrics.label");
@@ -30,7 +30,7 @@ namespace Nox.XR.Runtime.Settings {
 			=> RefreshLabel();
 
 		private void RefreshLabel() {
-			var calibration = FullBodyCalibration.Instance;
+			var calibration = CalibrationManager.Instance;
 			if (calibration is { IsEstimatingMetrics: true }) {
 				SetButtonText(
 					"settings.entry.xr.general.estimate_player_metrics.estimating",
@@ -46,7 +46,7 @@ namespace Nox.XR.Runtime.Settings {
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/button.prefab");
 
 		public override void OnClick(IContext context) {
-			FullBodyCalibration.Instance?.StartMetricsEstimate();
+			CalibrationManager.Instance?.StartMetricsEstimate();
 			RefreshLabel();
 		}
 	}

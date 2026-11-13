@@ -9,7 +9,7 @@ namespace Nox.CCK.XR {
 	public interface IXRInputProvider {
 		/// <summary>
 		/// Devices XR du provider : c'est lui qui sait d'où ils viennent (<see cref="InputDevices"/>,
-		/// SteamVR, AutoHand…) et qui prévient quand ils apparaissent, disparaissent ou changent de
+		/// SteamVR, AutoHand...) et qui prévient quand ils apparaissent, disparaissent ou changent de
 		/// configuration. Les consommateurs s'y abonnent via <see cref="XRInputs.DeviceConnected"/>.
 		/// </summary>
 		UnityEvent<InputDevice> DeviceConnected { get; }
@@ -17,7 +17,7 @@ namespace Nox.CCK.XR {
 		/// <summary>Device XR disparu.</summary>
 		UnityEvent<InputDevice> DeviceDisconnected { get; }
 
-		/// <summary>Configuration d'un device XR changée (rôle, modèle…).</summary>
+		/// <summary>Configuration d'un device XR changée (rôle, modèle...).</summary>
 		UnityEvent<InputDevice> DeviceConfigChanged { get; }
 
 		/// <summary>

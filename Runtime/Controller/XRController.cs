@@ -177,15 +177,28 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		private const float AutoFixWaitSeconds = 5f;
 
 
-		public void Dispose() {
+		/// <summary>
+		/// Disposes the proxy and completes once its avatar is destroyed: the avatar writes what it has to
+		/// persist while it is disposed, and that write must end before the mods (and their table) go away.
+		/// </summary>
+		public UniTask Dispose() {
 			DisposeNameplate();
 
 			if (XRInputs.Provider is AutoHandProvider)
 				XRInputs.Provider = null;
+
 			avatarLoader?.ClearRig();
-			avatarLoader?.Dispose();
+
+			var avatar = avatarLoader != null
+				? avatarLoader.Dispose()
+				: UniTask.CompletedTask;
+
 			Menu.Dispose();
-			Destroy(gameObject);
+
+			// Deferred: the avatar is a child of this object and finishes its write on this frame.
+			gameObject.Destroy();
+
+			return avatar;
 		}
 
 		private void Awake() => SetupNameplate();

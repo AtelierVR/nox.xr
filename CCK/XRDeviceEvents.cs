@@ -8,19 +8,19 @@ namespace Nox.CCK.XR {
 	///
 	/// <para>
 	/// Un provider les expose via <see cref="IXRInputProvider"/> : les consommateurs (nox.xr, le
-	/// calibrage du corps entier…) s'abonnent ainsi au <b>provider</b> au lieu d'écouter InputDevices
+	/// calibrage du corps entier...) s'abonnent ainsi au <b>provider</b> au lieu d'écouter InputDevices
 	/// directement, et continuent de fonctionner si le provider change (AutoHand en remplace un autre,
 	/// un provider de test, ...).
 	/// </para>
 	/// </summary>
 	public sealed class XRDeviceEvents : IDisposable {
-		/// <summary>Device XR apparu (casque, manette, tracker…).</summary>
+		/// <summary>Device XR apparu (casque, manette, tracker...).</summary>
 		public readonly UnityEvent<InputDevice> Connected = new();
 
 		/// <summary>Device XR disparu.</summary>
 		public readonly UnityEvent<InputDevice> Disconnected = new();
 
-		/// <summary>Configuration d'un device XR changée (rôle, modèle…).</summary>
+		/// <summary>Configuration d'un device XR changée (rôle, modèle...).</summary>
 		public readonly UnityEvent<InputDevice> ConfigChanged = new();
 
 		private bool _subscribed;

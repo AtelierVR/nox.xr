@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 using Nox.CCK.Control;
 using Nox.Control;
 using Nox.XR.Runtime.Diagnostics;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Operators {
@@ -137,7 +137,7 @@ namespace Nox.XR.Runtime.Operators {
 			.Property<bool>("with_rig", "Include the rig bones (path, position, active) for the calibration bones.");
 
 		protected override UniTask<IOutput> Run(IInput args) {
-			var snapshot = XRDiagnostics.FullBody(args.Get<bool>("with_rig"));
+			var snapshot = XRDiagnostics.Tracking(args.Get<bool>("with_rig"));
 
 			return UniTask.FromResult<IOutput>(OperatorOutput.Ok(new {
 				snapshot,
@@ -176,7 +176,7 @@ namespace Nox.XR.Runtime.Operators {
 			.Property<string>("action", "start | confirm | cancel | clear | toggle | status", true);
 
 		protected override UniTask<IOutput> Run(IInput args) {
-			var calibration = FullBodyCalibration.Instance;
+			var calibration = CalibrationManager.Instance;
 			if (calibration == null)
 				return UniTask.FromResult<IOutput>(OperatorOutput.Error(
 					"Full-body calibration is unavailable: the XR proxy is not created (no XR session or not the active controller)."
@@ -211,7 +211,7 @@ namespace Nox.XR.Runtime.Operators {
 					));
 			}
 
-			var snapshot = XRDiagnostics.FullBody();
+			var snapshot = XRDiagnostics.Tracking();
 			return UniTask.FromResult<IOutput>(OperatorOutput.Ok(new {
 				action,
 				calibrating = snapshot.Calibrating,

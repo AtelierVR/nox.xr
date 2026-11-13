@@ -258,7 +258,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// <para>
 		/// <c>IKSolverVRSpine.Bend()</c> returns early when a weight is 0: with <c>rotationWeight</c> at 0
 		/// the head keeps its animated rotation while its position still follows. An avatar can lower both
-		/// through <c>rig/ik/head/*_weight</c>.
+		/// through <c>Rig/Ik/Head/*Weight</c>.
 		/// </para>
 		/// </summary>
 		private void ApplyHeadWeights() {
@@ -268,7 +268,8 @@ namespace Nox.XR.Runtime.Connectors {
 			// The avatar's own tracking choice wins: when its pose state cuts the head (TrackingControl →
 			// Animation), the VRIK spine weights must stay at 0 — forcing them back to 1 here kept the head
 			// IK on over the T-pose. With no override (Normal) or an explicit Tracking, keep the head open.
-			var cut    = GetRigProvider()?.GetRig()?.GetTracking(HumanBodyBones.Head) == RiggingTrackingMode.Animation;
+			var cut    = GetRigProvider()?.Rig
+				?.GetTracking(HumanBodyBones.Head) == RiggingTrackingMode.Animation;
 			var weight = cut ? 0f : 1f;
 
 			vrik.solver.spine.positionWeight = weight;

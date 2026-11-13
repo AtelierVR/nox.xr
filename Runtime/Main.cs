@@ -46,16 +46,16 @@ namespace Nox.XR.Runtime {
 
 			_settings = new IHandler[] {
 				new EnableXRSetting(),
-				new StartVRSetting(),			
-				new RecenterViewSetting(),				
+				new StartVRSetting(),
+				new RecenterViewSetting(),
 				new PokeEnabledSetting(),
 				new PokeDisablePercentSetting(),
 				new PokeDisableNearFarSetting(),
 				new PokeOpenHandIndexSetting(),
 				new IPDSetting(),
 				new FullBodyTrackingSetting(),
-				new CalibrateFullBodySetting(),
-				new FullBodyCalibrationRangeSetting(),
+				new CalibrateSetting(),
+				new CalibrationRangeSetting(),
 				new RealHeightSetting(),
 				new PlayerArmSpanSetting(),
 				new EstimatePlayerMetricsSetting(),
@@ -63,7 +63,10 @@ namespace Nox.XR.Runtime {
 				new TrackersIncludeControllerSetting(),
 				new TurnModeSetting(),
 				new SnapTurnAngleSetting(),
-				new SmoothTurnSpeedSetting()
+				new SmoothTurnSpeedSetting(),
+				new MaxMenuDistanceSetting(),
+				new MenuAnchorSetting(),
+				new MenuRecallSetting()
 			};
 
 			foreach (var setting in _settings)

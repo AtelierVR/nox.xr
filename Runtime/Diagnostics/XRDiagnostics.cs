@@ -7,11 +7,11 @@ using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
 using Nox.CCK.Entities;
 using Nox.CCK.XR;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using Nox.XR.Runtime.Loaders;
 using Nox.XR.Runtime.Settings;
+using Nox.XR.Trackers;
 using UnityEngine;
-using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Diagnostics {
@@ -20,7 +20,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 	/// operators, the <c>nox.terminal</c> command and the editor debug window).
 	/// <para>
 	/// Everything is resolved through the public/static entry points of the mod
-	/// (<see cref="XRInputs"/>, <see cref="XRLoaderManager"/>, <see cref="FullBodyCalibration"/>),
+	/// (<see cref="XRInputs"/>, <see cref="XRLoaderManager"/>, <see cref="CalibrationManager"/>),
 	/// so the three consumers share a single source of truth and cannot drift apart.
 	/// </para>
 	/// <para>
@@ -51,14 +51,18 @@ namespace Nox.XR.Runtime.Diagnostics {
 				=> string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###} {2:0.###}", X, Y, Z);
 		}
 
-		/// <summary>One physical XR device, as <c>InputDevices</c> reports it.</summary>
+		/// <summary>One tracker, as an <see cref="ITrackerProvider"/> exposes it.</summary>
 		[Serializable]
 		public sealed class DeviceSnapshot {
 			public string Name;
 			public string Manufacturer;
 			public string Serial;
-			/// <summary>Flags of <see cref="InputDeviceCharacteristics"/>, space separated.</summary>
+			/// <summary>Flags of <see cref="TrackerFeatures"/>, space separated.</summary>
 			public string Characteristics;
+			/// <summary>Rig slot driven by the tracker.</summary>
+			public string Rig;
+			public bool IsHead;
+			public bool IsHand;
 			public bool IsValid;
 			public bool? IsTracked;
 			public bool HasPosition;
@@ -66,9 +70,9 @@ namespace Nox.XR.Runtime.Diagnostics {
 			public VectorSnapshot Position;
 			/// <summary>Euler angles, in the tracking space (or the avatar's, when an origin is set).</summary>
 			public VectorSnapshot Rotation;
-			/// <summary>Would <see cref="FullBodyTrackers.Get"/> keep this device?</summary>
+			/// <summary>Whether a tracker provider exposes this device as a tracker.</summary>
 			public bool TrackerCandidate;
-			/// <summary>Why the tracker filter rejected the device (null when kept).</summary>
+			/// <summary>Why no provider exposes the device (null when exposed).</summary>
 			public string TrackerRejection;
 
 			public string Describe() {
@@ -152,7 +156,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 					.Append(", hand L: ").Append(HasHandLeft)
 					.Append(", hand R: ").Append(HasHandRight).AppendLine();
 				sb.Append(indent).Append("devices: ").Append(DeviceCount)
-					.Append(", XRNode.HardwareTracker devices: ").Append(HardwareTrackerNodeCount)
+					.Append(", standalone trackers: ").Append(HardwareTrackerNodeCount)
 					.Append(", trackers used: ").Append(TrackerCount).AppendLine();
 				sb.Append(indent).Append("XRController is the active proxy: ").Append(XRControllerActive).AppendLine();
 				sb.Append(indent).Append("origin: ").Append(Origin ?? "(none)")
@@ -200,7 +204,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 
 		/// <summary>Full-body calibration + driving state.</summary>
 		[Serializable]
-		public sealed class FullBodySnapshot {
+		public sealed class TrackingSnapshot {
 			public bool Available;
 			public bool Calibrating;
 			public bool HasCalibration;
@@ -246,14 +250,12 @@ namespace Nox.XR.Runtime.Diagnostics {
 
 		#region Builders
 
-		/// <summary>Every XR device reported by Unity, with its tracker-filter verdict.</summary>
+		/// <summary>Every tracker exposed by the loaded loader providers.</summary>
 		public static List<DeviceSnapshot> Devices(bool trackedOnly = false) {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevices(devices);
+			var snapshots = new List<DeviceSnapshot>();
 
-			var snapshots = new List<DeviceSnapshot>(devices.Count);
-			foreach (var device in devices) {
-				var snapshot = Snapshot(device);
+			foreach (var tracker in AllTrackers()) {
+				var snapshot = Snapshot(tracker);
 				if (trackedOnly && snapshot.IsTracked != true)
 					continue;
 				snapshots.Add(snapshot);
@@ -262,71 +264,76 @@ namespace Nox.XR.Runtime.Diagnostics {
 			return snapshots;
 		}
 
-		/// <summary>One device as a diagnostic snapshot (including the exact tracker-filter verdict).</summary>
-		public static DeviceSnapshot Snapshot(InputDevice device) {
-			var characteristics = device.characteristics;
+		/// <summary>Trackers exposed by the loader providers (the filter no longer lives here).</summary>
+		public static List<DeviceSnapshot> Trackers(bool includeAll = false)
+			=> Devices();
 
-			var hasPosition = device.TryGetFeatureValue(CommonUsages.devicePosition, out var position);
-			var hasRotation = device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rotation);
-			var hasTracked  = device.TryGetFeatureValue(CommonUsages.isTracked, out var tracked);
+		/// <summary>One tracker as a diagnostic snapshot.</summary>
+		public static DeviceSnapshot Snapshot(ITracker tracker) {
+			var hasPosition = tracker.Features.HasFlag(TrackerFeatures.Position);
+			var hasRotation = tracker.Features.HasFlag(TrackerFeatures.Rotation);
+			var hasPose     = tracker.TryGetPose(TrackerPoseMode.Raw, out var pose);
 
-			if (FullBodyTrackers.TrackingSpace() is { } trackingSpace) {
+			var position = hasPose ? pose.Position : Vector3.zero;
+			var rotation = hasPose ? pose.Rotation : Quaternion.identity;
+
+			if (TrackerResolver.TrackingSpace() is { } trackingSpace) {
 				position = trackingSpace.TransformPoint(position);
 				rotation = trackingSpace.rotation * rotation;
 			}
 
-			FullBodyTrackers.IsCandidate(device, true, out var rejection);
-
 			return new DeviceSnapshot {
-				Name            = device.name,
-				Manufacturer    = device.manufacturer,
-				Serial          = device.serialNumber,
-				Characteristics = DescribeCharacteristics(characteristics),
-				IsValid         = device.isValid,
-				IsTracked       = hasTracked ? tracked : null,
+				Name            = tracker.Name,
+				Manufacturer    = tracker.Manufacturer,
+				Serial          = tracker.Id,
+				Characteristics = DescribeFeatures(tracker.Features),
+				Rig             = tracker.Rig.ToEntityRig().ToString(),
+				IsHead          = tracker.IsHead(),
+				IsHand          = tracker.IsHand(),
+				IsValid         = tracker.IsConnected,
+				IsTracked       = tracker.IsTracking,
 				HasPosition     = hasPosition,
 				HasRotation     = hasRotation,
 				Position        = VectorSnapshot.From(position),
 				Rotation        = VectorSnapshot.From(rotation.eulerAngles),
-				TrackerCandidate = rejection == null,				TrackerRejection = rejection
+				TrackerCandidate = true,
+				TrackerRejection = null
 			};
 		}
 
-		/// <summary>Trackers used by full-body tracking, plus (optionally) every other tracked device.</summary>
-		/// <param name="includeAll">When set, also returns devices the in-game filter rejects.</param>
-		public static List<DeviceSnapshot> Trackers(bool includeAll = false) {
-			var devices = new List<InputDevice>();
-			InputDevices.GetDevices(devices);
+		/// <summary>Every tracker exposed by every available provider, deduplicated by id.</summary>
+		private static List<ITracker> AllTrackers() {
+			var trackers = new List<ITracker>();
 
-			var snapshots = new List<DeviceSnapshot>();
-			foreach (var device in devices) {
-				var snapshot = Snapshot(device);
-				var trackedDevice = device.characteristics.HasFlag(InputDeviceCharacteristics.TrackedDevice);
+			foreach (var provider in TrackerResolver.Providers()) {
+				if (provider == null || !provider.IsAvailable)
+					continue;
 
-				if (snapshot.TrackerCandidate || (includeAll && trackedDevice))
-					snapshots.Add(snapshot);
+				var providerTrackers = provider.Trackers;
+				for (var i = 0; i < providerTrackers.Count; i++) {
+					var tracker = providerTrackers[i];
+					if (tracker != null && trackers.TrueForAll(t => !string.Equals(t.Id, tracker.Id, StringComparison.OrdinalIgnoreCase)))
+						trackers.Add(tracker);
+				}
 			}
 
-			return snapshots;
+			return trackers;
 		}
 
 		/// <summary>Loader/provider/device state.</summary>
 		public static StateSnapshot State() {
 			var providers = XRLoaderManager.Providers;
-			var tracked   = new List<InputDevice>();
-			var all       = new List<InputDevice>();
-			InputDevices.GetDevices(all);
-			InputDevices.GetDevicesAtXRNode(XRNode.HardwareTracker, tracked);
+			var trackers  = AllTrackers();
 
 			var origin = XROriginSetter.GlobalOrigin;
-			var trackingSpace = FullBodyTrackers.TrackingSpace();
+			var trackingSpace = TrackerResolver.TrackingSpace();
 
 			return new StateSnapshot {
 				Playing           = Application.isPlaying,
 				Platform          = Application.platform.ToString(),
 				XREnabled         = EnableXRSetting.Value,
 				LoaderRunning     = XRLoaderManager.IsRunning,
-				ActiveLoader      = XRLoaderManager.Current?.Id,
+				ActiveLoader      = XRLoaderManager.Provider?.Id,
 				PreferredLoader   = XRLoaderPreference.Preferred,
 				Providers         = providers == null
 					? Array.Empty<ProviderSnapshot>()
@@ -337,40 +344,41 @@ namespace Nox.XR.Runtime.Diagnostics {
 				HasHeadset        = XRInputs.HasHeadset,
 				HasHandLeft       = XRInputs.HasHandLeft,
 				HasHandRight      = XRInputs.HasHandRight,
-				HardwareTrackerNodeCount = tracked.Count,
-				DeviceCount       = all.Count,
-				TrackerCount      = Trackers().Count,
+				HardwareTrackerNodeCount = trackers.FindAll(t => t.IsCustom()).Count,
+				DeviceCount       = trackers.Count,
+				TrackerCount      = trackers.Count,
 				XRControllerActive = IsXRControllerActive(),
 				Origin            = origin ? $"{origin.name} (suivi : {trackingSpace?.name ?? "racine"})" : null,
 				OriginPosition    = VectorSnapshot.From(trackingSpace ? trackingSpace.position : Vector3.zero),
 				AvatarScale       = AvatarScale(),
 				FullBodyTracking  = FullBodyTrackingSetting.Value,
-				CalibrationRange  = FullBodyCalibrationRangeSetting.Value,
+				CalibrationRange  = CalibrationRangeSetting.Value,
 				OneHandValidation = OneHandValidationSetting.Value,
-				TrackerProviders  = FullBodyTrackers.Providers()
+				TrackerProviders  = TrackerResolver.Providers()
 					.Select(provider => provider == null ? "(null)" : $"{provider.Id}: {provider.Describe()}")
 					.ToArray()
 			};
 		}
 
 		/// <summary>Calibration + rig state (empty snapshot when the XR proxy is absent).</summary>
-		public static FullBodySnapshot FullBody(bool withRig = false) {
-			var calibration = FullBodyCalibration.Instance;
+		public static TrackingSnapshot Tracking(bool withRig = false) {
+			var calibration = CalibrationManager.Instance;
 			if (calibration == null)
-				return new FullBodySnapshot { Available = false };
+				return new TrackingSnapshot { Available = false };
 
 			var avatarLoader = calibration.avatarLoader;
-			var rig          = avatarLoader?.GetAvatar()?.Descriptor?.Anchor
-				?.GetComponentInChildren<IRigProvider>(true)?.GetRig();
+			var rig          = avatarLoader?.GetAvatar()?.Descriptor
+				?.GetModules<IRigProvider>()
+				.FirstOrDefault()?.Rig;
 
-			var snapshot = new FullBodySnapshot {
+			var snapshot = new TrackingSnapshot {
 				Available       = true,
 				Calibrating     = calibration.IsCalibrating,
 				HasCalibration  = calibration.HasCalibration,
 				Driving         = calibration.HasCalibration && !calibration.IsCalibrating && IsXRControllerActive(),
 				Range           = calibration.CurrentRange,
 				AvatarScale     = AvatarScale(),
-				Bones           = FullBodyCalibration.GetAssignableBones(rig)
+				Bones           = CalibrationManager.GetAssignableBones(rig)
 					.Select(b => b.ToString())
 					.ToArray(),
 				RigBackend      = rig?.Id,
@@ -388,7 +396,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 				Bindings        = calibration.Data?.Bindings?
 					.Select(b => new BindingSnapshot {
 						Tracker        = b.TrackerId,
-						Bone           = b.BodyBone.ToString(),
+						Bone           = b.Rig.ToEntityRig().ToString(),
 						OffsetPosition = VectorSnapshot.From(b.OffsetPosition),
 						OffsetRotation = VectorSnapshot.From(b.OffsetRotation.eulerAngles),
 						Scale          = b.Scale
@@ -397,7 +405,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 			};
 
 			if (withRig && rig != null)
-				snapshot.RigBones = FullBodyCalibration.GetAssignableBones(rig)
+				snapshot.RigBones = CalibrationManager.GetAssignableBones(rig)
 					.Select(bone => {
 						var boneTransform = rig.GetBone(bone);
 						return new RigBoneSnapshot {
@@ -420,15 +428,15 @@ namespace Nox.XR.Runtime.Diagnostics {
 			var hints  = new List<string>();
 			var state  = State();
 			var all    = Devices();
-			var used   = all.Where(d => d.TrackerCandidate).ToArray();
+			var used   = all.ToArray();
 
 			// Reported even in edit mode: without that API the proxy state cannot be read at all.
 			if (_controllerApiWarning)
 				hints.Add("The controllers mod API is unavailable (XRController.IsCurrent() failed): the XR proxy state cannot be read.");
 
 			// Trackers the active XR runtime cannot expose but another provider can (a tracker with no
-			// role, a hands-role tracker, a network backend…): each provider reports its own state.
-			foreach (var provider in FullBodyTrackers.Providers())
+			// role, a hands-role tracker, a network backend...): each provider reports its own state.
+			foreach (var provider in TrackerResolver.Providers())
 				hints.Add(provider.Describe());
 
 			if (!state.Playing) {
@@ -445,27 +453,15 @@ namespace Nox.XR.Runtime.Diagnostics {
 						: ""));
 
 			if (state.DeviceCount == 0) {
-				hints.Add("Unity reports no XR device at all.");
+				hints.Add("No tracker provider reports any tracker.");
 				return hints.ToArray();
 			}
 
-			if (used.Length == 0) {
-				hints.Add($"No tracker is usable: {state.DeviceCount} device(s) seen, 0 kept by the filter (range {state.CalibrationRange:0.###} m).");
-
-				foreach (var device in all.Where(d => d.Characteristics.Contains("TrackedDevice")))
-					hints.Add($"  - {device.Name}: {device.TrackerRejection}");
-
-				if (!all.Any(d => d.Characteristics.Contains("TrackedDevice")))
-					hints.Add("  - no device is flagged 'TrackedDevice'.");
-				else if (state.HardwareTrackerNodeCount == 0)
-					hints.Add("  - no device is exposed on XRNode.HardwareTracker (runtime-side profile missing).");
-			} else {
-				hints.Add($"{used.Length} tracker(s) usable: {string.Join(", ", used.Select(d => d.Name))}.");
-			}
+			hints.Add($"{used.Length} tracker(s) exposed: {string.Join(", ", used.Select(d => d.Name))}.");
 
 			if (!state.FullBodyTracking)
 				hints.Add("Full-body tracking is DISABLED in the XR settings: the calibration button is hidden and no tracker is driven.");
-			else if (FullBodyCalibration.Instance is { HasCalibration: false })
+			else if (CalibrationManager.Instance is { HasCalibration: false })
 				hints.Add("No stored calibration: run the XR calibration to bind the trackers to the rig bones.");
 
 			return hints.ToArray();
@@ -522,7 +518,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 
 			builder.AppendLine();
 			builder.AppendLine("--- full-body ---");
-			builder.AppendLine(FullBody(withRig: true).Describe(string.Empty).TrimEnd());
+			builder.AppendLine(Tracking(withRig: true).Describe(string.Empty).TrimEnd());
 
 			return builder.ToString();
 		}
@@ -531,22 +527,21 @@ namespace Nox.XR.Runtime.Diagnostics {
 
 		#region Helpers
 
-		/// <summary>Flags of an <see cref="InputDeviceCharacteristics"/> value, space separated.</summary>
-		public static string DescribeCharacteristics(InputDeviceCharacteristics characteristics) {
-			if (characteristics == InputDeviceCharacteristics.None)
-				return "None";
+		/// <summary>Flags of a <see cref="TrackerFeatures"/> value, space separated.</summary>
+		public static string DescribeFeatures(TrackerFeatures features) {
+			var names = new List<string>();
 
-			var names = Enum.GetValues(typeof(InputDeviceCharacteristics))
-				.Cast<InputDeviceCharacteristics>()
-				.Where(flag => flag != InputDeviceCharacteristics.None && characteristics.HasFlag(flag))
-				.Select(flag => flag.ToString())
-				.ToArray();
+			if (features.HasFlag(TrackerFeatures.Position)) names.Add(nameof(TrackerFeatures.Position));
+			if (features.HasFlag(TrackerFeatures.Rotation)) names.Add(nameof(TrackerFeatures.Rotation));
+			if (features.HasFlag(TrackerFeatures.Velocity)) names.Add(nameof(TrackerFeatures.Velocity));
+			if (features.HasFlag(TrackerFeatures.AngularVelocity)) names.Add(nameof(TrackerFeatures.AngularVelocity));
+			if (features.HasFlag(TrackerFeatures.Calibrated)) names.Add(nameof(TrackerFeatures.Calibrated));
 
-			return names.Length == 0 ? characteristics.ToString() : string.Join(" | ", names);
+			return names.Count == 0 ? TrackerFeatures.None.ToString() : string.Join(" | ", names);
 		}
 
 		public static float AvatarScale()
-			=> FullBodyCalibration.Instance?.avatarLoader?.GetAvatar()?.Descriptor?
+			=> CalibrationManager.Instance?.avatarLoader?.GetAvatar()?.Descriptor?
 				.GetModules<IScaleAvatarModule>()
 				.FirstOrDefault()?.Scale ?? 1f;
 

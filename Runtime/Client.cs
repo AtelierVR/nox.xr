@@ -1,6 +1,7 @@
-﻿using Nox.CCK.Mods.Cores;
+using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
+using Nox.CCK.Utils;
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -24,20 +25,39 @@ namespace Nox.XR.Runtime {
 		public static Client Instance;
 		static internal IClientModCoreAPI CoreAPI;
 
-		static internal IUiAPI UiAPI
-			=> CoreAPI.ModAPI.GetMod("ui")
+		/// <summary>
+		/// API of the UI mod: null when the mod is not loaded.
+		/// <para>
+		/// Public because the v2 XR player (in its own assembly) builds its menu through it
+		/// (see <c>PersonalMenu</c>).
+		/// </para>
+		/// </summary>
+		public static IUiAPI UiAPI
+			=> CoreAPI?.ModAPI?.GetMod("ui")
 				?.GetInstance<IUiAPI>();
 
-		static internal IAvatarAPI AvatarAPI
-			=> CoreAPI.ModAPI.GetMod("avatar")
+		/// <summary>
+		/// API of the avatar mod: null when the mod is not loaded.
+		/// <para>
+		/// Public because the v2 XR rig (in its own assembly) loads the avatar of the local user through it.
+		/// </para>
+		/// </summary>
+		public static IAvatarAPI AvatarAPI
+			=> CoreAPI?.ModAPI?.GetMod("avatar")
 				?.GetInstance<IAvatarAPI>();
 
-		static internal IUserAPI UserAPI
-			=> CoreAPI.ModAPI.GetMod("users")
+		/// <summary>
+		/// API of the users mod: null when the mod is not loaded.
+		/// <para>
+		/// Public because the v2 XR rig (in its own assembly) reads the avatar of the current user through it.
+		/// </para>
+		/// </summary>
+		public static IUserAPI UserAPI
+			=> CoreAPI?.ModAPI?.GetMod("users")
 				?.GetInstance<IUserAPI>();
 
 		static internal ISessionAPI SessionAPI
-			=> CoreAPI.ModAPI.GetMod("session")
+			=> CoreAPI.ModAPI.GetMod("sessions")
 				?.GetInstance<ISessionAPI>();
 
 		static internal IControllerAPI ControllerAPI
@@ -75,6 +95,33 @@ namespace Nox.XR.Runtime {
 		public bool IsReady()
 			=> IsRunning && XRInputs.HasHeadset;
 
+		/// <summary>
+		/// Instantiates a prefab shipped with this mod (proxy rigs, widgets...).
+		/// <para>
+		/// The asset API only exists once the client is initialised, so a call made before
+		/// <see cref="OnInitializeClientAsync"/> (or after <see cref="OnDisposeClientAsync"/>) returns
+		/// <c>null</c> and logs why instead of throwing.
+		/// </para>
+		/// </summary>
+		/// <param name="prefabName">Asset name, for example <see cref="XRProxySpawner.V2Prefab"/>.</param>
+		/// <param name="parent">Optional parent of the instance.</param>
+		/// <returns>The instance, or <c>null</c> when the asset cannot be instantiated.</returns>
+		public GameObject InstantiateAsset(string prefabName, Transform parent = null) {
+			var assetAPI = CoreAPI?.AssetAPI;
+			if (assetAPI == null) {
+				Logger.LogWarning($"Asset '{prefabName}' requested before the XR client was initialised.", tag: nameof(Client));
+				return null;
+			}
+
+			var prefab = assetAPI.GetAsset<GameObject>(prefabName);
+			if (!prefab) {
+				Logger.LogError($"Prefab '{prefabName}' not found in the xr assets.", tag: nameof(Client));
+				return null;
+			}
+
+			return prefab.Instantiate(parent);
+		}
+
 		public async UniTask OnInitializeClientAsync(IClientModCoreAPI api) {
 			CoreAPI  = api;
 			Instance = this;
@@ -94,7 +141,7 @@ namespace Nox.XR.Runtime {
 
         public async UniTask OnDisposeClientAsync() {
 			StandUpWidget.Hide();
-			FullBodyCalibrationWidget.Hide();
+			CalibrationWidget.Hide();
 
 			foreach (var e in _events)
 				CoreAPI?.EventAPI.Unsubscribe(e);
@@ -120,7 +167,7 @@ namespace Nox.XR.Runtime {
 			// Already present devices also arrive in a burst: same deferred handling.
 			ScheduleHeadsetWatch();
 
-			// The loader state drives several XR settings (Start VR label, IPD…).
+			// The loader state drives several XR settings (Start VR label, IPD...).
 			SettingsNotifier.NotifyUpdated(null);
 		}
 
@@ -137,7 +184,7 @@ namespace Nox.XR.Runtime {
 			// The session devices are all about to disconnect: stop the watch.
 			_deviceWatchVersion++;
 
-			await XRController.Remove();
+			await XRProxySpawner.RemoveProxy();
 			await XRLoaderManager.Stop();
 
 			SettingsNotifier.NotifyUpdated(null);
@@ -190,20 +237,20 @@ namespace Nox.XR.Runtime {
 				return;
 
 			// The usable tracker count may have changed with the burst.
-			FullBodyCalibrationWidget.Refresh();
+			CalibrationWidget.Refresh();
 
 			try {
 				var hasHeadset = XRInputs.HasHeadset;
-				var isCurrent  = XRController.IsCurrent();
+				var isCurrent  = XRProxySpawner.IsProxyCurrent();
 
 				if (hasHeadset == isCurrent)
 					return;
 
 				if (hasHeadset) {
-					if (!await XRController.Make())
-						CoreAPI.LoggerAPI.LogWarning($"Failed to {nameof(XRController)}.");
-				} else if (!await XRController.Remove()) {
-					CoreAPI.LoggerAPI.LogWarning($"Failed to remove {nameof(XRController)}.");
+					if (!await XRProxySpawner.MakeProxy())
+						CoreAPI.LoggerAPI.LogWarning("Failed to create the XR proxy.");
+				} else if (!await XRProxySpawner.RemoveProxy()) {
+					CoreAPI.LoggerAPI.LogWarning("Failed to remove the XR proxy.");
 				}
 			} catch (Exception e) {
 				CoreAPI.LoggerAPI.LogError($"Headset watch failed: {e.Message}");
@@ -211,7 +258,7 @@ namespace Nox.XR.Runtime {
 		}
 
 		#endregion
-		
+
 		#region Widget
 
 		/// <summary>
@@ -228,7 +275,7 @@ namespace Nox.XR.Runtime {
 			if (StandUpWidget.TryMake(menu, parent, out var widget) && widget.Item2 != null)
 				context.Callback(widget.Item2, widget.Item1);
 
-			if (FullBodyCalibrationWidget.TryMake(menu, parent, out widget) && widget.Item2 != null)
+			if (CalibrationWidget.TryMake(menu, parent, out widget) && widget.Item2 != null)
 				context.Callback(widget.Item2, widget.Item1);
 		}
 
@@ -236,10 +283,10 @@ namespace Nox.XR.Runtime {
 		private static void OnCurrentControllerChanged(EventData context) {
 			if (context.TryGet<IXRController>(0, out var _)) {
 				StandUpWidget.Show();
-				FullBodyCalibrationWidget.Refresh();
+				CalibrationWidget.Refresh();
 			} else {
 				StandUpWidget.Hide();
-				FullBodyCalibrationWidget.Hide();
+				CalibrationWidget.Hide();
 			}
 		}
 

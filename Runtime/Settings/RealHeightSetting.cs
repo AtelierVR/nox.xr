@@ -1,7 +1,7 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
 using Nox.Settings;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -31,7 +31,7 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
 		public RealHeightSetting() {
 			// Stored in metres (used as is by the calibration) but set/displayed in decimal centimetres.

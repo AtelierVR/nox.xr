@@ -1,6 +1,6 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -19,7 +19,7 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && EnableXRSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
 		public OneHandValidationSetting() {
 			SetValue(Value, notify: false);

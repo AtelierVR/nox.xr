@@ -114,8 +114,18 @@ namespace Nox.XR.Runtime.Widgets {
 		}
 
 		private async UniTask UpdateIcon() {
-			var icon      = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>("ui:icons/person.png");
+			var icon = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>(
+				"ui:icons/person.png", this.GetCancellationTokenOnDestroy());
+
+			// The page can be closed (and this widget destroyed) while the sprite loads: the content is
+			// gone by then, so there is no icon left to set.
+			if (!this || !_content)
+				return;
+
 			var labelIcon = Reference.GetComponent<Image>("icon", _content);
+			if (!labelIcon)
+				return;
+
 			labelIcon.sprite = icon;
 		}
 	}

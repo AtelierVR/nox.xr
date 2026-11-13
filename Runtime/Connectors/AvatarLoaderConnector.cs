@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Autohand;
 using Cysharp.Threading.Tasks;
+using Nox.Assets;
 using Nox.Avatars;
 using Nox.Avatars.AutoHand;
 using Nox.Avatars.Hand;
@@ -54,7 +55,11 @@ namespace Nox.XR.Runtime.Connectors {
 			_onUserUpdate = Client.CoreAPI.EventAPI.Subscribe("user_update", OnUserUpdate);
 		}
 
-		public void Dispose() {
+		/// <summary>
+		/// Releases the connector and completes once its avatar is really gone: disposing an avatar writes
+		/// its last values, and the table they go to is unloaded with the mods right after.
+		/// </summary>
+		public UniTask Dispose() {
 			if (_onUserUpdate != null) {
 				Client.CoreAPI.EventAPI.Unsubscribe(_onUserUpdate);
 				_onUserUpdate = null;
@@ -64,8 +69,13 @@ namespace Nox.XR.Runtime.Connectors {
 			_context = null;
 			_settingUp = false;
 			ClearRig();
-			_runtime?.Dispose();
+
+			var runtime = _runtime;
 			_runtime = null;
+
+			return runtime != null
+				? runtime.Dispose()
+				: UniTask.CompletedTask;
 		}
 
 		public IRuntimeAvatar GetAvatar()
@@ -111,11 +121,11 @@ namespace Nox.XR.Runtime.Connectors {
 				);
 			}
 
-			var left  = leftData != null 
-				? HandToAutoHand.Convert(leftData) 
+			var left  = leftData != null
+				? HandToAutoHand.Convert(leftData)
 				: null;
-			var right = rightData != null 
-				? HandToAutoHand.Convert(rightData) 
+			var right = rightData != null
+				? HandToAutoHand.Convert(rightData)
 				: null;
 
 			connector.Set(left, right);
@@ -214,28 +224,28 @@ namespace Nox.XR.Runtime.Connectors {
 			var parameters = parameterModule.GetParameters();
 				foreach (var param in parameters)
 					switch (param.Name) {
-						case "tracking/head/active":
+						case "Tracking/Head/Active":
 							param.Value = XRInputs.HasHeadset;
 							break;
 
-						case "tracking/left_hand/active":
+						case "Tracking/LeftHand/Active":
 							param.Value = XRInputs.HasHandLeft;
 							break;
 
-						case "tracking/right_hand/active":
+						case "Tracking/RightHand/Active":
 							param.Value = XRInputs.HasHandRight;
 							break;
 
-						case "tracking/left_foot/active":
-						case "tracking/right_foot/active":
-						case "tracking/left_toes/active":
-						case "tracking/right_toes/active":
+						case "Tracking/LeftFoot/Active":
+						case "Tracking/RightFoot/Active":
+						case "Tracking/LeftToes/Active":
+						case "Tracking/RightToes/Active":
 							param.Value = false;
 							break;
 
 						case "VRMode" or "in_vr":
 						case "IsLocal" or "local":
-						case "rig/ik/head/target":
+						case "Rig/Ik/Head/Target":
 							param.Value = true;
 							break;
 					}
@@ -291,8 +301,7 @@ namespace Nox.XR.Runtime.Connectors {
 
 			if (!Client.AvatarAPI.HasInCache(hash)) {
 				var download = Client.AvatarAPI.DownloadToCache(
-					asset.Url,
-					hash: hash,
+					new IdentifierCache(identifier, asset),
 					progress: p => progress?.Invoke($"Downloading avatar {identifier.ToString()}", p),
 					token: _context.Token
 				);
@@ -314,8 +323,7 @@ namespace Nox.XR.Runtime.Connectors {
 				Logger.LogWarning($"Corrupt cache entry for avatar {identifier.ToString()}, re-downloading...");
 				Client.AvatarAPI.RemoveFromCache(hash);
 				var reDownload = Client.AvatarAPI.DownloadToCache(
-					asset.Url,
-					hash: hash,
+					new IdentifierCache(identifier, asset),
 					progress: p => progress?.Invoke($"Re-downloading avatar {identifier.ToString()}", p),
 					token: _context.Token
 				);
@@ -345,6 +353,8 @@ namespace Nox.XR.Runtime.Connectors {
 
 			Logger.LogDebug($"Avatar loaded: {identifier.ToString()}");
 			avatar.Identifier = identifier;
+			avatar.Owner      = Client.UserAPI?.Current?.Identifier
+				?? Identifier.Invalid;
 			await SetAvatar(avatar);
 			if (playerAvatar != null)
 				await playerAvatar.OnAvatarReady();

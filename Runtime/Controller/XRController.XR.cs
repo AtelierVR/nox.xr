@@ -191,7 +191,7 @@ namespace Nox.XR.Runtime {
 
 			// Full-body targets (hips, feet, ...) are controller parts too: the calibration publishes the very
 			// pose it applies locally, so a viewer replays the same target instead of guessing it.
-			if (FullBody.FullBodyCalibration.TryGetDriverTarget(index, out var fbtPart)) {
+			if (Tracking.CalibrationManager.TryGetDriverTarget(index, out var fbtPart)) {
 				tr = fbtPart;
 				return true;
 			}
@@ -217,10 +217,7 @@ namespace Nox.XR.Runtime {
 		[NoxPublic(NoxAccess.Method)]
 		public Dictionary<string, object> GetAbilities()
 			=> new() {
-				{ "pushing", player.IsPushing() },
 				{ "grounded", player.IsGrounded() },
-				{ "climbing", player.IsClimbing() },
-				{ "pushing_up", player.IsPushingUp() },
 				{ "immobilized", !player.useMovement },
 				{ "crouching", player.crouching },
 				{ "flying", !player.useGrounding },
@@ -345,8 +342,8 @@ namespace Nox.XR.Runtime {
 
 			// Full-body tracking targets enter the same dictionary (cf. TryGetPart): what the controller tracks
 			// is what travels, and the rig is written from this single source on both the owner and the viewers.
-			foreach (var id in FullBody.FullBodyCalibration.DriverTargetIds)
-				if (FullBody.FullBodyCalibration.TryGetDriverTarget(id, out var fbtTarget))
+			foreach (var id in Tracking.CalibrationManager.DriverTargetIds)
+				if (Tracking.CalibrationManager.TryGetDriverTarget(id, out var fbtTarget))
 					parts[id] = fbtTarget;
 
 			return parts;

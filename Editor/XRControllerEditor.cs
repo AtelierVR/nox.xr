@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -146,8 +147,9 @@ namespace Nox.XR.Editor {
 				return;
 			}
 
-			var rig = controller.GetAvatar()?.Descriptor?.Anchor
-				?.GetComponentInChildren<IRigProvider>(true)?.GetRig();
+			var rig = controller.GetAvatar()?.Descriptor
+				?.GetModules<IRigProvider>()
+				.FirstOrDefault()?.Rig;
 
 			EditorGUILayout.LabelField($"Parts ({parts.Count})");
 			foreach (var (partId, part) in parts) {

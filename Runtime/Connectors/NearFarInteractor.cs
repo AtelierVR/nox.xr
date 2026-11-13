@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using Nox.CCK.Utils;
 using XRNearFarInteractor = UnityEngine.XR.Interaction.Toolkit.Interactors.NearFarInteractor;
 
 namespace Nox.XR.Runtime.Connectors {

@@ -1,10 +1,9 @@
 using System;
-using Autohand;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Interaction;
 using Nox.UI;
 using UnityEngine;
 using UnityEngine.XR;
-using Hand = Autohand.Hand;
 using Nox.CCK.Nameplate;
 using Logger = Nox.CCK.Utils.Logger;
 using Keys = Nox.CCK.Nameplate.Constants;
@@ -12,35 +11,12 @@ using Keys = Nox.CCK.Nameplate.Constants;
 namespace Nox.XR.Runtime.Connectors {
 	public class XRMenuProvider : MonoBehaviour, IMenuProvider, IDisposable {
 		public RectTransform Container;
-		public Grabbable Grabbable;
+		public GrabbableObject Grabbable;
 		public XRController Controller;
 
 		public XRNode LastUsedHand = XRNode.LeftHand;
 
 		public IMenu Menu;
-
-		/// <summary>
-		/// Use the menu's authored AutoHand grab pose (the <c>GrabbablePose</c> on the menu prefab).
-		/// <para>
-		/// Off by default: that pose was captured with the AutoHand <c>RobotHand</c> prefab, and applying
-		/// it to an avatar hand (different finger local frames and hand pivot) twists the fingers and
-		/// mis-orients the panel. With it off, AutoHand wraps the fingers around the panel procedurally
-		/// (see <c>Hand.AutoPose</c>), which adapts to any hand.
-		/// </para>
-		/// </summary>
-		[Tooltip("Use the menu's authored AutoHand grab pose. Off: the fingers wrap procedurally.")]
-		public bool useGrabPose = false;
-
-		/// <summary>
-		/// The menu is grabbed with the player's hands, so a pose authored for the AutoHand RobotHand
-		/// cannot be reused: clear it before any grab (the pose is only read on grab, so doing it once
-		/// at spawn is enough).
-		/// </summary>
-		private void Awake() {
-			if (!useGrabPose && Grabbable != null)
-				foreach (var pose in Grabbable.GetComponentsInChildren<GrabbablePose>(true))
-					pose.poseEnabled = false;
-		}
 
 		RectTransform IMenuProvider.Container
 			=> Container;
@@ -102,17 +78,13 @@ namespace Nox.XR.Runtime.Connectors {
 		private void ToggleMenu(XRNode node) {
 			LastUsedHand = node;
 
-			var hand = XRNode.LeftHand == node
-				? Controller.player.handLeft
-				: Controller.player.handRight;
-
 			if (Menu.Active)
 				Close();
 			else
-				Open(hand);
+				Open();
 		}
 
-		public void Open(Hand hand) {
+		public void Open() {
 			if (Menu == null) {
 				Logger.LogError("Menu is not generated");
 				return;
@@ -151,17 +123,11 @@ namespace Nox.XR.Runtime.Connectors {
 				}
 
 				Grabbable.transform.SetPositionAndRotation(position, rotation);
-			} else {
-				// Fallback: position in front of the hand if no main camera found
-				Grabbable.transform.SetPositionAndRotation(
-					hand.palmTransform.position + Vector3.forward * menuDistance, 
-					Quaternion.identity
-				);
 			}
 
-			if (Grabbable.body != null) {
-				Grabbable.body.position = Grabbable.transform.position;
-				Grabbable.body.rotation = Grabbable.transform.rotation;
+			if (Grabbable.Body != null) {
+				Grabbable.Body.position = Grabbable.transform.position;
+				Grabbable.Body.rotation = Grabbable.transform.rotation;
 			}
 
 			// No need to try-grab the grabbable when opening the menu;
@@ -175,7 +141,7 @@ namespace Nox.XR.Runtime.Connectors {
 			}
 
 			Menu.Active = false;
-			Grabbable.HandsRelease();
+			Grabbable.ReleaseAll();
 
 			// Nameplates are only shown while a menu is open.
 			SyncNameplate(false);

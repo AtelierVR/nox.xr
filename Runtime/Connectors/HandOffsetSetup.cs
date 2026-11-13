@@ -149,7 +149,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// zero. Its Δrot is the angle of <see cref="adjustRotation"/> by construction (the adjust rotates
 		/// the hand around the pivot): zero it to check the raw avatar pivot.
 		/// <b>bone</b> is the pivot really carried by <c>IHand.Anchor</c>, i.e. after VRIK: its residual
-		/// is a solver/target issue (target lag, <c>handGrabPoint</c> while grabbing…), not an offset one.
+		/// is a solver/target issue (target lag, <c>handGrabPoint</c> while grabbing...), not an offset one.
 		/// </para>
 		/// <para>
 		/// Both lines are measured in the same frame — a single log per print. Comparing the controller
