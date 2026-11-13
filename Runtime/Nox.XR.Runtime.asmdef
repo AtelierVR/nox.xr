@@ -4,6 +4,7 @@
   "references": [
     "Nox.CCK",
     "Nox.CCK.Entities",
+    "Nox.XR.Calibration",
     "UniTask",
     "Nox.XR",
     "Nox.CCK.Avatars",
@@ -34,6 +35,7 @@
     "Nox.Avatars.Scale",
     "Nox.Avatars.StateMachines",
     "Unity.XR.CoreUtils",
+    "Unity.XR.Hands",
     "Unity.InputSystem",
     "Nox.KeyBinding",
     "Nox.Settings",
@@ -42,7 +44,7 @@
     "Nox.Sessions",
     "Nox.CCK.Audio",
     "Nox.CCK.Network",
-    "Nox.Network",
+    "Nox.Network", "Nox.Assets", "Nox.CCK.Assets",
     "Nox.Control",
     "Nox.CCK.Control",
     "Nox.Terminal"

@@ -85,6 +85,28 @@ MonoBehaviour:
       value: "{0}°"
     - key: settings.range.value.degrees_per_second
       value: "{0}°/s"
+    - key: settings.group.xr.menu.label
+      value: "Menu"
+    - key: settings.entry.xr.menu.max_distance.label
+      value: "Recall Distance"
+    - key: settings.entry.xr.menu.anchor.label
+      value: "Anchor"
+    - key: settings.entry.xr.menu.anchor.option.head
+      value: "Head (Viewport)"
+    - key: settings.entry.xr.menu.anchor.option.player
+      value: "Player"
+    - key: settings.entry.xr.menu.anchor.option.world
+      value: "World"
+    - key: settings.entry.xr.menu.recall.label
+      value: "Out of Reach"
+    - key: settings.entry.xr.menu.recall.option.despawn
+      value: "Despawn"
+    - key: settings.entry.xr.menu.recall.option.teleport
+      value: "Teleport In Front"
+    - key: settings.entry.xr.menu.recall.option.clamp
+      value: "Keep In Range"
+    - key: settings.range.value.meters
+      value: "{0} m"
     - key: terminal.command.xr.description
       value: "XR diagnostics: loaders, devices, trackers and full-body calibration."
     - key: terminal.command.xr.short
@@ -163,6 +185,28 @@ MonoBehaviour:
       value: "{0}°"
     - key: settings.range.value.degrees_per_second
       value: "{0}°/s"
+    - key: settings.group.xr.menu.label
+      value: "Menu"
+    - key: settings.entry.xr.menu.max_distance.label
+      value: "Distance de rappel"
+    - key: settings.entry.xr.menu.anchor.label
+      value: "Ancrage"
+    - key: settings.entry.xr.menu.anchor.option.head
+      value: "Tête (vue)"
+    - key: settings.entry.xr.menu.anchor.option.player
+      value: "Joueur"
+    - key: settings.entry.xr.menu.anchor.option.world
+      value: "Monde"
+    - key: settings.entry.xr.menu.recall.label
+      value: "Hors de portée"
+    - key: settings.entry.xr.menu.recall.option.despawn
+      value: "Masquer"
+    - key: settings.entry.xr.menu.recall.option.teleport
+      value: "Téléporter devant"
+    - key: settings.entry.xr.menu.recall.option.clamp
+      value: "Garder à portée"
+    - key: settings.range.value.meters
+      value: "{0} m"
     - key: terminal.command.xr.description
       value: "Diagnostic XR : loaders, périphériques, trackers et calibration du corps entier."
     - key: terminal.command.xr.short

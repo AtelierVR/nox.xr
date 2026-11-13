@@ -2,5 +2,10 @@
 <linker>
 	<assembly fullname="Nox.CCK.XR" preserve="all" />
 	<assembly fullname="Nox.XR" preserve="all" />
+	<assembly fullname="Nox.XR.Calibration" preserve="all" />
+	<assembly fullname="Nox.XR.Controller.V2" preserve="all" />
+	<assembly fullname="Nox.XR.Interactions" preserve="all" />
+	<assembly fullname="Nox.XR.Menu" preserve="all" />
+	<assembly fullname="Nox.XR.Player" preserve="all" />
 	<assembly fullname="Nox.XR.Runtime" preserve="all" />
 </linker>

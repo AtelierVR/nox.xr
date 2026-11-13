@@ -11072,7 +11072,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: da605ad663430d54e9302ac05c23cd11, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Nox.XR.Runtime::Nox.XR.Runtime.FullBody.FullBodyCalibration
+  m_EditorClassIdentifier: Nox.XR.Runtime::Nox.XR.Runtime.Tracking.CalibrationManager
   avatarLoader: {fileID: 82659967211542849}
   player: {fileID: 6788632155518835669}
 --- !u!1 &9005094917879979828
