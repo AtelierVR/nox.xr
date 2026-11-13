@@ -1,0 +1,25 @@
+{
+    "name": "Nox.XR.Interactions",
+    "rootNamespace": "Nox.XR.Interactions",
+    "references": [
+        "Nox.CCK",
+        "Nox.CCK.Entities",
+        "Nox.Interactions",
+        "Nox.CCK.Interactions",
+        "Nox.XR",
+        "Nox.XR.Runtime",
+        "Nox.XR.Player",
+        "Nox.Avatars.Hand",
+        "Unity.XR.CoreUtils",
+        "Unity.XR.Interaction.Toolkit"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,22 @@
+{
+	"name": "Nox.XR.Menu",
+	"rootNamespace": "Nox.XR.Menu",
+	"references": [
+		"Nox.CCK",
+		"Nox.Interactions",
+		"Nox.CCK.Interactions",
+		"Nox.UI",
+		"Nox.XR",
+		"Nox.XR.Runtime",
+		"UniTask"
+	],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}

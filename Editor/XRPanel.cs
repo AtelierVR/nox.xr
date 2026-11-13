@@ -10,7 +10,7 @@ using Nox.Editor.Panel;
 using Nox.XR.Loaders;
 using Nox.XR.Runtime;
 using Nox.XR.Runtime.Diagnostics;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using Nox.XR.Runtime.Loaders;
 using Nox.XR.Runtime.Panels;
 using Nox.XR.Runtime.Settings;
@@ -454,7 +454,7 @@ namespace Nox.XR.Editor {
 			// L'espace de suivi est l'objet dont la caméra XR est l'enfant : c'est lui (et pas la racine du
 			// rig) qui sert de repère aux poses des devices, donc celui à afficher.
 			var origin        = XROriginSetter.GlobalOrigin;
-			var trackingSpace = FullBodyTrackers.TrackingSpace();
+			var trackingSpace = TrackerResolver.TrackingSpace();
 			Set("origin", origin != null ? origin.gameObject.name : "None", origin != null ? Status.Ok : Status.Bad);
 			Set("origin-pos", trackingSpace ? $"{trackingSpace.name} {Format(trackingSpace.position)}" : "—");
 		}
@@ -512,13 +512,13 @@ namespace Nox.XR.Editor {
 		}
 
 		private void RefreshFullBody() {
-			var snapshot = XRDiagnostics.FullBody(withRig: true);
+			var snapshot = XRDiagnostics.Tracking(withRig: true);
 
 			Set("calibration",
 				!snapshot.Available
 					? "Component not present (no XR proxy?)"
 					: snapshot.Calibrating
-						? "Running…"
+						? "Running..."
 						: snapshot.HasCalibration ? "Stored" : "None",
 				!snapshot.Available ? Status.Warn : snapshot.Calibrating ? Status.Warn : snapshot.HasCalibration ? Status.Ok : Status.Neutral);
 
@@ -671,7 +671,7 @@ namespace Nox.XR.Editor {
 			return value;
 		}
 
-		private void AddToggle(VisualElement parent, string id, string label, string tooltip, Func<bool> get, Action<bool> set) {			
+		private void AddToggle(VisualElement parent, string id, string label, string tooltip, Func<bool> get, Action<bool> set) {
             var row = new VisualElement();
 			row.AddToClassList("flex-row");
 			row.AddToClassList("align-center");
@@ -948,16 +948,12 @@ namespace Nox.XR.Editor {
 		}
 
 		private static string DeviceKind(DeviceSnapshot device) {
-			var characteristics = device.Characteristics ?? string.Empty;
-
-			if (characteristics.Contains("HeadMounted"))
+			if (device.IsHead)
 				return "head-mounted";
-			if (characteristics.Contains("Controller"))
+			if (device.IsHand)
 				return "controller";
-			if (characteristics.Contains("TrackedDevice"))
-				return "tracker";
 
-			return "device";
+			return "tracker";
 		}
 
 		private static string Name(IXRInputProvider provider)
@@ -1032,7 +1028,7 @@ namespace Nox.XR.Editor {
 					asset?.name,
 					asset != null ? IsConfigured(asset) : ConfiguredLoaders().Count > 0,
 					provider.IsValid,
-					provider == XRLoaderManager.Current));
+					provider == XRLoaderManager.Provider));
 			}
 
 			foreach (var editor in editors)
@@ -1070,7 +1066,7 @@ namespace Nox.XR.Editor {
 	}
 
 	/// <summary>
-	/// "Nox/XR/XR Panel…": opens the panel in the Nox panel window. The panel framework itself
+	/// "Nox/XR/XR Panel...": opens the panel in the Nox panel window. The panel framework itself
 	/// (nox.editor.panel) is an optional mod, hence the null checks.
 	/// <para>
 	/// Priority stays in the diagnostics band of the "Nox/XR" sub-menu: after "Open XR Settings"
@@ -1080,7 +1076,7 @@ namespace Nox.XR.Editor {
 	public static class XRPanelMenu {
 		private const int Priority = 992;
 
-		[MenuItem("Nox/XR/XR Panel…", false, Priority)]
+		[MenuItem("Nox/XR/XR Panel...", false, Priority)]
 		private static void Open() {
 			var panels = XRPanel.API?.ModAPI?.GetMod("editor.panel")?.GetInstance<IPanelAPI>();
 			if (panels == null) {

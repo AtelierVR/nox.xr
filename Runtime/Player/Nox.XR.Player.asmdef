@@ -1,0 +1,27 @@
+{
+	"name": "Nox.XR.Player",
+	"rootNamespace": "Nox.XR.Player",
+	"references": [
+		"Nox.CCK",
+		"Nox.CCK.Entities",
+		"Nox.CCK.XR",
+		"Nox.Interactions",
+		"Nox.XR",
+		"Nox.XR.Runtime",
+		"Nox.XR.Calibration",
+		"Nox.Avatars.Hand",
+		"Nox.UI",
+		"UniTask",
+		"Unity.XR.CoreUtils",
+		"Unity.XR.Interaction.Toolkit"
+	],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}

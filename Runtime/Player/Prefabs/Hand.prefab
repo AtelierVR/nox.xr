@@ -1,0 +1,314 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1001}
+  - component: {fileID: 1002}
+  - component: {fileID: 1003}
+  - component: {fileID: 1004}
+  - component: {fileID: 1005}
+  - component: {fileID: 1006}
+  - component: {fileID: 1007}
+  - component: {fileID: 1008}
+  - component: {fileID: 1009}
+  m_Layer: 8
+  m_Name: Hand
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1011}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!54 &1002
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
+--- !u!114 &1003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 615241f10fdaff2479d3c963e5fe5e8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rig: 65535
+  trackingSource: {fileID: 0}
+  partEnabled: 1
+  collideWithEnvironment: 1
+  environmentCollider: {fileID: 0}
+  crouchUnderCeiling: 1
+  standingClearance: 1
+  Attached:
+    m_PersistentCalls:
+      m_Calls: []
+  Detached:
+    m_PersistentCalls:
+      m_Calls: []
+  EnabledChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  side: 1
+  body: {fileID: 1002}
+  moveTo: {fileID: 0}
+  encapsulationBox: {fileID: 0}
+  enableMovement: 1
+  adjustRotation: {x: 0, y: 0, z: 0, w: 1}
+  adjustPosition: {x: 0, y: 0, z: 0}
+  SourceChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  _target: {fileID: 1011}
+--- !u!114 &1004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2686fb01745baa418ddca7cd8413067, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  part: {fileID: 1003}
+  follow: 1
+  freeTrackerId: 
+  freeTrackerIndex: 0
+  applyVelocity: 0
+  disableWhenMissing: 1
+  applyInUpdate: 1
+  applyBeforeRender: 1
+--- !u!114 &1005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53e32671da2b1fa408569f69b8e3cedb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hand: {fileID: 1003}
+  addBody: 1
+  bodySize: {x: 0.06, y: 0.05, z: 0.1}
+  bodyCenter: {x: 0, y: 0, z: 0.02}
+  environmentRadius: 0.035
+  bodyLayer: Hand
+  ignoredLayers:
+  - Hand
+  - HandPlayer
+  - Player
+  - LocalAvatar
+  - RemoteAvatar
+  - Grabbing
+--- !u!114 &1006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7d9694a4084caa45a0c714b92ad034c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hand: {fileID: 1003}
+  addPokes: 1
+--- !u!1 &1010
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1011}
+  m_Layer: 8
+  m_Name: Wrist
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1011
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1010}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60e88b0ac4a79d84da979ad675db4c49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Interactions::Nox.XR.Interactions.HandGrabber
+  hand: {fileID: 1003}
+  palm: {fileID: 0}
+  targetRate: 30
+  minGrabDuration: 0.05
+  maxGrabDuration: 0.25
+  conformFingers: 1
+  conformDistance: 0.15
+  conformRetry: 0.05
+  conformSteps: 40
+  bindJoint: 0
+  jointBreakForce: 3500
+  relaxDuration: 0.2
+  grabType: 2
+  maxReachMass: 2
+  reachDuration: 0.08
+  returnDuration: 0.2
+  maxReachOffset: 0.15
+  grabPoint: {fileID: 1001}
+  rig: 0
+  source: 0
+  kind: 0
+  ray:
+    layers:
+      serializedVersion: 2
+      m_Bits: 0
+    reach: 0.2
+    offset: 0.02
+  highlight:
+    enabled: 1
+    material: {fileID: 0}
+  onGrabbed:
+    m_PersistentCalls:
+      m_Calls: []
+  onReleased:
+    m_PersistentCalls:
+      m_Calls: []
+  onTargetChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  onStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ef21f2ef086df64690e43ed557169e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Interactions::Nox.XR.Interactions.HandDistanceGrabber
+  hand: {fileID: 1003}
+  pointer: {fileID: 0}
+  maxRange: 5
+  sphereRadius: 0.03
+  pullDuration: 0.2
+  forwardSmoothing: 5
+  grabPoint: {fileID: 1001}
+  rig: 0
+  source: 1
+  kind: 1
+  ray:
+    layers:
+      serializedVersion: 2
+      m_Bits: 0
+    reach: 5
+    offset: 0.02
+  highlight:
+    enabled: 1
+    material: {fileID: 0}
+  onGrabbed:
+    m_PersistentCalls:
+      m_Calls: []
+  onReleased:
+    m_PersistentCalls:
+      m_Calls: []
+  onTargetChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  onStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3d4e5f60718293a4b5c6d7e8f901234, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Interactions::Nox.XR.Interactions.HandGrabInput
+  hand: {fileID: 1003}
+  near: {fileID: 1007}
+  far: {fileID: 1008}
+  grabBinding: select
+  altGrabBinding: activate
+  grabThreshold: 0.5
+  throwPower: 1.25
