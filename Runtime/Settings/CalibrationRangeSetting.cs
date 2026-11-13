@@ -1,6 +1,6 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -8,7 +8,7 @@ namespace Nox.XR.Runtime.Settings {
 	/// Maximum distance (metres) between a tracker and a bone for an automatic match during
 	/// full-body calibration. Can be adjusted live while calibrating.
 	/// </summary>
-	public sealed class FullBodyCalibrationRangeSetting : RangeHandler {
+	public sealed class CalibrationRangeSetting : RangeHandler {
 		private const string ConfigKey = "settings.xr.fbt_calibration_range";
 		/// <summary>Default calibration range (metres). Kept at 0.60 or below.</summary>
 		public const float DefaultRange = 0.5f;
@@ -21,9 +21,9 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
-		public FullBodyCalibrationRangeSetting() {
+		public CalibrationRangeSetting() {
 			// Stored in metres, set and displayed in decimal centimetres.
 			SetRange(0.1f, 3f);
 			SetStep(0.01f);

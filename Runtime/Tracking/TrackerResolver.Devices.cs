@@ -1,44 +1,22 @@
 using System.Collections.Generic;
 using Nox.CCK.XR;
-using Nox.XR.Runtime.Loaders;
 using Nox.XR.Trackers;
 using UnityEngine;
-using UnityEngine.XR;
 
-namespace Nox.XR.Runtime.FullBody {
-	/// <summary>
-	/// Trackers used by full-body tracking. They come from the XR loaders of every loaded mod (deduplicated by
-	/// serial), then from the generic <see cref="XRInputDevicesTrackerProvider"/> fallback.
-	/// </summary>
-	public static class FullBodyTrackers {
-		/// <summary>Providers read in order: known loaders first, then the generic XR device fallback.</summary>
-		public static List<ITrackerProvider> Providers() {
-			var providers = new List<ITrackerProvider>();
-
-			foreach (var loader in XRLoaderManager.Providers) {
-				ITrackerProvider trackers;
-				try {
-					trackers = loader?.Trackers;
-				} catch (System.Exception) {
-					// Un mod tiers ne doit pas casser la lecture des trackers des autres.
-					continue;
+namespace Nox.XR.Runtime.Tracking {
+	public static partial class TrackerResolver {
+		/// <summary>Whether at least one loader exposes a usable tracker provider.</summary>
+		public static bool HasAvailableProvider {
+			get {
+				var providers = Providers();
+				for (var i = 0; i < providers.Count; i++) {
+					if (providers[i] != null && providers[i].IsAvailable)
+						return true;
 				}
 
-				if (trackers != null && providers.TrueForAll(p => p.Id != trackers.Id))
-					providers.Add(trackers);
+				return false;
 			}
-
-			providers.Add(XRInputDevicesTrackerProvider.Instance);
-			return providers;
 		}
-
-		/// <summary>Whether <paramref name="device"/> can be used as a full-body tracker, and why not when it cannot.</summary>
-		public static bool IsCandidate(InputDevice device, bool excludeHanded, bool excludeControllers, out string reason)
-			=> XRInputDevicesTrackerProvider.IsCandidate(device, excludeHanded, excludeControllers, out reason);
-
-		/// <summary>Same as <see cref="IsCandidate(InputDevice, bool, bool, out string)"/> with controllers excluded.</summary>
-		public static bool IsCandidate(InputDevice device, bool excludeHanded, out string reason)
-			=> IsCandidate(device, excludeHanded, true, out reason);
 
 		/// <summary>
 		/// Space the XR device poses are expressed in: the camera floor offset of the <see cref="XROrigin"/>
@@ -76,7 +54,6 @@ namespace Nox.XR.Runtime.FullBody {
 				ToWorldSpace(into, start, origin);
 			}
 		}
-
 		/// <summary>
 		/// Brings the entries from <paramref name="from"/> to world space: providers publish their runtime
 		/// tracking space, the XR origin belongs to nox.xr.

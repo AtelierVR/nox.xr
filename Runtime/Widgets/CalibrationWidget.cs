@@ -4,7 +4,7 @@ using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.UI;
 using Nox.UI.Widgets;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using Nox.XR.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,18 +12,18 @@ using UnityEngine.UI;
 namespace Nox.XR.Runtime.Widgets {
 	/// <summary>
 	/// Full-body calibration widget: starts a calibration, or confirms the one running — the same action as
-	/// <see cref="CalibrateFullBodySetting"/>, without opening the menu.
+	/// <see cref="CalibrateSetting"/>, without opening the menu.
 	/// <para>
 	/// Only available when a calibration makes sense: the XR proxy is current and at least one tracker is
 	/// usable (<see cref="IsAvailable"/>).
 	/// </para>
 	/// </summary>
-	public class FullBodyCalibrationWidget : MonoBehaviour, IWidget {
+	public class CalibrationWidget : MonoBehaviour, IWidget {
 		public static string GetDefaultKey()
 			=> "full_body_calibration";
 
 		/// <summary>Live instances.</summary>
-		internal static readonly HashSet<FullBodyCalibrationWidget> All = new();
+		internal static readonly HashSet<CalibrationWidget> All = new();
 
 		/// <summary>Last widget container a page provided (see <see cref="Show"/>).</summary>
 		private static IMenu _menu;
@@ -48,16 +48,16 @@ namespace Nox.XR.Runtime.Widgets {
 			=> 102;
 
 		/// <summary>
-		/// True when the XR proxy is the current controller and <see cref="FullBodyCalibration.TrackerCount"/>
+		/// True when the XR proxy is the current controller and <see cref="CalibrationManager.TrackerCount"/>
 		/// reports at least one tracker.
 		/// </summary>
 		public static bool IsAvailable()
 			=> Client.ControllerAPI?.Current is IXRController
-			   && FullBodyCalibration.TrackerCount > 0;
+			   && CalibrationManager.TrackerCount > 0;
 
 		/// <summary>Starts the calibration, or confirms it when one is running.</summary>
 		private void OnClick() {
-			var calibration = FullBodyCalibration.Instance;
+			var calibration = CalibrationManager.Instance;
 			if (calibration == null)
 				return;
 
@@ -79,7 +79,7 @@ namespace Nox.XR.Runtime.Widgets {
 
 			var prefab    = Client.CoreAPI.AssetAPI.GetAsset<GameObject>("ui:prefabs/grid_item.prefab");
 			var instance  = prefab.Instantiate(parent);
-			var component = instance.AddComponent<FullBodyCalibrationWidget>();
+			var component = instance.AddComponent<CalibrationWidget>();
 
 			var button = Reference.GetComponent<Button>("button", instance);
 			button.onClick.AddListener(component.OnClick);
@@ -110,7 +110,7 @@ namespace Nox.XR.Runtime.Widgets {
 			if (!_parent || _menu == null || !IsAvailable())
 				return;
 
-			if (_parent.GetComponentInChildren<FullBodyCalibrationWidget>(true))
+			if (_parent.GetComponentInChildren<CalibrationWidget>(true))
 				return;
 
 			if (!TryMake(_menu, _parent, out var values) || values.Item2 == null)
@@ -133,8 +133,18 @@ namespace Nox.XR.Runtime.Widgets {
 		}
 
 		private async UniTask UpdateIcon() {
-			var icon         = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>("ui:icons/fbt.png");
-			var labelIcon    = Reference.GetComponent<Image>("icon", _content);
+			var icon = await Client.CoreAPI.AssetAPI.GetAssetAsync<Sprite>(
+				"ui:icons/fbt.png", this.GetCancellationTokenOnDestroy());
+
+			// The page can be closed (and this widget destroyed) while the sprite loads: the content is
+			// gone by then, so there is no icon left to set.
+			if (!this || !_content)
+				return;
+
+			var labelIcon = Reference.GetComponent<Image>("icon", _content);
+			if (!labelIcon)
+				return;
+
 			labelIcon.sprite = icon;
 		}
 	}

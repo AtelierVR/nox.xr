@@ -1,6 +1,6 @@
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -19,7 +19,7 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && EnableXRSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
 		public FullBodyTrackingSetting() {
 			SetValue(Value, notify: false);
@@ -43,7 +43,7 @@ namespace Nox.XR.Runtime.Settings {
 
 			// Le widget de calibration n'a de sens qu'avec le suivi activé *et* au moins un tracker : c'est ici
 			// que la première moitié de la condition peut changer sans événement de device.
-			Widgets.FullBodyCalibrationWidget.Refresh();
+			Widgets.CalibrationWidget.Refresh();
 		}
 	}
 }

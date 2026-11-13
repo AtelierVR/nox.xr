@@ -1,6 +1,6 @@
 using Nox.CCK.Settings;
 using Nox.Settings;
-using Nox.XR.Runtime.FullBody;
+using Nox.XR.Runtime.Tracking;
 using UnityEngine;
 
 namespace Nox.XR.Runtime.Settings {
@@ -8,7 +8,7 @@ namespace Nox.XR.Runtime.Settings {
 	/// "Calibrate" button. The first click starts a full-body calibration (avatar in the
 	/// calibration-only pose with the trackers displayed); the next click confirms and saves it.
 	/// </summary>
-	public sealed class CalibrateFullBodySetting : ButtonHandler {
+	public sealed class CalibrateSetting : ButtonHandler {
 		public override string[] Path
 			=> new[] { "xr", "fbt", "full_body_calibration" };
 
@@ -17,9 +17,9 @@ namespace Nox.XR.Runtime.Settings {
 		public override bool IsActive
 			=> Client.Instance != null
 			   && FullBodyTrackingSetting.Value
-			   && FullBodyCalibration.IsXRControllerActive;
+			   && CalibrationManager.IsXRControllerActive;
 
-		public CalibrateFullBodySetting() {
+		public CalibrateSetting() {
 			SetLabel("settings.entry.xr.general.full_body_calibration.label");
 			RefreshLabel();
 		}
@@ -28,7 +28,7 @@ namespace Nox.XR.Runtime.Settings {
 			=> RefreshLabel();
 
 		private void RefreshLabel()
-			=> SetButtonText(FullBodyCalibration.Instance is { IsCalibrating: true }
+			=> SetButtonText(CalibrationManager.Instance is { IsCalibrating: true }
 				? "settings.entry.xr.general.full_body_calibration.confirm"
 				: "settings.entry.xr.general.full_body_calibration.start");
 
@@ -36,7 +36,7 @@ namespace Nox.XR.Runtime.Settings {
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/button.prefab");
 
 		public override void OnClick(IContext context) {
-			var calibration = FullBodyCalibration.Instance;
+			var calibration = CalibrationManager.Instance;
 			if (calibration == null)
 				return;
 
@@ -46,7 +46,7 @@ namespace Nox.XR.Runtime.Settings {
 				calibration.StartCalibration();
 
 			// Le libellé dépend de IsCalibrating, qui peut aussi changer sans clic (validation aux
-			// manettes) : c'est SettingsNotifier qui resynchronise dans ce cas (voir FullBodyCalibration).
+			// manettes) : c'est SettingsNotifier qui resynchronise dans ce cas (voir CalibrationManager).
 			RefreshLabel();
 		}
 	}

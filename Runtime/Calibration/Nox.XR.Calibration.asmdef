@@ -1,0 +1,19 @@
+{
+	"name": "Nox.XR.Calibration",
+	"rootNamespace": "Nox.XR.Calibration",
+	"references": [
+		"Nox.CCK",
+		"Nox.CCK.Entities",
+		"Nox.XR",
+		"Unity.XR.Hands"
+	],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}
