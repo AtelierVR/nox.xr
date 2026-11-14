@@ -34,6 +34,20 @@ namespace Nox.XR.Calibration {
 		[JsonConverter(typeof(QuaternionJsonConverter))]
 		public Quaternion OffsetRotation = Quaternion.identity;
 
+		/// <summary>
+		/// Rotation of the tracker when the offsets were measured. The offsets are turned by the rotation the tracker
+		/// went through since, which is stable whatever the attitude the device is mounted at. Left at zero (an
+		/// invalid rotation) by a calibration stored before this field existed: those offsets keep their old frame.
+		/// </summary>
+		[JsonProperty("capture")]
+		[JsonConverter(typeof(QuaternionJsonConverter))]
+		public Quaternion CaptureRotation;
+
+		/// <summary>Whether the binding carries the tracker pose of its calibration (see <see cref="CaptureRotation"/>).</summary>
+		[JsonIgnore]
+		public bool HasCapture
+			=> CaptureRotation.w != 0f;
+
 		/// <summary>Avatar scale at the moment of calibration.</summary>
 		[JsonProperty("scale")]
 		public float Scale = 1f;

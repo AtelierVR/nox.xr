@@ -47,10 +47,14 @@ namespace Nox.XR.Trackers {
 
 	/// <summary>Which pose a caller wants.</summary>
 	public enum TrackerPoseMode {
-		/// <summary>Pose as reported by the runtime, without calibration offsets.</summary>
+		/// <summary>Pose as reported by the runtime, in the tracking space of the loader.</summary>
 		Raw,
 
-		/// <summary>Pose with the calibration offsets applied when available.</summary>
+		/// <summary>
+		/// Calibrated pose, when the loader can produce it. A loader working in its own tracking space cannot: the
+		/// offsets are measured on the avatar skeleton in world space, so nox.xr composes them itself (see
+		/// <c>TrackerResolver</c>) and both modes return the raw pose from an <c>InputDevice</c> provider.
+		/// </summary>
 		Calibrated,
 	}
 
@@ -60,8 +64,8 @@ namespace Nox.XR.Trackers {
 	/// The tracker owns its rig slot; loaders create them, nox.xr only reads their pose.
 	/// The slot is an <c>ushort</c> so a loader can expose custom values (a tracker attached to a
 	/// prop, for instance) in addition to the well-known <see cref="EntityRig"/> slots.
-	/// <see cref="TrackerPoseMode.Calibrated"/> applies the offsets published by
-	/// <c>Nox.XR.Calibration</c> when the tracker has a binding.
+	/// The calibration offsets published by <c>Nox.XR.Calibration</c> are composed by nox.xr, in world space,
+	/// once the pose of the loader was brought to world space: a loader only reports device poses.
 	/// </para>
 	/// </summary>
 	public interface ITracker {

@@ -21,11 +21,27 @@ namespace Nox.XR.Runtime.Tracking {
 		/// <summary>
 		/// Space the XR device poses are expressed in: the camera floor offset of the <see cref="XROrigin"/>
 		/// (the object the XR camera is a child of), not the rig root, which sits anywhere in the world.
+		/// <para>
+		/// The v2 player rig has no <see cref="XROrigin"/>: its tracked parts are written by <c>XRFollow</c> in
+		/// the player tracking container, so the raw device poses are relative to that container. Without this
+		/// fallback the calibration and the diagnostics would read raw poses as if they were world space, and
+		/// every tracker would appear away from the player.
+		/// </para>
 		/// </summary>
+		public static Transform FallbackTrackingSpace { get; set; }
+
+		/// <summary>
+		/// Factor the tracked poses are stretched by so the player's real body reaches the avatar's proportions
+		/// (1 = the avatar is the player's size). The avatar is never rescaled, its own size is the reference: a
+		/// 2 m avatar driven by a 1.8 m player scales the headset, the hands and the feet by 1.11, which puts the
+		/// head on the eyes of the player and keeps the feet on the ground.
+		/// </summary>
+		public static float PoseScale { get; set; } = 1f;
+
 		public static Transform TrackingSpace() {
 			var origin = XROriginSetter.GlobalOrigin;
 			if (!origin)
-				return null;
+				return FallbackTrackingSpace;
 
 			return origin.CameraFloorOffsetObject
 				? origin.CameraFloorOffsetObject.transform
@@ -64,7 +80,7 @@ namespace Nox.XR.Runtime.Tracking {
 
 			for (var i = from; i < trackers.Count; i++) {
 				var tracker = trackers[i];
-				tracker.Position = origin.TransformPoint(tracker.Position);
+				tracker.Position = origin.TransformPoint(tracker.Position * PoseScale);
 				tracker.Rotation = origin.rotation * tracker.Rotation;
 				// Velocities are tracking-space directions: rotate them, do not translate.
 				tracker.Velocity        = origin.rotation * tracker.Velocity;

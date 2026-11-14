@@ -195,37 +195,22 @@ namespace Nox.XR.Player {
 			ApplyPose(pose);
 		}
 
-		/// <summary>Writes a resolved pose on the part (the part decides what it drives).</summary>
+		/// <summary>
+		/// Writes a resolved pose on the part (the part decides what it drives).
+		/// <para>
+		/// The pose is already in world space (<see cref="TrackerResolver.TryGetPose(ushort, out TrackerPose)"/> applies
+		/// the tracking space, the avatar fit and the calibration): transforming it again here would move a calibrated
+		/// bone by the container rotation and stretch its offset with the fit.
+		/// </para>
+		/// </summary>
 		private void ApplyPose(TrackerPose pose) {
-			var space    = TrackingSpace;
-			var position = space
-				? space.TransformPoint(pose.Position)
-				: pose.Position;
-			var rotation = space
-				? space.rotation * pose.Rotation
-				: pose.Rotation;
-
-			part.SetPose(position, rotation);
+			part.SetPose(pose.Position, pose.Rotation);
 
 			if (!applyVelocity)
 				return;
 
 			part.SetVelocity(pose.Velocity);
 			part.SetAngularVelocity(pose.AngularVelocity);
-		}
-
-		/// <summary>
-		/// Space the tracker poses are expressed in: the tracking container of the player, which is what the
-		/// player moves and turns (walking, snap turn, smooth turn, teleport).
-		/// </summary>
-		private Transform TrackingSpace {
-			get {
-				if (part && part.Player && part.Player.TrackingContainer)
-					return part.Player.TrackingContainer;
-
-				// Not attached yet: the part is already a child of the rig.
-				return transform.parent;
-			}
 		}
 
 		private bool TryGetPose(out TrackerPose pose) {

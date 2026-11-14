@@ -156,22 +156,51 @@ namespace Nox.XR.Trackers {
 		public bool TryGet(ushort rig, out ITracker tracker)
 			=> TryGetRegistered(rig, out tracker);
 
-		/// <summary>Lookup of an already-registered tracker, without touching the device list.</summary>
+		/// <summary>
+		/// Lookup of an already-registered tracker, without touching the device list.
+		/// <para>
+		/// Several devices can claim the same rig: a runtime tracks the controllers and, when hand tracking is
+		/// enabled, a pair of bare hands on the same <see cref="EntityRig.LeftHand"/> / <see cref="EntityRig.RightHand"/>
+		/// slots. The controller always wins - it is the device the player actually holds, with its buttons, trigger
+		/// and grip - and the bare hand is only used for a side no controller serves. Without that preference the
+		/// device enumeration order decided the answer: one hand of a Quest session could answer with the hand
+		/// device (no buttons, no skeleton while the controllers are held) and the other with its controller.
+		/// </para>
+		/// </summary>
 		protected bool TryGetRegistered(ushort rig, out ITracker tracker) {
+			tracker = null;
+
 			for (var i = 0; i < _trackers.Count; i++) {
-				if (_trackers[i].Rig != rig)
+				var candidate = _trackers[i];
+				if (candidate.Rig != rig)
 					continue;
 
-				tracker = _trackers[i];
-				return true;
+				if (tracker == null) {
+					tracker = candidate;
+				} else if (!IsController(tracker) && IsController(candidate))
+					tracker = candidate;
+
+				if (IsController(tracker))
+					return true;
 			}
 
-			tracker = null;
-			return false;
+			return tracker != null;
+		}
+
+		/// <summary>
+		/// Whether a tracker is a physical controller. A bare hand can carry buttons too (the grip or the pinch of a
+		/// hand device), which is why the <see cref="TrackerFeatures.Handed"/> flag is excluded.
+		/// </summary>
+		private static bool IsController(ITracker tracker) {
+			if (tracker == null)
+				return false;
+
+			var features = tracker.Features;
+			return features.HasFlag(TrackerFeatures.Buttons) && !features.HasFlag(TrackerFeatures.Handed);
 		}
 
 		public bool TryGet(string id, out ITracker tracker) {
-			if (!string.IsNullOrEmpty(id)) {
+			if (!string.IsNullOrEmpty(id))
 				for (var i = 0; i < _trackers.Count; i++) {
 					if (!string.Equals(_trackers[i].Id, id, global::System.StringComparison.OrdinalIgnoreCase))
 						continue;
@@ -179,7 +208,6 @@ namespace Nox.XR.Trackers {
 					tracker = _trackers[i];
 					return true;
 				}
-			}
 
 			tracker = null;
 			return false;

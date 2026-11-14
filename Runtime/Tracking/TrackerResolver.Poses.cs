@@ -12,7 +12,16 @@ namespace Nox.XR.Runtime.Tracking {
 		public static bool TryGetPose(EntityRig rig, out TrackerPose pose)
 			=> TryGetPose(rig.ToIndex(), out pose);
 
-		/// <summary>Resolve the current pose of a rig slot, including custom ids (prop trackers...).</summary>
+		/// <summary>
+		/// Resolve the current pose of a rig slot, including custom ids (prop trackers...), in <b>world</b> space and
+		/// with the calibration applied.
+		/// <para>
+		/// The calibration offsets are measured on the avatar skeleton in world space, so they are composed here, once
+		/// the raw pose was brought to world space: applied inside the tracking space (as the loader sees it) they
+		/// would be turned by the player and stretched by the avatar fit, and the pelvis would jump the moment the
+		/// calibration is confirmed.
+		/// </para>
+		/// </summary>
 		public static bool TryGetPose(ushort rig, out TrackerPose pose) {
 			// Loader-owned trackers first (HMD, controllers...): each runtime knows its own devices.
 			foreach (var trackers in Providers()) {
@@ -20,8 +29,10 @@ namespace Nox.XR.Runtime.Tracking {
 					continue;
 
 				trackers.Poll();
-				if (trackers.TryGetPose(rig, TrackerPoseMode.Calibrated, out pose))
+				if (trackers.TryGetPose(rig, TrackerPoseMode.Calibrated, out pose)) {
+					pose = ToWorld(rig, pose);
 					return true;
+				}
 			}
 
 			var knownRig = rig.ToEntityRig();
@@ -30,6 +41,27 @@ namespace Nox.XR.Runtime.Tracking {
 
 			RefreshTrackers();
 			return TryGetFreeTracker(0, out pose);
+		}
+
+		/// <summary>
+		/// Brings a raw pose of a loader (tracking space) to world space, then applies the calibration of its rig slot.
+		/// </summary>
+		private static TrackerPose ToWorld(ushort rig, TrackerPose pose) {
+			var origin = TrackingSpace();
+			if (origin) {
+				pose.Position        = origin.TransformPoint(pose.Position * PoseScale);
+				pose.Rotation        = origin.rotation * pose.Rotation;
+				pose.Velocity        = origin.rotation * pose.Velocity;
+				pose.AngularVelocity = origin.rotation * pose.AngularVelocity;
+			}
+
+			if (!CalibrationService.IsCalibratable(rig) || !CalibrationService.TryGetBinding(rig.ToEntityRig(), out var binding))
+				return pose;
+
+			CalibrationService.Apply(binding, pose.Position, pose.Rotation, out var position, out var rotation);
+			pose.Position = position;
+			pose.Rotation = rotation;
+			return pose;
 		}
 
 		/// <summary>Resolve a free (unclaimed) tracker by serial.</summary>
@@ -87,16 +119,12 @@ namespace Nox.XR.Runtime.Tracking {
 			if (!TryFindTracker(binding.TrackerId, out var tracker))
 				return false;
 
-			var offset = tracker.Rotation * (binding.OffsetPosition * (binding.Scale > 0f ? CalibrationService.CurrentScale / binding.Scale : 1f));
-
-			// Hips follow the tracker yaw only, so tilting the tracker does not move the pelvis vertically.
-			if (rig == EntityRig.Hips && YawOf(tracker.Rotation) is { } yaw)
-				offset = yaw * (binding.OffsetPosition * (binding.Scale > 0f ? CalibrationService.CurrentScale / binding.Scale : 1f));
+			CalibrationService.Apply(binding, tracker.Position, tracker.Rotation, out var position, out var rotation);
 
 			pose = new TrackerPose {
 				Id = tracker.Id,
-				Position = tracker.Position + offset,
-				Rotation = tracker.Rotation * binding.OffsetRotation,
+				Position = position,
+				Rotation = rotation,
 				Velocity = tracker.Velocity,
 				AngularVelocity = tracker.AngularVelocity
 			};
@@ -116,19 +144,6 @@ namespace Nox.XR.Runtime.Tracking {
 
 			tracker = default;
 			return false;
-		}
-
-		private static Quaternion? YawOf(Quaternion rotation) {
-			var forward = rotation * Vector3.forward;
-			forward.y = 0f;
-			if (forward.sqrMagnitude < 0.0001f) {
-				forward = rotation * Vector3.up;
-				forward.y = 0f;
-				if (forward.sqrMagnitude < 0.0001f)
-					return null;
-			}
-
-			return Quaternion.LookRotation(forward.normalized, Vector3.up);
 		}
 
 		/// <summary>Reads tracker poses once per frame, shared by every caller.</summary>

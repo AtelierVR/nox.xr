@@ -74,7 +74,7 @@ namespace Nox.XR.Calibration {
 				name: device.name,
 				manufacturer: device.manufacturer,
 				model: device.name,
-				readConnected: () => device.isValid,
+				readConnected: () => IsConnected(device),
 				readValue: ReadValue,
 				readSkeleton: ReadSkeleton,
 				readFeatures: () => FeaturesOf(device, RigOf(device, id).ToEntityRig())
@@ -157,12 +157,9 @@ namespace Nox.XR.Calibration {
 			device.TryGetFeatureValue(CommonUsages.deviceVelocity, out var velocity);
 			device.TryGetFeatureValue(CommonUsages.deviceAngularVelocity, out var angularVelocity);
 
-			// Calibrated mode applies the offset published by nox.xr's calibration, when one exists.
-			if (mode == TrackerPoseMode.Calibrated && CalibrationService.IsCalibratable(rig) && CalibrationService.TryGetBinding(rig, out var binding)) {
-				position += CalibrationService.GetOffset(binding, rotation, 1f);
-				rotation *= binding.OffsetRotation;
-			}
-
+			// Both modes return the raw pose of the runtime: a loader works in the tracking space of its devices and
+			// cannot compose the calibration offsets, which are measured on the avatar skeleton in world space. The
+			// runtime applies them after the tracking space transform (see TrackerResolver), for both modes.
 			pose = new TrackerPose {
 				Id = id,
 				Position = position,
@@ -185,6 +182,16 @@ namespace Nox.XR.Calibration {
 
 			return true;
 		}
+
+		/// <summary>
+		/// Whether the device is physically present. OpenXR declares a valid <see cref="InputDevice"/> for every
+		/// tracker slot it knows, even with no tracker on it: such a slot has no serial number and never
+		/// tracks. A device that tracks is connected, and so is one with a serial number (a real tracker that
+		/// is currently asleep).
+		/// </summary>
+		private static bool IsConnected(InputDevice device)
+			=> device.isValid
+			   && (IsTracked(device) || !string.IsNullOrEmpty(device.serialNumber));
 
 		private static bool TryReadValue(InputDevice device, string key, out object value) {
 			value = null;
