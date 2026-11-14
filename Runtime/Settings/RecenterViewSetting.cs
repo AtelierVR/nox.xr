@@ -13,7 +13,7 @@ namespace Nox.XR.Runtime.Settings {
 		public override string[] Path
 			=> new[] { "xr", "general", "recenter" };
 
-		/// <summary>Between "Start VR" (0) and the IPD (2): a comfort setting, not a hardware one.</summary>
+		/// <summary>Next to "Start VR": a comfort setting, not a hardware one.</summary>
 		public override int Order => 60001;
 
 		public override bool IsActive

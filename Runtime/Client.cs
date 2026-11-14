@@ -167,7 +167,7 @@ namespace Nox.XR.Runtime {
 			// Already present devices also arrive in a burst: same deferred handling.
 			ScheduleHeadsetWatch();
 
-			// The loader state drives several XR settings (Start VR label, IPD...).
+			// The loader state drives several XR settings (the Start VR label...).
 			SettingsNotifier.NotifyUpdated(null);
 		}
 

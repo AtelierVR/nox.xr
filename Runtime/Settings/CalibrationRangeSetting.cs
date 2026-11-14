@@ -19,9 +19,10 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60005;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public CalibrationRangeSetting() {
 			// Stored in metres, set and displayed in decimal centimetres.
@@ -46,5 +47,8 @@ namespace Nox.XR.Runtime.Settings {
 
 		protected override void OnValueChanged(float value)
 			=> Value = value;
+
+		public override void OnUpdated(Nox.Settings.IHandler handler)
+			=> RefreshEditable();
 	}
 }

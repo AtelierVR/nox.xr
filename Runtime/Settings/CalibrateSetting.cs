@@ -15,17 +15,20 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60001;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public CalibrateSetting() {
 			SetLabel("settings.entry.xr.general.full_body_calibration.label");
 			RefreshLabel();
 		}
 
-		public override void OnUpdated(IHandler handler)
-			=> RefreshLabel();
+		public override void OnUpdated(IHandler handler) {
+			RefreshLabel();
+			RefreshEditable();
+		}
 
 		private void RefreshLabel()
 			=> SetButtonText(CalibrationManager.Instance is { IsCalibrating: true }

@@ -25,9 +25,10 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60004;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public PlayerArmSpanSetting() {
 			SetRange(0f, 3f);
@@ -53,7 +54,9 @@ namespace Nox.XR.Runtime.Settings {
 			=> Value = value;
 
 		/// <summary>Resynchronises the slider when the T-pose estimation writes the value.</summary>
-		public override void OnUpdated(IHandler handler)
-			=> SetValue(Value);
+		public override void OnUpdated(IHandler handler) {
+			SetValue(Value);
+			RefreshEditable();
+		}
 	}
 }

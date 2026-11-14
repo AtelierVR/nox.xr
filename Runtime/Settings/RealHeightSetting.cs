@@ -1,3 +1,4 @@
+using Nox.CCK.Events;
 using Nox.CCK.Settings;
 using Nox.CCK.Utils;
 using Nox.Settings;
@@ -29,9 +30,10 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60003;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public RealHeightSetting() {
 			// Stored in metres (used as is by the calibration) but set/displayed in decimal centimetres.
@@ -45,12 +47,20 @@ namespace Nox.XR.Runtime.Settings {
 		protected override GameObject GetPrefab()
 			=> Main.CoreAPI.AssetAPI.GetAsset<GameObject>("settings:prefabs/range.prefab");
 
+		/// <summary>Raised when the height is written (estimation, slider, storage), with the new value.</summary>
+		public static readonly NoxEvent<float> Changed = new();
+
 		public static new float Value {
 			get => Config.Load().Get(ConfigKey, Config.Load().Get(LegacyConfigKey, Automatic));
 			set {
+				if (Mathf.Approximately(Value, value))
+					return;
+
 				var config = Config.Load();
 				config.Set(ConfigKey, value);
 				config.Save();
+
+				Changed.Invoke(value);
 			}
 		}
 
@@ -58,7 +68,9 @@ namespace Nox.XR.Runtime.Settings {
 			=> Value = value;
 
 		/// <summary>Resynchronises the slider when the value is written from elsewhere.</summary>
-		public override void OnUpdated(IHandler handler)
-			=> SetValue(Value);
+		public override void OnUpdated(IHandler handler) {
+			SetValue(Value);
+			RefreshEditable();
+		}
 	}
 }

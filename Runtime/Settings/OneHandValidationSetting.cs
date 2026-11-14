@@ -12,14 +12,15 @@ namespace Nox.XR.Runtime.Settings {
 		private const string ConfigKey = "settings.xr.one_hand_validation";
 
 		public override string[] Path
-			=> new[] { "xr", "interaction", "one_hand_validation" };
+			=> new[] { "xr", "fbt", "one_hand_validation" };
 
-		public override int Order => 60002;
+		public override int Order => 60007;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && EnableXRSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> EnableXRSetting.Value && CalibrationManager.IsAvailable;
 
 		public OneHandValidationSetting() {
 			SetValue(Value, notify: false);
@@ -40,5 +41,8 @@ namespace Nox.XR.Runtime.Settings {
 
 		protected override void OnValueChanged(bool value)
 			=> Value = value;
+
+		public override void OnUpdated(Nox.Settings.IHandler handler)
+			=> RefreshEditable();
 	}
 }

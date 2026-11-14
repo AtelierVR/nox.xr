@@ -17,17 +17,20 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60002;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public EstimatePlayerMetricsSetting() {
 			SetLabel("settings.entry.xr.general.estimate_player_metrics.label");
 			RefreshLabel();
 		}
 
-		public override void OnUpdated(IHandler handler)
-			=> RefreshLabel();
+		public override void OnUpdated(IHandler handler) {
+			RefreshLabel();
+			RefreshEditable();
+		}
 
 		private void RefreshLabel() {
 			var calibration = CalibrationManager.Instance;

@@ -23,10 +23,10 @@ namespace Nox.XR.Runtime.Settings {
 		public override int Order => 60006;
 
 		public override bool IsActive
-			=> Client.Instance != null
-			   && EnableXRSetting.Value
-			   && FullBodyTrackingSetting.Value
-			   && CalibrationManager.IsXRControllerActive;
+			=> Client.Instance != null;
+
+		public override bool IsEditable
+			=> EnableXRSetting.Value && FullBodyTrackingSetting.Value && CalibrationManager.IsAvailable;
 
 		public TrackersIncludeControllerSetting() {
 			SetValue(Value, notify: false);
@@ -47,5 +47,8 @@ namespace Nox.XR.Runtime.Settings {
 
 		protected override void OnValueChanged(bool value)
 			=> Value = value;
+
+		public override void OnUpdated(Nox.Settings.IHandler handler)
+			=> RefreshEditable();
 	}
 }
