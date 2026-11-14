@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Interaction;
 using Nox.UI;
@@ -39,8 +40,8 @@ namespace Nox.XR.Runtime.Connectors {
 		/// </summary>
 		private bool? _nameplateVisible;
 
-		public async UniTask<bool> Generate() {
-			Menu = await Client.UiAPI.Make(this);
+		public async UniTask<bool> Generate(CancellationToken cancellationToken = default) {
+			Menu = await Client.UiAPI.Make(this, cancellationToken);
 
 			if (Menu == null) {
 				Logger.LogError("Failed to create XR proxy menu");
@@ -48,6 +49,18 @@ namespace Nox.XR.Runtime.Connectors {
 			}
 
 			Menu.Active = false;
+
+			return true;
+		}
+
+		/// <summary>
+		/// The menu can only be opened/closed once it exists: reports it instead of failing silently.
+		/// </summary>
+		private bool CheckUsable() {
+			if (Menu == null) {
+				Logger.LogError("Menu is not generated");
+				return false;
+			}
 
 			return true;
 		}
@@ -85,10 +98,8 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		public void Open() {
-			if (Menu == null) {
-				Logger.LogError("Menu is not generated");
+			if (!CheckUsable())
 				return;
-			}
 
 			Menu.Active = true;
 
@@ -135,10 +146,8 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		public void Close() {
-			if (Menu == null) {
-				Logger.LogError("Menu is not generated");
+			if (!CheckUsable())
 				return;
-			}
 
 			Menu.Active = false;
 			Grabbable.ReleaseAll();

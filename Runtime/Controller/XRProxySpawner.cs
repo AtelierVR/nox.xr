@@ -1,4 +1,5 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using System.Threading;
+using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using Nox.Controllers;
 using UnityEngine;
@@ -41,7 +42,8 @@ namespace Nox.XR.Runtime {
 		/// Creates the proxy matching the headset presence: the v2 rig when its prefab carries an
 		/// <see cref="IController"/>, the AutoHand proxy otherwise.
 		/// </summary>
-		public static async UniTask<bool> MakeProxy() {
+		/// <param name="cancellationToken">Owns the creation: cancelled, no proxy is left half-built.</param>
+		public static async UniTask<bool> MakeProxy(CancellationToken cancellationToken = default) {
 			if (Client.Instance == null) {
 				Logger.LogError("The XR client is not running: cannot create the XR proxy.", tag: nameof(XRProxySpawner));
 				return false;
@@ -62,7 +64,7 @@ namespace Nox.XR.Runtime {
 				}
 			}
 
-			return await XRController.Make();
+			return await XRController.Make(cancellationToken);
 		}
 
 		/// <summary>Removes the current XR proxy, if it is one.</summary>

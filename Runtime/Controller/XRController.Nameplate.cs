@@ -1,3 +1,4 @@
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using Nox.CCK.Nameplate;
@@ -53,13 +54,13 @@ namespace Nox.XR.Runtime {
 				NameplateAnchor = go.transform;
 			}
 
-			CreateNameplateAsync(api, NameplateAnchor).Forget();
+			CreateNameplateAsync(api, NameplateAnchor, this.GetCancellationTokenOnDestroy()).Forget();
 		}
 
-		private async UniTaskVoid CreateNameplateAsync(INameplateAPI api, Transform anchor) {
+		private async UniTaskVoid CreateNameplateAsync(INameplateAPI api, Transform anchor, CancellationToken cancellationToken) {
 			_creatingNameplate = true;
 			try {
-				var plate = await api.Instantiate(anchor);
+				var plate = await api.Instantiate(anchor, cancellationToken);
 				if (!plate.IsAlive())
 					return;
 

@@ -28,10 +28,11 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		private const string DefaultId = "xr";
 
 		/// <summary>
-		/// Get the proxy mod API.
+		/// Get the proxy mod API, or <c>null</c> when the loader is not initialized yet (edit mode, start-up) or when
+		/// the controllers mod is missing: every caller works with a missing API instead of throwing.
 		/// </summary>
 		private static IControllerAPI ControllerAPI
-			=> Client.CoreAPI.ModAPI
+			=> Client.CoreAPI?.ModAPI
 				.GetMod("controllers")
 				?.GetInstance<IControllerAPI>();
 
@@ -40,18 +41,19 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 		/// </summary>
 		/// <returns></returns>
 		private static bool IsBetterThanCurrent() {
-			var controller = ControllerAPI.Current;
+			var controller = ControllerAPI?.Current;
 			return controller == null
 				|| controller.GetPriority() < DefaultPriority
 				|| controller.GetId() == DefaultId;
 		}
 
 		/// <summary>
-		/// Check if the current proxy is the XR proxy.
+		/// Check if the current proxy is the XR proxy. <c>false</c> when the controllers API cannot be read (not
+		/// playing, mod not initialized): the answer is only meaningful while the game runs.
 		/// </summary>
 		/// <returns></returns>
 		internal static bool IsCurrent() {
-			var controller = ControllerAPI.Current;
+			var controller = ControllerAPI?.Current;
 			return controller != null
 				&& controller.GetId() == DefaultId;
 		}
@@ -66,7 +68,14 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 			return true;
 		}
 
-		public static async UniTask<bool> Make() {
+		/// <summary>
+		/// Creates the XR proxy (the AutoHand rig), makes it the current controller and starts its avatar.
+		/// </summary>
+		/// <param name="cancellationToken">
+		/// Owns the creation: the proxy and everything it instantiates (its menu) must not be built once
+		/// the caller is gone. Cancelled, the half-built proxy is dropped.
+		/// </param>
+		public static async UniTask<bool> Make(CancellationToken cancellationToken = default) {
 			// Idempotent: the proxy is already the current controller.
 			if (IsCurrent()) {
 				Logger.LogDebug("XR proxy already current, nothing to create.", tag: nameof(XRController));
@@ -78,9 +87,14 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 				return false;
 			}
 
-			var wait = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+			using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			wait.CancelAfter(TimeSpan.FromSeconds(30));
+
 			await Client.Instance.WaitReady(wait.Token)
 				.SuppressCancellationThrow();
+
+			if (cancellationToken.IsCancellationRequested)
+				return false;
 
 			if (!XRLoaderManager.IsRunning) {
 				Logger.LogError("XR system failed to initialize, cannot create XR proxy");
@@ -93,33 +107,71 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 				return false;
 			}
 
-			var xr = await prefab.InstantiateAsync<XRController>();
+			XRController xr;
+			try {
+				xr = await prefab.InstantiateAsync<XRController>(cancellationToken: cancellationToken);
+			} catch (OperationCanceledException) {
+				// The caller went away before the prefab was ready: nothing to drop.
+				return false;
+			}
+
 			if (!xr) {
 				Logger.LogError("Failed to get XR proxy component");
 				return false;
 			}
 
-			xr.gameObject.name = $"[{xr.GetType().Name}_{ComponentExtension.GetId(xr)}]";
-
-			if (xr.eventSystem)
-				xr.eventSystem.enabled = false;
-
-			await xr.Menu.Generate();
-
-			await UniTask.NextFrame(cancellationToken: wait.Token);
-
-			if (!await ControllerAPI.SetCurrent(xr)) {
-				Logger.LogError("Failed to set XR proxy as current");
+			if (!xr.Menu) {
+				Logger.LogError("XR menu provider is not configured in the prefab");
 				xr.gameObject.Destroy();
 				return false;
 			}
 
-			await UniTask.DelayFrame(3, cancellationToken: wait.Token);
+			xr.gameObject.name = $"[{xr.GetType().Name}] {ComponentExtension.GetId(xr)}";
+
+			if (xr.eventSystem)
+				xr.eventSystem.enabled = false;
+
+			var isCurrent = false;
+			try {
+				if (!await xr.Menu.Generate(cancellationToken)) {
+					Logger.LogError("Failed to generate the XR proxy menu");
+					xr.gameObject.Destroy();
+					return false;
+				}
+
+				await UniTask.NextFrame(cancellationToken: cancellationToken);
+				cancellationToken.ThrowIfCancellationRequested();
+
+				if (!await ControllerAPI.SetCurrent(xr)) {
+					Logger.LogError("Failed to set XR proxy as current");
+					xr.Menu.Dispose();
+					xr.gameObject.Destroy();
+					return false;
+				}
+				isCurrent = true;
+
+				await UniTask.DelayFrame(3, cancellationToken: cancellationToken);
+			} catch (OperationCanceledException) {
+				// The caller went away: drop the proxy instead of finishing its creation.
+				xr.Menu.Dispose();
+
+				if (isCurrent && ControllerAPI != null)
+					await ControllerAPI.SetCurrent(null);
+
+				xr.gameObject.Destroy();
+				return false;
+			}
 
 			if (xr.eventSystem)
 				xr.eventSystem.enabled = true;
 
-			xr.avatarLoader.SetupAvatar().Forget();
+			xr.gameObject.DontDestroyOnLoad();
+
+			if (!xr.avatarLoader) {
+				Logger.LogError("XR avatar loader is not configured in the prefab");
+			} else {
+				xr.avatarLoader.SetupAvatar().Forget();
+			}
 
 			return true;
 		}
@@ -166,9 +218,6 @@ public partial class XRController : MonoBehaviour, IController, IControllerAvata
 
 		/// <summary>Default view height, used until an avatar provides its own size.</summary>
 		private const float DefaultViewHeight = 1.7f;
-
-		/// <summary>Autohand prefab default for <see cref="AutoHandPlayer.minMaxHeight"/>.</summary>
-		private const float AutoHandDefaultMaxHeight = 2.5f;
 
 		/// <summary>Below this height the view is considered to start under the floor.</summary>
 		private const float MinPlausibleViewHeight = 0.5f;
