@@ -11,6 +11,7 @@
 		"Nox.XR.Calibration",
 		"Nox.Avatars.Hand",
 		"Nox.UI",
+		"Nox.CCK.UI",
 		"UniTask",
 		"Unity.XR.CoreUtils",
 		"Unity.XR.Interaction.Toolkit"

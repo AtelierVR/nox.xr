@@ -6,6 +6,7 @@ using Nox.XR.Player;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Controller.V2 {
@@ -38,6 +39,13 @@ namespace Nox.XR.Controller.V2 {
 			get => interactionManager;
 			set => interactionManager = value;
 		}
+
+		/// <summary>
+		/// Scales the EventSystem drag threshold for tracked devices (the prefab ships 2). A poke that drifts
+		/// past it while pressed is a drag, which cancels the click: the button plays its hover sound and never
+		/// fires. Raised so hand jitter and a small finger slide stay within a click.
+		/// </summary>
+		private const float TRACKED_DRAG_THRESHOLD_MULTIPLIER = 4f;
 
 		[Header("Grab")]
 		[SerializeField, Tooltip("Give every hand part a near grabber, a distance grabber and the input that drives them.")]
@@ -85,6 +93,10 @@ namespace Nox.XR.Controller.V2 {
 
 			if (EventSystem.current != eventSystem)
 				EventSystem.current = eventSystem;
+
+			var module = eventSystem.GetComponent<XRUIInputModule>();
+			if (module)
+				module.trackedDeviceDragThresholdMultiplier = TRACKED_DRAG_THRESHOLD_MULTIPLIER;
 		}
 
 		/// <summary>See <see cref="Nox.Controllers.IController.GetEventSystem"/>.</summary>
@@ -101,7 +113,13 @@ namespace Nox.XR.Controller.V2 {
 		/// still receives its grabbers.
 		/// </summary>
 		private void SetupInteraction() {
-			if (!player || !enableGrab)
+			if (!player)
+				return;
+
+			var feedback = gameObject.GetOrAddComponent<HandUiFeedback>();
+			feedback.Player = player;
+
+			if (!enableGrab)
 				return;
 
 			player.OnPartRegistered.RemoveListener(OnInteractionPartRegistered);
@@ -160,6 +178,8 @@ namespace Nox.XR.Controller.V2 {
 
 			hand.gameObject.GetOrAddComponent<HandSkeletonPose>()
 				.Configure(hand, grabber);
+
+			hand.gameObject.GetOrAddComponent<HandNearFar>();
 		}
 
 		/// <summary>Releases the hand that is going away.</summary>
