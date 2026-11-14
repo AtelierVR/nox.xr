@@ -40,6 +40,8 @@
     "Nox.KeyBinding",
     "Nox.Settings",
     "Nox.CCK.Settings",
+    "Nox.Notifications",
+    "Nox.CCK.Notifications",
     "Nox.Audio",
     "Nox.Sessions",
     "Nox.CCK.Audio",

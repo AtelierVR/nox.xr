@@ -76,6 +76,11 @@
       "register": "git+https://github.com/AtelierVR/nox.settings.git"
     },
     {
+      "id": "notifications",
+      "type": "recommends",
+      "register": "git+https://github.com/AtelierVR/nox.notifications.git"
+    },
+    {
       "id": "ui",
       "type": "depends",
       "version": ">=1.0.0",
