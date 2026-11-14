@@ -21,14 +21,14 @@ using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 
 		private void CreateVisuals() {
 			ClearVisuals();
 
 			_visualsRoot = new GameObject("FBT Calibration Visuals").transform;
-			_visualsRoot.SetParent(player ? player.transform : transform, false);
+			_visualsRoot.SetParent(Root, false);
 		}
 
 		private void UpdateTrackerVisuals() {

@@ -21,7 +21,7 @@ using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 
 		private void TickCalibration() {
@@ -144,24 +144,24 @@ namespace Nox.XR.Runtime.Tracking {
 					continue;
 
 				var tracker = pair.Value;
-				var inverse = Quaternion.Inverse(tracker.Rotation);
-				var offset  = inverse * (boneTransform.position - tracker.Position);
+				var delta   = boneTransform.position - tracker.Position;
 
-				// The hips are driven with the tracker's yaw (see TickDriving), so the offset is measured in the
-				// same frame.
-				if (pair.Key == HumanBodyBones.Hips && YawOf(tracker.Rotation) is { } captureYaw)
-					offset = Quaternion.Inverse(captureYaw) * (boneTransform.position - tracker.Position);
+				var binding = new TrackerBinding {
+					TrackerId       = tracker.Id,
+					Rig             = pair.Key.ToIndex(),
+					CaptureRotation = tracker.Rotation,
+					Scale           = scale
+				};
+
+				var frame  = CalibrationService.Frame(binding, tracker.Rotation);
+				var offset = Quaternion.Inverse(frame) * delta;
 
 				if (offset.magnitude > EffectiveRange)
 					Logger.LogWarning($"Calibration: {pair.Key} est ÃƒÂ  {offset.magnitude:0.##} m de {tracker.Id} Ã¢â‚¬â€ la pose de calibration semble fausse (l'avatar doit ÃƒÂªtre en pose {AvatarPose.Calibration} pendant la calibration), l'offset risque d'ÃƒÂªtre inutilisable.", this, tag: nameof(CalibrationManager));
 
-				list.Add(new TrackerBinding {
-					TrackerId      = tracker.Id,
-					Rig            = pair.Key.ToIndex(),
-					OffsetPosition = offset,
-					OffsetRotation = inverse * boneTransform.rotation,
-					Scale          = scale
-				});
+				binding.OffsetPosition = offset;
+				binding.OffsetRotation = Quaternion.Inverse(frame) * boneTransform.rotation;
+				list.Add(binding);
 			}
 
 			_data = new CalibrationData { Bindings = list.ToArray() };

@@ -1,15 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using Autohand;
+using Nox.Avatars;
 using Nox.Avatars.Parameters;
 using Nox.Avatars.Rigging;
 using Nox.Avatars.Scale;
 using Nox.Avatars.StateMachines;
-using Nox.CCK.Avatars.Playable;
-using Nox.CCK.Avatars.Rigging;
 using Nox.CCK.Entities;
-using Nox.CCK.Utils;
-using Nox.CCK.XR;
+using Nox.CCK.Events;
 using Nox.Settings;
 using Nox.XR.Calibration;
 using CalibrationService = Nox.XR.Calibration.Calibration;
@@ -17,7 +15,6 @@ using Nox.XR.Runtime.Connectors;
 using Nox.XR.Runtime.Settings;
 using Nox.XR.Trackers;
 using UnityEngine;
-using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
@@ -27,6 +24,46 @@ namespace Nox.XR.Runtime.Tracking {
 
 		public AvatarLoaderConnector avatarLoader;
 		public AutoHandPlayer         player;
+
+		[Tooltip("Avatar calibrated by this manager when the proxy hosting it has no AvatarLoaderConnector (v2 player rig).")]
+		[System.NonSerialized] public IRuntimeAvatar avatar;
+
+		[Tooltip("Root the calibration visuals are parented to when the proxy has no AutoHandPlayer.")]
+		public Transform root;
+
+		[Tooltip("Write the calibrated bones directly on the rig. The v2 rig does not need it: its parts follow the calibrated poses themselves.")]
+		public bool driveRigParts = true;
+
+		[Tooltip("Align the avatar root on the head while calibrating. Must be off on a proxy whose avatar container already follows the head: the two alignments add up and the avatar slides away.")]
+		public bool alignAvatarRoot = true;
+
+		[Tooltip("Pose the head of the avatar must reach while calibrating: the view of the player (eyes). Falls back to the head target of the rig.")]
+		public Transform headReference;
+
+		/// <summary>Raised when a calibration starts (true) and when it is saved or cancelled (false).</summary>
+		public static readonly NoxEvent<bool> CalibrationStateChanged = new();
+
+		/// <summary>Avatar being calibrated: the loader of the v1 proxy, or the one bound by the v2 proxy.</summary>
+		public IRuntimeAvatar Avatar
+			=> avatarLoader ? avatarLoader.GetAvatar() : avatar;
+
+		/// <summary>Root the calibration visuals are parented to.</summary>
+		private Transform Root
+			=> player ? player.transform : root ? root : transform;
+
+		/// <summary>Binds the avatar of a proxy that has no AvatarLoaderConnector.</summary>
+		public void Bind(IRuntimeAvatar target, Transform visualsRoot, bool driveParts = true, bool alignRoot = true) {
+			avatar        = target;
+			root          = visualsRoot;
+			driveRigParts = driveParts;
+			alignAvatarRoot = alignRoot;
+		}
+
+		/// <summary>Forgets the avatar bound to this manager.</summary>
+		public void Unbind() {
+			avatar = null;
+			root   = null;
+		}
 
 		/// <summary>Bones already reported as having no IK target.</summary>
 		private readonly HashSet<HumanBodyBones> _missingParts = new();
@@ -84,7 +121,8 @@ namespace Nox.XR.Runtime.Tracking {
 
 		private void OnDestroy() {
 			DriverTargets.Clear();
-			SetExternalRootControl(false);
+			if (driveRigParts)
+				SetExternalRootControl(false);
 			if (Instance == this)
 				Instance = null;
 		}
@@ -112,7 +150,20 @@ namespace Nox.XR.Runtime.Tracking {
 			// The avatar is in its calibration pose, so the rig targets are not written.
 			if (IsCalibrating) {
 				DriverTargets.Clear();
-				ApplyCalibrationRoot();
+				if (alignAvatarRoot)
+					ApplyCalibrationRoot();
+				return;
+			}
+
+			// The v2 rig follows the calibrated poses through its parts: the scale it must compensate
+			// still comes from here.
+			if (!driveRigParts || !FullBodyTrackingSetting.Value) {
+				DriverTargets.Clear();
+				CalibrationService.SetScale(AvatarScale);
+
+				if (driveRigParts)
+					ReleaseDrivenBones();
+
 				return;
 			}
 
@@ -197,8 +248,10 @@ namespace Nox.XR.Runtime.Tracking {
 
 			SetPose(AvatarPose.Calibration);
 			SetExternalRootControl(true);
+			SetReferencePose(true);
 
 			CreateVisuals();
+			CalibrationStateChanged.Invoke(true);
 			NotifySettingsMenu();
 			Logger.Log($"Full-body calibration started (pose {AvatarPose.Calibration}).", this, tag: nameof(CalibrationManager));
 		}
@@ -215,8 +268,11 @@ namespace Nox.XR.Runtime.Tracking {
 			CalibrationService.Publish(_data, AvatarScale);
 
 			ClearVisuals();
+			SetReferencePose(false);
 			SetPose(AvatarPose.Normal);
-			SetExternalRootControl(false);
+			if (driveRigParts)
+				SetExternalRootControl(false);
+			CalibrationStateChanged.Invoke(false);
 			NotifySettingsMenu();
 			Logger.Log($"Full-body calibration saved ({_data.Bindings.Length} tracker(s)).", this, tag: nameof(CalibrationManager));
 		}
@@ -230,10 +286,13 @@ namespace Nox.XR.Runtime.Tracking {
 			_restartCooldown = RestartCooldown;
 			_matches.Clear();
 			ClearVisuals();
+			SetReferencePose(false);
 			SetPose(AvatarPose.Normal);
 			_data = CalibrationStore.Load();
 			CalibrationService.Publish(_data, AvatarScale);
-			SetExternalRootControl(false);
+			if (driveRigParts)
+				SetExternalRootControl(false);
+			CalibrationStateChanged.Invoke(false);
 			NotifySettingsMenu();
 		}
 
@@ -242,6 +301,7 @@ namespace Nox.XR.Runtime.Tracking {
 			_data = new CalibrationData();
 			CalibrationStore.Clear();
 			CalibrationService.Publish(_data, AvatarScale);
+			CalibrationStateChanged.Invoke(false);
 			NotifySettingsMenu();
 		}
 
@@ -255,23 +315,43 @@ namespace Nox.XR.Runtime.Tracking {
 			=> CalibrationRangeSetting.Value * Mathf.Max(0.01f, AvatarScale);
 
 		/// <summary>
-		/// Aligns the avatar root on the head during a calibration (same X/Z and same yaw), so the player can line
-		/// up their avatar with their body. The Y is left alone, <c>AvatarSyncConnector</c> handles it.
+		/// Places the avatar under the player while calibrating: the head bone lands on the reference (the eyes, see
+		/// <see cref="headReference"/>) and the body takes its yaw.
+		/// <para>
+		/// The body is in its reference pose (straight legs and spine, see <see cref="SetReferencePose"/>) and the
+		/// avatar is usually taller than the player, so the root has to sink for the head to reach the eyes: the feet
+		/// then go under the floor. That is the point, the pose has to stay the same for every avatar and the player
+		/// cannot be stretched, and the offsets captured from it are measured in that pose.
+		/// </para>
+		/// <para>
+		/// The head bone offset in the root frame is constant while the body holds its pose, so subtracting it lands the
+		/// head on the reference and keeps it there, instead of adding the offset on every frame (which made the avatar
+		/// slide away).
+		/// </para>
 		/// </summary>
 		private void ApplyCalibrationRoot() {
 			var anchor = GetAnchor()?.transform;
-			var head   = GetHeadTransform();
-			if (!anchor || !head)
+			if (!anchor)
 				return;
 
-			var position = anchor.position;
-			var headPos  = head.position;
-			anchor.position = new Vector3(headPos.x, position.y, headPos.z);
+			var head      = GetRig()?.GetBone(HumanBodyBones.Head);
+			var reference = headReference ? headReference : GetHeadTransform();
+			if (!reference)
+				return;
 
-			var forward = head.forward;
+			var forward = reference.forward;
 			forward.y = 0f;
 			if (forward.sqrMagnitude > 0.0001f)
 				anchor.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+
+			var position = anchor.position;
+			if (!head) {
+				anchor.position = new Vector3(reference.position.x, position.y, reference.position.z);
+				return;
+			}
+
+			var offset = anchor.TransformVector(anchor.InverseTransformPoint(head.position));
+			anchor.position = new Vector3(reference.position.x - offset.x, reference.position.y - offset.y, reference.position.z - offset.z);
 		}
 
 		/// <summary>Head target of the rig (the one the head bone follows), or <c>null</c>.</summary>
@@ -284,27 +364,38 @@ namespace Nox.XR.Runtime.Tracking {
 		private void SetExternalRootControl(bool external)
 			=> GetRig()?.SetExternalRootControl(external);
 
+		/// <summary>
+		/// Asks the rig to hold the reference pose of a calibration: body upright, arms and legs straight, feet on the
+		/// ground. The limbs are handed back to the animation during a calibration, so the pose is written on the bones
+		/// by the rig itself instead of going through the IK targets.
+		/// </summary>
+		private void SetReferencePose(bool enabled) {
+			var rig = GetRig();
+			if (rig != null)
+				rig.ReferencePose = enabled;
+		}
+
 		private GameObject GetAnchor()
-			=> avatarLoader?.GetAvatar()?.Descriptor?.Anchor;
+			=> Avatar?.Descriptor?.Anchor;
 
 		private float AvatarScale
-			=> avatarLoader?.GetAvatar()?.Descriptor?
+			=> Avatar?.Descriptor?
 				.GetModules<IScaleAvatarModule>()
 				.FirstOrDefault()?.Scale ?? 1f;
 
 		private IRigging GetRig()
-			=> avatarLoader?.GetAvatar()?.Descriptor
+			=> Avatar?.Descriptor
 				?.GetModules<IRigProvider>()
 				.FirstOrDefault()
 				?.Rig;
 
 		private IPlayableLayerModule GetPlayableLayers()
-			=> avatarLoader?.GetAvatar()?.Descriptor?
+			=> Avatar?.Descriptor?
 				.GetModules<IPlayableLayerModule>()
 				.FirstOrDefault();
 
 		private IParameterModule GetParameters()
-			=> avatarLoader?.GetAvatar()?.Descriptor?
+			=> Avatar?.Descriptor?
 				.GetModules<IParameterModule>()
 				.FirstOrDefault();
 

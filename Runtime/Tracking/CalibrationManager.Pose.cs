@@ -21,7 +21,7 @@ using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 
 		/// <summary>

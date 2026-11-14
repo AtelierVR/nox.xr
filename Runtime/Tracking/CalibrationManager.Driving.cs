@@ -1,27 +1,16 @@
 using System.Collections.Generic;
-using System.Linq;
-using Autohand;
-using Nox.Avatars.Parameters;
 using Nox.Avatars.Rigging;
-using Nox.Avatars.Scale;
-using Nox.Avatars.StateMachines;
-using Nox.CCK.Avatars.Playable;
 using Nox.CCK.Avatars.Rigging;
 using Nox.CCK.Entities;
 using Nox.CCK.Utils;
-using Nox.CCK.XR;
-using Nox.Settings;
 using Nox.XR.Calibration;
 using CalibrationService = Nox.XR.Calibration.Calibration;
-using Nox.XR.Runtime.Connectors;
-using Nox.XR.Runtime.Settings;
 using Nox.XR.Trackers;
 using UnityEngine;
-using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 		/// IK targets of the tracked bones (key = part index), published so the controller can expose them as
 		/// parts: that channel (threshold, interpolation, batching) is what lets a viewer replay the pose applied
@@ -65,12 +54,12 @@ namespace Nox.XR.Runtime.Tracking {
 			var scale = AvatarScale;
 			CalibrationService.SetScale(scale);
 
+			(Vector3 Position, Quaternion Rotation, Vector3 Velocity, Vector3 Angular)? hips = null;
+
 			foreach (var binding in _data.Bindings) {
 				var bone  = binding.Rig.ToHumanBodyBones();
 				var found = FindTracker(binding.TrackerId);
 
-				// A tracker that is gone hands the bone back to the animation instead of leaving it frozen on its
-				// last pose; publishing the animated reference pose keeps both channels consistent.
 				if (found == null) {
 					rig.SetTracking(bone, RiggingTrackingMode.Normal);
 					if (rig.IsActive(bone))
@@ -86,52 +75,135 @@ namespace Nox.XR.Runtime.Tracking {
 					continue;
 				}
 
-				// A present tracker wins over the pose asked by the avatar: the target is always written.
 				rig.SetTracking(bone, RiggingTrackingMode.Tracking);
 				rig.SetActive(bone, true);
 				SetTrackingActive(bone, true);
 
 				var tracker = found.Value;
 
-				// Only the avatar scale changed since the capture is compensated.
-				var scaleFactor = binding.Scale > 0f ? scale / binding.Scale : 1f;
-				var offset      = tracker.Rotation * (binding.OffsetPosition * scaleFactor);
+				CalibrationService.Apply(binding, tracker.Position, tracker.Rotation, out var position, out var rotation);
 
-				// The hips follow the tracker's yaw only, so tilting the tracker does not move the pelvis vertically.
-				if (bone == HumanBodyBones.Hips) {
-					var yaw = YawOf(tracker.Rotation);
-					if (yaw.HasValue)
-						offset = yaw.Value * (binding.OffsetPosition * scaleFactor);
-				}
-
-				var position = tracker.Position + offset;
-				var rotation = tracker.Rotation * binding.OffsetRotation;
-
-				// Published as a controller part: a viewer replays it through the parts channel.
 				DriverTargets[bone.ToIndex()] = (position, rotation, tracker.Velocity, tracker.AngularVelocity);
 
 				if (RigPartDriver.Write(rig, bone.ToIndex(), position, rotation))
 					_missingParts.Remove(bone);
 				else if (_missingParts.Add(bone))
 					Logger.LogWarning($"Full-body tracking: no IK target for {bone} on the rig, this bone will not follow its tracker.", this, tag: nameof(CalibrationManager));
+
+				if (bone == HumanBodyBones.Hips) {
+					DrivePelvisWeight(rig, binding, tracker);
+					hips = DriverTargets[bone.ToIndex()];
+				}
 			}
+
+			if (hips is { } pelvis)
+				ClampPelvis(rig, pelvis);
 		}
 
-		/// <summary>
-		/// Yaw of <paramref name="rotation"/> (rotation around the vertical axis), used for the hips so their
-		/// position offset does not follow the tracker's pitch or roll. Null when the yaw cannot be defined.
-		/// </summary>
-		private static Quaternion? YawOf(Quaternion rotation) {
-			var forward = rotation * Vector3.forward;
-			forward.y = 0f;
-			if (forward.sqrMagnitude < 0.0001f) {
-				forward = rotation * Vector3.up;
-				forward.y = 0f;
-				if (forward.sqrMagnitude < 0.0001f)
-					return null;
-			}
+		private const float SpineMinRatio = 0.85f;
 
-			return Quaternion.LookRotation(forward.normalized, Vector3.up);
+		private static void DrivePelvisWeight(IRigging rig, TrackerBinding binding, TrackerPose tracker) {
+			var weight = CalibrationService.PelvisPositionWeight(binding, tracker.Rotation);
+
+			foreach (var parameter in rig.GetParameters()) {
+				if (parameter.Name != "Rig/Ik/Hips/PositionWeight")
+					continue;
+
+				parameter.Value = weight;
+				return;
+			}
+		}
+		private void ReleaseDrivenBones() {
+			var rig = GetRig();
+			if (rig == null)
+				return;
+
+			foreach (var binding in _data.Bindings) {
+				var bone = binding.Rig.ToHumanBodyBones();
+
+				rig.SetTracking(bone, RiggingTrackingMode.Normal);
+
+				if (rig.IsActive(bone))
+					rig.SetActive(bone, false);
+
+				SetTrackingActive(bone, false);
+
+				var reference = ReferenceBone(rig, bone);
+				if (reference)
+					RigPartDriver.Write(rig, bone.ToIndex(), reference.position, reference.rotation);
+			}
+		}
+		private void ClampPelvis(IRigging rig, (Vector3 Position, Quaternion Rotation, Vector3 Velocity, Vector3 Angular) pelvis) {
+			var position = LimitToLegReach(rig, pelvis.Position);
+			position = KeepSpineLength(rig, position);
+
+			if ((position - pelvis.Position).sqrMagnitude < 0.000001f)
+				return;
+
+			RigPartDriver.Write(rig, HumanBodyBones.Hips.ToIndex(), position, pelvis.Rotation);
+			DriverTargets[HumanBodyBones.Hips.ToIndex()] = (position, pelvis.Rotation, pelvis.Velocity, pelvis.Angular);
+		}
+
+		private static Vector3 LimitToLegReach(IRigging rig, Vector3 position) {
+			if (!RigPartDriver.TryGetPart(rig, HumanBodyBones.LeftFoot.ToIndex(), out var left) || !RigPartDriver.TryGetPart(rig, HumanBodyBones.RightFoot.ToIndex(), out var right))
+				return position;
+
+			var reach = LegReach(rig);
+			if (reach <= 0.01f)
+				return position;
+
+			var feet     = (left.position + right.position) * 0.5f;
+			var offset   = position - feet;
+			var distance = offset.magnitude;
+
+			return distance > reach ? feet + offset * (reach / distance) : position;
+		}
+
+		private static Vector3 KeepSpineLength(IRigging rig, Vector3 position) {
+			if (!RigPartDriver.TryGetPart(rig, HumanBodyBones.Head.ToIndex(), out var head))
+				return position;
+
+			var min = SpineLength(rig) * SpineMinRatio;
+			if (min <= 0.01f)
+				return position;
+
+			var offset   = position - head.position;
+			var distance = offset.magnitude;
+
+			if (distance >= min || distance < 0.0001f)
+				return position;
+
+			return head.position + offset * (min / distance);
+		}
+
+		private static float SpineLength(IRigging rig) {
+			var hips  = rig.GetBone(HumanBodyBones.Hips);
+			var spine = rig.GetBone(HumanBodyBones.Spine);
+			var chest = rig.GetBone(HumanBodyBones.Chest);
+			var neck  = rig.GetBone(HumanBodyBones.Neck);
+			var head  = rig.GetBone(HumanBodyBones.Head);
+
+			if (!hips || !spine || !head || !chest || !neck)
+				return 0f;
+
+			return Vector3.Distance(hips.position, spine.position)
+			       + Vector3.Distance(spine.position, chest.position)
+			       + Vector3.Distance(chest.position, neck.position)
+			       + Vector3.Distance(neck.position, head.position);
+		}
+
+		private static float LegReach(IRigging rig) {
+			var thigh = rig.GetBone(HumanBodyBones.LeftUpperLeg);
+			var calf  = rig.GetBone(HumanBodyBones.LeftLowerLeg);
+			var foot  = rig.GetBone(HumanBodyBones.LeftFoot);
+			var toes  = rig.GetBone(HumanBodyBones.LeftToes);
+
+			if (!thigh || !calf || !foot)
+				return 0f;
+
+			var reach = Vector3.Distance(thigh.position, calf.position) + Vector3.Distance(calf.position, foot.position);
+
+			return toes ? reach + Vector3.Distance(foot.position, toes.position) : reach;
 		}
 
 		/// <summary>

@@ -21,7 +21,7 @@ using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 
 		/// <summary>Duration of the T-pose capture started by <see cref="StartMetricsEstimate"/>.</summary>
@@ -68,13 +68,22 @@ namespace Nox.XR.Runtime.Tracking {
 		private void TickMetricsEstimate() {
 			_metricsRemaining -= Time.unscaledDeltaTime;
 
+			// The v1 proxy reads the AutoHand player; the v2 one has no AutoHandPlayer, so the poses come from
+			// the input provider.
 			var camera = player && player.headCamera ? player.headCamera.transform : null;
-			if (camera)
+			if (camera) {
 				_metricsEyeHeight = Mathf.Max(_metricsEyeHeight, camera.position.y);
+			} else if (XRInputs.GetHeadsetPose(out var headPosition, out _)) {
+				_metricsEyeHeight = Mathf.Max(_metricsEyeHeight, headPosition.y);
+			}
 
 			// In T-pose the hand span is the arm span (wrist to wrist).
-			if (player && player.handLeft && player.handRight)
+			if (player && player.handLeft && player.handRight) {
 				_metricsArmSpan = Mathf.Max(_metricsArmSpan, Vector3.Distance(player.handLeft.transform.position, player.handRight.transform.position));
+			} else if (XRInputs.GetLeftHandPose(out var leftPosition, out _)
+			           && XRInputs.GetRightHandPose(out var rightPosition, out _)) {
+				_metricsArmSpan = Mathf.Max(_metricsArmSpan, Vector3.Distance(leftPosition, rightPosition));
+			}
 
 			var second = Mathf.CeilToInt(Mathf.Max(0f, _metricsRemaining));
 			if (second != _metricsShownSecond) {
@@ -110,7 +119,7 @@ namespace Nox.XR.Runtime.Tracking {
 		/// model's rest pose, so it does not follow the animation or the trackers.
 		/// </summary>
 		private float AvatarHeight()
-			=> avatarLoader?.GetAvatar()?.Descriptor
+			=> Avatar?.Descriptor
 				?.GetModules<IScaleAvatarModule>()
 				.FirstOrDefault()?.Height ?? 0f;
 

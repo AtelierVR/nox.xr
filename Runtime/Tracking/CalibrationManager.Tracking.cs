@@ -21,7 +21,7 @@ using UnityEngine.XR;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Runtime.Tracking {
-	
+
 	public partial class CalibrationManager : MonoBehaviour {
 		/// <summary>
 		/// Bones a tracker may be assigned to: the parts the avatar's rig exposes, converted to humanoid bones.
@@ -70,7 +70,15 @@ namespace Nox.XR.Runtime.Tracking {
 		/// tracker driving) from being offered or applied outside of XR (desktop mode, other proxies).
 		/// </summary>
 		public static bool IsXRControllerActive
-			=> XRController.IsCurrent();
+			=> XRProxySpawner.IsProxyCurrent();
+
+		/// <summary>
+		/// Whether full-body calibration can run: the calibration component exists (an XR proxy carrying it was
+		/// created) and it is the active controller. The FBT settings stay visible but are shown disabled when
+		/// it is false, instead of disappearing from the page.
+		/// </summary>
+		public static bool IsAvailable
+			=> Instance != null && IsXRControllerActive;
 
 		/// <summary>
 		/// Usable trackers right now, with the same filters as the calibration: hands and controllers are
