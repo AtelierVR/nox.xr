@@ -134,7 +134,7 @@ namespace Nox.XR.Runtime.Connectors {
 			Gizmos.Color = new Color(0.75f, 0.75f, 0.75f, 1f);
 			Gizmos.DrawWireCube(centre, col.bounds.size);
 
-			// Allowed side: circle inscribed on that face + a cone towards it (VRChat-like).
+			// Allowed side: circle inscribed on that face + a cone towards it.
 			if (allowedSide != Vector3.zero) {
 				var normal     = col.transform.TransformDirection(allowedSide.normalized);
 				var halfDepth  = Vector3.Dot(col.bounds.extents, Abs(normal));
