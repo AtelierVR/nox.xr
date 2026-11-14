@@ -7,6 +7,7 @@ using Nox.XR.Runtime;
 using Nox.XR.Runtime.Connectors;
 using Nox.XR.Runtime.Settings;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace Nox.XR.Player {
 	/// <summary>
@@ -31,6 +32,9 @@ namespace Nox.XR.Player {
 
 		/// <summary>Last value of each finger binding, to detect a fully open hand.</summary>
 		private readonly Dictionary<string, float> _values = new();
+
+		/// <summary>Whether each finger is currently considered bent, with hysteresis.</summary>
+		private readonly Dictionary<string, bool> _bent = new();
 
 		private IGrabber _grabber;
 
@@ -80,7 +84,6 @@ namespace Nox.XR.Player {
 			if (!hand)
 				return;
 
-			// The part announces its avatar: the pokes are bound when it arrives, never polled.
 			hand.SourceChanged.RemoveListener(OnSourceChanged);
 			hand.SourceChanged.AddListener(OnSourceChanged);
 			OnSourceChanged(hand.Source);
@@ -153,6 +156,7 @@ namespace Nox.XR.Player {
 
 			_pokes.Clear();
 			_values.Clear();
+			_bent.Clear();
 		}
 
 		/// <summary>
@@ -165,22 +169,24 @@ namespace Nox.XR.Player {
 				return;
 
 			var threshold = PokeSettings.DisablePokePercent;
+			var release   = Mathf.Max(0f, threshold - PokeSettings.BEND_HYSTERESIS);
 			var module    = XRInteractorBinder.Current();
 
-			// A fully open hand would poke with all five fingers: that state is detected here.
 			var allOpen = true;
 			for (var i = 0; i < _pokes.Count; i++) {
 				var key   = _pokes[i].key;
 				var value = Keybindings.GetFloatValue(key);
 				_values[key] = value;
 
-				if (value >= threshold)
+				var wasBent = _bent.TryGetValue(key, out var bent) && bent;
+				var isBent  = value >= (wasBent ? release : threshold);
+				_bent[key]  = isBent;
+
+				if (isBent)
 					allOpen = false;
 			}
 
-			// A hand grabbing something does not poke: it is busy with the object.
-			if (_grabber == null)
-				_grabber = GetComponent<IGrabber>();
+			_grabber ??= GetComponent<IGrabber>();
 
 			var blocked = !PokeSettings.Enabled || (_grabber != null && _grabber.State == GrabState.Held);
 
@@ -191,15 +197,13 @@ namespace Nox.XR.Player {
 
 				var value = _values.TryGetValue(key, out var v) ? v : 0f;
 
-				// An open hand cuts every poke; PokeSettings.OpenHandIndex keeps the index one, to point.
-				var enabled = !blocked && value < threshold
-					&& (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(key)));
+				var interacting = poke.Enable && (poke.hasHover || poke.hasSelection || PressesUi(poke, module));
+				var enabled = !blocked && (interacting
+					|| (value < threshold && (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(key)))));
 
 				if (poke.Enable != enabled)
 					poke.Enable = enabled;
 
-				// Keeps the poke on the manager of the rig and of the UI module in use: a poke built before a
-				// desktop -> VR switch keeps the module of the previous controller and never reaches the UI.
 				XRInteractorBinder.Bind(poke, module);
 			}
 		}
@@ -207,6 +211,10 @@ namespace Nox.XR.Player {
 		/// <summary>Is this finger binding key the index finger (<c>finger.&lt;side&gt;.index</c>)?</summary>
 		private static bool IsIndexFinger(string key)
 			=> key != null && key.EndsWith(".index", StringComparison.Ordinal);
+
+		/// <summary>Whether the poke is currently pressing a UI element through the XR UI module.</summary>
+		private static bool PressesUi(PokeInteractor poke, XRUIInputModule module)
+			=> module && module.GetTrackedDeviceModel(poke, out var model) && model.select;
 
 		/// <summary>Binding key of a finger: <c>finger.&lt;side&gt;.&lt;type&gt;</c>, as <c>XRBinding</c> declares it.</summary>
 		private static string Key(string side, FingerType type)

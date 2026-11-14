@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Autohand;
 using Nox.XR.Runtime.Settings;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace Nox.XR.Runtime.Connectors {
 	/// <summary>
@@ -20,6 +21,7 @@ namespace Nox.XR.Runtime.Connectors {
 	public class HandPokeConnector : MonoBehaviour {
 		private Hand _hand;
 		private readonly Dictionary<string, float> _fingerValues = new();
+		private readonly Dictionary<string, bool> _bent = new();
 		private (string key, PokeInteractor poke)[] _pokes = Array.Empty<(string, PokeInteractor)>();
 
 		/// <summary>
@@ -48,10 +50,10 @@ namespace Nox.XR.Runtime.Connectors {
 			PokeSettings.DisablePercentChanged.RemoveListener(OnDisablePercentChanged);
 		}
 
-		private void OnGlobalPokeChanged(bool _) 
+		private void OnGlobalPokeChanged(bool _)
 			=> RefreshAllPokes();
 
-		private void OnDisablePercentChanged(float _) 
+		private void OnDisablePercentChanged(float _)
 			=> RefreshAllPokes();
 
 		/// <summary>
@@ -68,6 +70,7 @@ namespace Nox.XR.Runtime.Connectors {
 
 		private void RefreshAllPokes() {
 			var threshold = PokeSettings.DisablePokePercent;
+			var release   = Mathf.Max(0f, threshold - PokeSettings.BEND_HYSTERESIS);
 			var module    = XRInteractorBinder.Current();
 
 			// Read every finger and detect a "fully open" hand: NO finger bent past the threshold.
@@ -77,7 +80,12 @@ namespace Nox.XR.Runtime.Connectors {
 				var key   = _pokes[i].key;
 				var value = Keybindings.GetFloatValue(key);
 				_fingerValues[key] = value;
-				if (value >= threshold)
+
+				var wasBent = _bent.TryGetValue(key, out var bent) && bent;
+				var isBent  = value >= (wasBent ? release : threshold);
+				_bent[key]  = isBent;
+
+				if (isBent)
 					allOpen = false;
 			}
 
@@ -93,8 +101,11 @@ namespace Nox.XR.Runtime.Connectors {
 				// A fully open hand cuts every poke by default: an unrestricted open hand would poke with
 				// all five fingers. `PokeSettings.OpenHandIndex` (off by default) restores the opposite -
 				// only the index finger pokes on an open hand, to point with the index and poke.
-				var enabled = !blocked && value < threshold
-					&& (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(_pokes[i].key)));
+				// A poke that is already interacting stays on: cutting it mid-press cancels the UI press and
+				// the player gets the hover sound without the click.
+				var interacting = poke.Enable && (poke.hasHover || poke.hasSelection || PressesUi(poke, module));
+				var enabled = !blocked && (interacting
+					|| (value < threshold && (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(_pokes[i].key)))));
 				if (poke.Enable != enabled)
 					poke.Enable = enabled;
 
@@ -107,6 +118,10 @@ namespace Nox.XR.Runtime.Connectors {
 		/// <summary>Is this finger binding key the index finger (<c>finger.&lt;side&gt;.index</c>)?</summary>
 		private static bool IsIndexFinger(string key)
 			=> key != null && key.EndsWith(".index", StringComparison.Ordinal);
+
+		/// <summary>Whether the poke is currently pressing a UI element through the XR UI module.</summary>
+		private static bool PressesUi(PokeInteractor poke, XRUIInputModule module)
+			=> module && module.GetTrackedDeviceModel(poke, out var model) && model.select;
 
 		private bool IsGrabbing() {
 			var hand = physicalHand != null ? physicalHand : _hand;

@@ -39,11 +39,11 @@ namespace Nox.XR.Runtime.Connectors {
 		/// does too and always stays above the finger colliders whatever the avatar size.
 		/// </summary>
 		[Tooltip("Multiplier applied to the poke's world radius to size its detection depth.")]
-		public float depthMultiplier = 12f;
+		public float depthMultiplier = 5f;
 
 		/// <summary>Lower bound of the poke depth (world metres), so a small avatar still detects from a hand's length.</summary>
 		[Tooltip("Lower bound of the poke depth, in world metres.")]
-		public float minPokeDepth = 0.15f;
+		public float minPokeDepth = 0.08f;
 
 		/// <summary>
 		/// Fraction of the fingertip radius (<see cref="localRadius"/>) the poke point is pushed along the
