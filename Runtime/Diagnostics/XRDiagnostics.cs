@@ -219,7 +219,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 
 			public string Describe(string indent = "  ") {
 				if (!Available)
-					return indent + "full-body calibration component is not present (the XR proxy is not created?).";
+					return indent + "full-body calibration component is not present (the active XR proxy does not provide it).";
 
 				var sb = new StringBuilder();
 				sb.Append(indent).Append("calibrating: ").Append(Calibrating)
@@ -366,8 +366,8 @@ namespace Nox.XR.Runtime.Diagnostics {
 			if (calibration == null)
 				return new TrackingSnapshot { Available = false };
 
-			var avatarLoader = calibration.avatarLoader;
-			var rig          = avatarLoader?.GetAvatar()?.Descriptor
+			var avatar = calibration.Avatar;
+			var rig    = avatar?.Descriptor
 				?.GetModules<IRigProvider>()
 				.FirstOrDefault()?.Rig;
 
@@ -375,7 +375,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 				Available       = true,
 				Calibrating     = calibration.IsCalibrating,
 				HasCalibration  = calibration.HasCalibration,
-				Driving         = calibration.HasCalibration && !calibration.IsCalibrating && IsXRControllerActive(),
+				Driving         = calibration.HasCalibration && !calibration.IsCalibrating && calibration.driveRigParts && IsXRControllerActive(),
 				Range           = calibration.CurrentRange,
 				AvatarScale     = AvatarScale(),
 				Bones           = CalibrationManager.GetAssignableBones(rig)
@@ -472,8 +472,16 @@ namespace Nox.XR.Runtime.Diagnostics {
 		/// its API does not exist before the mods are initialized. The call is guarded because a
 		/// diagnostic runs from editor panels and from the control server, where an exception would
 		/// break the caller (the panel tick, the mod update loop) instead of just reporting.
+		/// <para>
+		/// Outside play mode there is no proxy to be current for: the answer is <c>false</c> without
+		/// touching the API, which keeps the editor panels quiet instead of warning about a state that
+		/// cannot exist yet.
+		/// </para>
 		/// </summary>
 		internal static bool IsXRControllerActive() {
+			if (!Application.isPlaying)
+				return false;
+
 			try {
 				return XRController.IsCurrent();
 			} catch (Exception e) {
@@ -541,7 +549,7 @@ namespace Nox.XR.Runtime.Diagnostics {
 		}
 
 		public static float AvatarScale()
-			=> CalibrationManager.Instance?.avatarLoader?.GetAvatar()?.Descriptor?
+			=> CalibrationManager.Instance?.Avatar?.Descriptor?
 				.GetModules<IScaleAvatarModule>()
 				.FirstOrDefault()?.Scale ?? 1f;
 

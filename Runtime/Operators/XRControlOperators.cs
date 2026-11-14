@@ -179,7 +179,9 @@ namespace Nox.XR.Runtime.Operators {
 			var calibration = CalibrationManager.Instance;
 			if (calibration == null)
 				return UniTask.FromResult<IOutput>(OperatorOutput.Error(
-					"Full-body calibration is unavailable: the XR proxy is not created (no XR session or not the active controller)."
+					XRProxySpawner.IsProxyCurrent()
+						? "Full-body calibration is unavailable: the active XR proxy does not provide it (the v2 player rig has no calibration component)."
+						: "Full-body calibration is unavailable: the XR proxy is not created (no XR session or not the active controller)."
 				));
 
 			var action = (args.Get<string>("action") ?? string.Empty).Trim().ToLowerInvariant();

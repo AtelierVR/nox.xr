@@ -46,6 +46,10 @@
                 <ui:Label name="no-trackers" class="text-center opacity-75 mt-8 hidden" text="No tracker is used by full-body tracking." />
                 <ui:VisualElement name="rows-full-body" class="mt-8" />
                 <ui:VisualElement name="bones" class="list" />
+                <ui:VisualElement class="flex-row align-center mt-8">
+                    <ui:Button name="calibrate" text="Start calibration" class="large me-8" tooltip="Start a full-body calibration, or confirm the one running (same action as the Calibrate setting)." />
+                    <ui:Button name="reset-calibration" text="Reset calibration" class="large" tooltip="Forget the stored full-body calibration (same action as xr_calibrate clear)." />
+                </ui:VisualElement>
             </ui:Foldout>
 
             <!-- Loaders: the nox.xr chain, what XR Plug-in Management has, and how to switch. -->

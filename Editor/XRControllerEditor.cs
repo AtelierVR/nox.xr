@@ -8,6 +8,7 @@ using Nox.CCK.Avatars.Rigging;
 using Nox.CCK.Entities;
 using Nox.XR.Runtime;
 using Nox.XR.Runtime.Settings;
+using Nox.XR.Runtime.Tracking;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.XR.Editor {
@@ -34,9 +35,9 @@ namespace Nox.XR.Editor {
 		/// Toggle persisté : détermine si la XR est armée au démarrage.
 		/// </summary>
 		[MenuItem(XRMenuPath, false, XRActionPriority)]
-		public static void ToggleVR() 
+		public static void ToggleVR()
 			=> EnableXRSetting.Value = !EnableXRSetting.Value;
-		
+
 
 		[MenuItem(XRMenuPath, true)]
 		private static bool ToggleVRValidate() {
@@ -81,6 +82,33 @@ namespace Nox.XR.Editor {
 			return Application.isPlaying && client != null && client.IsRunning;
 		}
 
+		private const string StartCalibrationMenuPath = "Nox/XR/Start Full-Body Calibration";
+		private const string ResetCalibrationMenuPath = "Nox/XR/Reset Full-Body Calibration";
+
+		[MenuItem(StartCalibrationMenuPath, false, XRActionPriority - 2)]
+		public static void StartFullBodyCalibration() {
+			var calibration = CalibrationManager.Instance;
+			if (calibration == null)
+				return;
+
+			if (calibration.IsCalibrating)
+				calibration.ConfirmCalibration();
+			else
+				calibration.StartCalibration();
+		}
+
+		[MenuItem(StartCalibrationMenuPath, true)]
+		private static bool StartFullBodyCalibrationValidate()
+			=> CalibrationManager.Instance != null;
+
+		[MenuItem(ResetCalibrationMenuPath, false, XRActionPriority - 1)]
+		public static void ResetFullBodyCalibration()
+			=> CalibrationManager.Instance?.ClearCalibration();
+
+		[MenuItem(ResetCalibrationMenuPath, true)]
+		private static bool ResetFullBodyCalibrationValidate()
+			=> CalibrationManager.Instance != null;
+
 		private static void SetXRRunning(bool running) {
 			if (!Application.isPlaying) {
 				// Hors Play mode le loader ne peut pas être piloté : on arme/désarme le
@@ -106,7 +134,7 @@ namespace Nox.XR.Editor {
 
 		public override void OnInspectorGUI() {
 			base.OnInspectorGUI();
-			
+
 			var controller = (XRController)target;
 			if (!controller) {
 				EditorGUILayout.LabelField("Controller is null");

@@ -122,6 +122,8 @@ namespace Nox.XR.Editor {
 		private Button _vrButton;
 		private Button _reportButton;
 		private Button _openXrButton;
+		private Button _calibrateButton;
+		private Button _resetCalibrationButton;
 
 		private readonly Dictionary<string, Label>   _rows     = new();
 		private readonly Dictionary<string, Toggle> _toggles  = new();
@@ -210,6 +212,8 @@ namespace Nox.XR.Editor {
 			_vrButton      = _content.Q<Button>("vr");
 			_reportButton  = _content.Q<Button>("report");
 			_openXrButton  = _content.Q<Button>("openxr");
+			_calibrateButton        = _content.Q<Button>("calibrate");
+			_resetCalibrationButton = _content.Q<Button>("reset-calibration");
 
 			CacheFoldouts();
 			BuildRows();
@@ -245,6 +249,12 @@ namespace Nox.XR.Editor {
 
 			if (_reportButton != null)
 				_reportButton.clicked += CopyReport;
+
+			if (_calibrateButton != null)
+				_calibrateButton.clicked += OnCalibrate;
+
+			if (_resetCalibrationButton != null)
+				_resetCalibrationButton.clicked += OnResetCalibration;
 		}
 
 		private void OnAssetsChanged()
@@ -305,7 +315,6 @@ namespace Nox.XR.Editor {
 			Row(_rowsLoaders, "configured", "XR Management");
 
 			// --- Settings ----------------------------------------------------------------
-			Row(_rowsSettings, "ipd",       "IPD");
 			Row(_rowsSettings, "poke-pct",  "Poke threshold");
 		}
 
@@ -516,7 +525,7 @@ namespace Nox.XR.Editor {
 
 			Set("calibration",
 				!snapshot.Available
-					? "Component not present (no XR proxy?)"
+					? "Component not present (proxy without calibration)"
 					: snapshot.Calibrating
 						? "Running..."
 						: snapshot.HasCalibration ? "Stored" : "None",
@@ -620,7 +629,6 @@ namespace Nox.XR.Editor {
 		}
 
 		private void RefreshSettings() {
-			Set("ipd", $"{IPDSetting.Value * 100f:0.00} cm");
 			Set("poke-pct", $"{PokeSettings.DisablePokePercent * 100f:0} %");
 
 			// Values are re-read every tick: a setting changed in the XR settings window must show up
@@ -641,6 +649,35 @@ namespace Nox.XR.Editor {
 				_vrButton.text = state.LoaderRunning ? "Stop VR" : "Start VR";
 				_vrButton.SetEnabled(Client.Instance != null);
 			}
+
+			var calibration = CalibrationManager.Instance;
+
+			if (_calibrateButton != null) {
+				_calibrateButton.text = calibration is { IsCalibrating: true }
+					? "Confirm calibration"
+					: "Start calibration";
+				_calibrateButton.SetEnabled(calibration != null);
+			}
+
+			_resetCalibrationButton?.SetEnabled(calibration != null);
+		}
+
+		private void OnCalibrate() {
+			var calibration = CalibrationManager.Instance;
+			if (calibration == null)
+				return;
+
+			if (calibration.IsCalibrating)
+				calibration.ConfirmCalibration();
+			else
+				calibration.StartCalibration();
+
+			Refresh();
+		}
+
+		private void OnResetCalibration() {
+			CalibrationManager.Instance?.ClearCalibration();
+			Refresh();
 		}
 
 		#endregion
