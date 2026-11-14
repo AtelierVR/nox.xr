@@ -81,9 +81,9 @@ namespace Nox.XR.Runtime.Connectors {
 		public IRuntimeAvatar GetAvatar()
 			=> _runtime;
 
-		private async UniTask ApplyRig(IRuntimeAvatar runtime) {
+		private UniTask ApplyRig(IRuntimeAvatar runtime) {
 			if (_runtime?.Descriptor == null)
-				return;
+				return UniTask.CompletedTask;
 
 			if (!connector) {
 				// Sans ce connecteur, aucune main n'est convertie en AutoHand, les mains de
@@ -95,7 +95,7 @@ namespace Nox.XR.Runtime.Connectors {
 					+ "Verify the 'connector' reference on the XR proxy prefab.",
 					this
 				);
-				return;
+				return UniTask.CompletedTask;
 			}
 
 			var handModule = _runtime.Descriptor.GetModules<IHandModule>().FirstOrDefault();
@@ -105,7 +105,7 @@ namespace Nox.XR.Runtime.Connectors {
 					+ "fallback hands will remain active.",
 					runtime.Descriptor.Anchor
 				);
-				return;
+				return UniTask.CompletedTask;
 			}
 
 			var leftData  = Array.Find(handModule.Hands, h => h.Type == NoxHandType.Left);
@@ -153,6 +153,8 @@ namespace Nox.XR.Runtime.Connectors {
 				// reload instead of depending on this async chain completing on the new hands.
 			}
 			#endif
+
+			return UniTask.CompletedTask;
 		}
 
 		public void ClearRig()
