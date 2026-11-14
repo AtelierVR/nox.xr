@@ -8,6 +8,7 @@ using Nox.Settings;
 using Nox.Terminal;
 using Nox.XR.Runtime.Providers;
 using Nox.XR.Runtime.Settings;
+using Nox.XR.Runtime.Tracking;
 
 namespace Nox.XR.Runtime {
 	public class Main : IMainModInitializer {
@@ -52,8 +53,10 @@ namespace Nox.XR.Runtime {
 				new PokeDisablePercentSetting(),
 				new PokeDisableNearFarSetting(),
 				new PokeOpenHandIndexSetting(),
-				new IPDSetting(),
+				new PokeHoverIndicatorSetting(),
+				new ScrollInputModeSetting(),
 				new FullBodyTrackingSetting(),
+				new TrackerStatusSetting(),
 				new CalibrateSetting(),
 				new CalibrationRangeSetting(),
 				new RealHeightSetting(),
@@ -71,6 +74,8 @@ namespace Nox.XR.Runtime {
 
 			foreach (var setting in _settings)
 				SettingAPI?.Add(setting);
+
+			TrackerWatcher.Initialize();
 
 			RegisterIntegrations();
 		}
@@ -114,6 +119,8 @@ namespace Nox.XR.Runtime {
 
 		public void OnDisposeMain() {
 			UnregisterIntegrations();
+
+			TrackerWatcher.Shutdown();
 
 			if (XRInputs.Provider == null)
 				XRInputs.DefaultProvider = null;

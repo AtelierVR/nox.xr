@@ -31,16 +31,46 @@ MonoBehaviour:
       value: "Enable XR"
     - key: settings.entry.xr.general.poke.label
       value: "Enable Finger Poke"
-    - key: settings.entry.xr.general.ipd.label
-      value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Poke Disable Threshold"
     - key: settings.entry.xr.general.poke_disable_near_far.label
       value: "Disable Ray While Poking"
     - key: settings.entry.xr.general.poke_open_hand_index.label
       value: "Index Poke With Open Hand"
+    - key: settings.entry.xr.general.poke_hover_indicator.label
+      value: "Show UI Hover Ring"
+    - key: settings.entry.xr.interaction.scroll_mode.label
+      value: "Joystick On a Scrollable UI"
+    - key: settings.entry.xr.interaction.scroll_mode.option.ui
+      value: "Scroll The UI"
+    - key: settings.entry.xr.interaction.scroll_mode.option.both
+      value: "Scroll And Move"
+    - key: settings.entry.xr.interaction.scroll_mode.option.movement
+      value: "Move The Player"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Full-Body Tracking"
+    - key: settings.entry.xr.fbt.tracker_status.value
+      value: "{0} tracker(s) connected · {1} tracking"
+    - key: xr.notification.channel
+      value: "XR"
+    - key: xr.notification.channel.description
+      value: "Full-body trackers and the XR system."
+    - key: xr.notification.tracker.connected.title
+      value: "Tracker connected"
+    - key: xr.notification.tracker.connected.body
+      value: "{0} is connected."
+    - key: xr.notification.tracker.disconnected.title
+      value: "Tracker disconnected"
+    - key: xr.notification.tracker.disconnected.body
+      value: "{0} disconnected."
+    - key: xr.notification.tracker.tracking.title
+      value: "Tracker tracking"
+    - key: xr.notification.tracker.tracking.body
+      value: "{0} is tracking."
+    - key: xr.notification.tracker.untracking.title
+      value: "Tracker not tracking"
+    - key: xr.notification.tracker.untracking.body
+      value: "{0} stopped tracking."
     - key: settings.entry.xr.general.full_body_calibration.label
       value: "Full-Body Calibration"
     - key: settings.entry.xr.general.full_body_calibration.start
@@ -131,16 +161,46 @@ MonoBehaviour:
       value: "Activer la XR"
     - key: settings.entry.xr.general.poke.label
       value: "Activer le poke des doigts"
-    - key: settings.entry.xr.general.ipd.label
-      value: "IPD"
     - key: settings.entry.xr.general.poke_disable_percent.label
       value: "Seuil de désactivation du poke"
     - key: settings.entry.xr.general.poke_disable_near_far.label
       value: "Désactiver la raie pendant le poke"
     - key: settings.entry.xr.general.poke_open_hand_index.label
       value: "Poke index avec la main ouverte"
+    - key: settings.entry.xr.general.poke_hover_indicator.label
+      value: "Afficher l'anneau de survol UI"
+    - key: settings.entry.xr.interaction.scroll_mode.label
+      value: "Joystick sur une UI défilante"
+    - key: settings.entry.xr.interaction.scroll_mode.option.ui
+      value: "Défiler l'UI"
+    - key: settings.entry.xr.interaction.scroll_mode.option.both
+      value: "Défiler et se déplacer"
+    - key: settings.entry.xr.interaction.scroll_mode.option.movement
+      value: "Déplacer le joueur"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Suivi du corps entier"
+    - key: settings.entry.xr.fbt.tracker_status.value
+      value: "{0} tracker(s) connecté(s) · {1} en suivi"
+    - key: xr.notification.channel
+      value: "XR"
+    - key: xr.notification.channel.description
+      value: "Trackers du corps entier et système XR."
+    - key: xr.notification.tracker.connected.title
+      value: "Tracker connecté"
+    - key: xr.notification.tracker.connected.body
+      value: "{0} est connecté."
+    - key: xr.notification.tracker.disconnected.title
+      value: "Tracker déconnecté"
+    - key: xr.notification.tracker.disconnected.body
+      value: "{0} est déconnecté."
+    - key: xr.notification.tracker.tracking.title
+      value: "Tracker en suivi"
+    - key: xr.notification.tracker.tracking.body
+      value: "{0} est suivi."
+    - key: xr.notification.tracker.untracking.title
+      value: "Tracker non suivi"
+    - key: xr.notification.tracker.untracking.body
+      value: "{0} n'est plus suivi."
     - key: settings.entry.xr.general.full_body_calibration.label
       value: "Calibration du corps entier"
     - key: settings.entry.xr.general.full_body_calibration.start
