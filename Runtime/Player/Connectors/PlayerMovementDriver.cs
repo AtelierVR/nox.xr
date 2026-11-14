@@ -133,7 +133,14 @@ namespace Nox.XR.Player {
 			if (!player)
 				return;
 
-			player.Move(CanMove ? Keybindings.GetVector2Value(XRBinding.Move) : Vector2.zero);
+			var move = CanMove ? Keybindings.GetVector2Value(XRBinding.Move) : Vector2.zero;
+
+			if (move != Vector2.zero
+			    && ScrollInputSettings.Mode == XRScrollInput.UiOnly
+			    && HandUiFeedback.ScrollableFocused)
+				move = Vector2.zero;
+
+			player.Move(move);
 			player.Turn(CanTurn ? Keybindings.GetVector2Value(XRBinding.Turn).x : 0f);
 
 			if (!CanJump) {
