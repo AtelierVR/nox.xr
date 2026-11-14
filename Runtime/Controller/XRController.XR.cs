@@ -49,10 +49,10 @@ namespace Nox.XR.Runtime {
 
 		[NoxPublic(NoxAccess.Method)]
 		public float GetRecommendedHeight() {
-			// minMaxHeight.y comes from the avatar size; until it does it is the Autohand prefab default.
-			if (player && player.minMaxHeight.y > 0f
-			           && !Mathf.Approximately(player.minMaxHeight.y, AutoHandDefaultMaxHeight))
-				return player.minMaxHeight.y;
+			var eyeHeight = XRViewHeight.EyeHeight(avatarLoader ? avatarLoader.GetAvatar()?.Descriptor : null);
+
+			if (eyeHeight > 0f)
+				return eyeHeight;
 
 			return defaultViewHeight > 0f ? defaultViewHeight : DefaultViewHeight;
 		}

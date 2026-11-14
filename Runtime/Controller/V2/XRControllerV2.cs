@@ -132,6 +132,7 @@ namespace Nox.XR.Controller.V2 {
 
 			SetupUi();
 			SetupInteraction();
+			SetupCalibration();
 
 			player.OnPartRegistered.AddListener(OnPartRegistered);
 			player.OnPartUnregistered.AddListener(OnPartUnregistered);
@@ -142,7 +143,9 @@ namespace Nox.XR.Controller.V2 {
 		}
 
 		private void OnDestroy() {
+			DisposeCalibration();
 			DisposeInteraction();
+			UnsubscribeFit();
 
 			if (!player)
 				return;
@@ -327,12 +330,19 @@ namespace Nox.XR.Controller.V2 {
 		/* ------------------------------------------------------------------ */
 
 		public float GetViewHeight()
-			=> HeadCamera ? HeadCamera.transform.position.y : transform.position.y;
+			=> HeadCamera
+				? HeadCamera.transform.position.y
+				: transform.position.y;
 
-		public float GetRecommendedHeight()
-			=> player && player.minMaxHeight.y > 0f
-				? player.minMaxHeight.y
-				: defaultViewHeight > 0f ? defaultViewHeight : DefaultViewHeight;
+		public float GetRecommendedHeight() {
+			var eyeHeight = XRViewHeight.EyeHeight(_avatar?.Descriptor);
+
+			return eyeHeight > 0f
+				? eyeHeight
+				: defaultViewHeight > 0f
+					? defaultViewHeight
+					: DefaultViewHeight;
+		}
 
 		public void ReHeight(float height = -1f) {
 			if (!player)
@@ -345,7 +355,6 @@ namespace Nox.XR.Controller.V2 {
 			if (Mathf.Abs(delta) < 0.001f)
 				return;
 
-			// The tracking space offset is the view height lever of the player.
 			player.heightOffset += delta;
 		}
 
@@ -353,7 +362,9 @@ namespace Nox.XR.Controller.V2 {
 			if (!player)
 				return;
 
-			var forward = HeadCamera ? HeadCamera.transform.forward : player.transform.forward;
+			var forward = HeadCamera
+				? HeadCamera.transform.forward
+				: player.transform.forward;
 			ReCenter(player.transform.position, forward);
 		}
 

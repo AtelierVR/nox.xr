@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using Nox.CCK.Entities;
 using Nox.CCK.Utils;
 using Nox.XR.Loaders;
 using Nox.XR.Runtime.Loaders;
+using Nox.XR.Runtime.Settings;
 using Nox.XR.Trackers;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
@@ -40,16 +42,61 @@ namespace Nox.XR.Player {
 
 		private void OnEnable() {
 			XRLoaderManager.ProviderChanged.AddListener(OnLoaderChanged);
+			FullBodyTrackingSetting.Changed.AddListener(OnFullBodyTrackingChanged);
 			AttachProvider();
 		}
 
 		private void OnDisable() {
 			XRLoaderManager.ProviderChanged.RemoveListener(OnLoaderChanged);
+			FullBodyTrackingSetting.Changed.RemoveListener(OnFullBodyTrackingChanged);
 			DetachProvider();
 		}
 
+		private void OnFullBodyTrackingChanged(bool _)
+			=> RefreshParts();
+
 		private void OnLoaderChanged(IXRLoaderProvider loader)
             => AttachProvider();
+
+		/// <summary>
+		/// Rebuilds the body parts from the trackers.
+		/// <para>
+		/// A full-body calibration changes the rig slot each tracker drives: the feet/hip parts spawned from
+		/// templates no longer match. They are unregistered and destroyed, then created again from the new
+		/// bindings. The parts that do not depend on the calibration are kept: the head (owned by the prefab)
+		/// and the hands (fixed by the controller characteristics). Recreating the hands would destroy their
+		/// poke/ray interactors and break the UI until they are rebuilt, which is exactly what must not happen
+		/// when a calibration is confirmed from the menu.
+		/// </para>
+		/// </summary>
+		public void RefreshParts() {
+			if (!player)
+				return;
+
+			var removed = new List<Part>();
+			foreach (var pair in player.Parts) {
+				var part = pair.Value;
+				if (!part || part.PersistsWithoutSource)
+					continue;
+
+				var rig = part.Rig;
+				if (rig == EntityRig.Head || rig == EntityRig.LeftHand || rig == EntityRig.RightHand)
+					continue;
+
+				removed.Add(part);
+			}
+
+			for (var i = 0; i < removed.Count; i++) {
+				player.UnregisterPart(removed[i]);
+				removed[i].gameObject.Destroy();
+			}
+
+			DetachProvider();
+			AttachProvider();
+		}
+
+		private static bool IsFullBodySlot(EntityRig rig)
+			=> rig != EntityRig.Head && rig != EntityRig.LeftHand && rig != EntityRig.RightHand;
 
 		private void AttachProvider() {
 			var provider = XRLoaderManager.Provider?.Features?.Trackers;
@@ -83,6 +130,9 @@ namespace Nox.XR.Player {
 				WarnUnassigned(tracker);
 				return;
 			}
+
+			if (!FullBodyTrackingSetting.Value && IsFullBodySlot(rig))
+				return;
 
 			if (player.Parts.TryGetValue(rig, out var existing)) {
 				if (existing)

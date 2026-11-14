@@ -18,6 +18,8 @@
         "Nox.Avatars.Parameters",
         "Nox.Avatars.Rigging",
         "Nox.Avatars.Scale",
+        "Nox.Avatars.StateMachines",
+        "Nox.CCK.Avatars.Playable",
         "Nox.CCK.Avatars.Rigging",
         "Nox.XR",
         "Nox.XR.Runtime",

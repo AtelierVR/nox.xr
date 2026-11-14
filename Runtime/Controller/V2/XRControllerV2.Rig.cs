@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Nox.Avatars;
 using Nox.Avatars.Rigging;
+using Nox.Avatars.StateMachines;
 using Nox.CCK.Entities;
 using Nox.XR.Player;
 using Logger = Nox.CCK.Utils.Logger;
@@ -85,6 +86,9 @@ namespace Nox.XR.Controller.V2 {
 
 		/// <summary>A module joined the avatar: it may be the rig provider.</summary>
 		private void OnModuleRegistered(IAvatarModule module) {
+			if (module is IPlayableLayerModule)
+				RefreshFullBodyOverride();
+
 			if (module is not IRigProvider provider)
 				return;
 
@@ -120,6 +124,11 @@ namespace Nox.XR.Controller.V2 {
 			if (rig == null)
 				return;
 			rig.SetExternalRootControl(true);
+
+			// While a calibration runs the avatar stays in its calibration pose: the parts must not drive it.
+			if (_calibration != null && _calibration.IsCalibrating)
+				return;
+
 			BindParts(rig);
 		}
 
@@ -197,18 +206,31 @@ namespace Nox.XR.Controller.V2 {
 			SetActive(_boundRig, id.ToEntityRig(), enabled);
 		}
 
-		/// <summary>Releases every part bound to the rig.</summary>
-		private void UnbindAllParts() {
-			if (_boundParts.Count == 0) {
-				_boundRig = null;
-				return;
+		/// <summary>
+		/// Releases every part bound to the rig, except the slots listed in <paramref name="keep"/>.
+		/// <para>
+		/// The head is kept during a calibration: unbound, the head bone stops following the view and the eyes of the
+		/// avatar drift away from the eyes of the player, which is exactly what the calibration is supposed to line up.
+		/// </para>
+		/// </summary>
+		private void UnbindAllParts(params EntityRig[] keep) {
+			var kept = new List<ushort>(keep.Length);
+			for (var i = 0; i < keep.Length; i++)
+				kept.Add(keep[i].ToIndex());
+
+			var released = new List<KeyValuePair<Part, ushort>>();
+			foreach (var pair in _boundParts) {
+				if (!kept.Contains(pair.Value))
+					released.Add(pair);
 			}
 
-			foreach (var pair in _boundParts)
+			foreach (var pair in released) {
 				UnbindPart(pair.Key, pair.Value);
+				_boundParts.Remove(pair.Key);
+			}
 
-			_boundParts.Clear();
-			_boundRig = null;
+			if (_boundParts.Count == 0)
+				_boundRig = null;
 		}
 
 		/// <summary>
@@ -242,6 +264,7 @@ namespace Nox.XR.Controller.V2 {
 			if (rig == null || !part)
 				return;
 			BindPart(rig, part, part.Rig);
+			RefreshFullBodyOverride();
 		}
 
 		/// <summary>
@@ -256,6 +279,8 @@ namespace Nox.XR.Controller.V2 {
 
 			if (_avatar != null)
 				ApplyTrackingParameters(_avatar.Descriptor);
+
+			RefreshFullBodyOverride();
 		}
 	}
 }

@@ -140,7 +140,13 @@ namespace Nox.XR.Controller.V2 {
 				return;
 
 			var pose = player.transform;
-			var local = space.InverseTransformPoint(new Vector3(pose.position.x, space.position.y, pose.position.z));
+
+			// The avatar follows the head, not the body: the body catches up with the view through physics
+			// (SyncBodyHead) and is blocked by walls and by its own colliders, so a body-based avatar stays
+			// behind while the player walks in room-scale. The head is always where the player is.
+			var head   = player.Head;
+			var source = head ? head.Position : pose.position;
+			var local  = space.InverseTransformPoint(new Vector3(source.x, space.position.y, source.z));
 			var current = avatarContainer.localPosition;
 
 			avatarContainer.localPosition = new Vector3(local.x, current.y, local.z);
@@ -296,6 +302,9 @@ namespace Nox.XR.Controller.V2 {
 			ApplyHandOffsets(descriptor);
 
 			descriptor.Anchor.SetActive(true);
+
+			BindCalibration(avatar);
+			SubscribeFit(descriptor);
 
 			return avatar;
 		}
@@ -651,6 +660,8 @@ namespace Nox.XR.Controller.V2 {
 
 			var avatar = _avatar;
 			_avatar = null;
+			UnbindCalibration();
+			UnsubscribeFit();
 			avatar?.Dispose().Forget();
 		}
 	}
