@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Interactions;
 using Nox.Interactions;
 using Nox.UI;
 using Nox.XR.Runtime.Settings;
@@ -31,6 +32,8 @@ namespace Nox.XR.Menu {
 		/// </summary>
 		[SerializeField, Tooltip("Board of the panel (renderer and collider), toggled with the menu.")]
 		private Transform _body;
+
+		private GrabbableBase _grabbable;
 
 		/// <summary>Container the UI mod builds the menu into: what the menu shows and hides.</summary>
 		public RectTransform Container {
@@ -95,6 +98,20 @@ namespace Nox.XR.Menu {
 		/// <summary>Whether the menu is currently shown: the container is what the menu toggles.</summary>
 		public bool IsOpen
 			=> _container && _container.gameObject.activeSelf;
+
+		/// <summary>Grabbable of the panel: what lets a hand carry it (found on this object).</summary>
+		private GrabbableBase Grabbable {
+			get {
+				if (!_grabbable)
+					_grabbable = GetComponent<GrabbableBase>();
+
+				return _grabbable;
+			}
+		}
+
+		/// <summary>Whether a hand is carrying the panel: it follows the hand instead of its anchor.</summary>
+		private bool Held
+			=> Grabbable != null && Grabbable.State == GrabState.Held;
 
 		/// <summary>
 		/// Shown state of the menu. The container is toggled, never the content alone: the UI mod builds the
@@ -215,7 +232,7 @@ namespace Nox.XR.Menu {
 		/// </para>
 		/// </summary>
 		private void UpdateAnchor() {
-			if (!_hasAnchor)
+			if (!_hasAnchor || Held)
 				return;
 
 			var beyondReach = TryGetReach(out var reachOrigin, out var reachLimit);
@@ -330,11 +347,23 @@ namespace Nox.XR.Menu {
 			_hasAnchor = true;
 		}
 
-		private void OnEnable()
-			=> MenuSettings.AnchorChanged.AddListener(OnAnchorSettingChanged);
+		private void OnEnable() {
+			MenuSettings.AnchorChanged.AddListener(OnAnchorSettingChanged);
 
-		private void OnDisable()
-			=> MenuSettings.AnchorChanged.RemoveListener(OnAnchorSettingChanged);
+			if (Grabbable != null)
+				Grabbable.OnReleasedEvent.AddListener(OnGrabbableReleased);
+		}
+
+		private void OnDisable() {
+			MenuSettings.AnchorChanged.RemoveListener(OnAnchorSettingChanged);
+
+			if (_grabbable)
+				_grabbable.OnReleasedEvent.RemoveListener(OnGrabbableReleased);
+		}
+
+		/// <summary>The hand let the panel go: it stays where it was released, the anchor follows it there.</summary>
+		private void OnGrabbableReleased(GrabbableBase grabbable, GrabberBase grabber)
+			=> Anchor();
 
 		/// <summary>
 		/// The mode changed: the panel stays exactly where it is and only follows differently from now on, so
