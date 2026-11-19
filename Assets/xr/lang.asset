@@ -47,6 +47,8 @@ MonoBehaviour:
       value: "Scroll And Move"
     - key: settings.entry.xr.interaction.scroll_mode.option.movement
       value: "Move The Player"
+    - key: settings.entry.xr.interaction.preview_pose.label
+      value: "Take The Grab Pose Before Grabbing"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Full-Body Tracking"
     - key: settings.entry.xr.fbt.tracker_status.value
@@ -177,6 +179,8 @@ MonoBehaviour:
       value: "Défiler et se déplacer"
     - key: settings.entry.xr.interaction.scroll_mode.option.movement
       value: "Déplacer le joueur"
+    - key: settings.entry.xr.interaction.preview_pose.label
+      value: "Prendre la pose de grab avant de grab"
     - key: settings.entry.xr.general.full_body_tracking.label
       value: "Suivi du corps entier"
     - key: settings.entry.xr.fbt.tracker_status.value

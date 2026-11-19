@@ -55,6 +55,7 @@ namespace Nox.XR.Runtime {
 				new PokeOpenHandIndexSetting(),
 				new PokeHoverIndicatorSetting(),
 				new ScrollInputModeSetting(),
+				new PreviewPoseSetting(),
 				new FullBodyTrackingSetting(),
 				new TrackerStatusSetting(),
 				new CalibrateSetting(),
