@@ -49,6 +49,8 @@ namespace Nox.XR.Runtime {
 					return;
 
 				var go = new GameObject("Nameplate Anchor");
+				if (Layers.LayerExists(Layers.Ui))
+					go.layer = LayerMask.NameToLayer(Layers.Ui);
 				go.transform.SetParent(player.headCamera.transform, false);
 				go.transform.localPosition = new Vector3(0f, NameplateAnchorHeight, 0f);
 				NameplateAnchor = go.transform;
