@@ -1,5 +1,6 @@
 using Autohand;
 using Nox.CCK.Development;
+using Nox.Interactions;
 using UnityEngine;
 using Gizmos = Nox.CCK.Development.Gizmos;
 
@@ -46,7 +47,7 @@ namespace Nox.XR.Runtime.Connectors {
 		public Grabbable GetGrabbable()
 			=> GetComponentInParent<Grabbable>();
 
-		/// <summary>Collider the conditions are tested against (default: the grabbable's first collider).</summary>
+		/// <summary>Collider the conditions are tested against (default: the first collider of the grabbable).</summary>
 		public Collider ConditionCollider {
 			get {
 				if (conditionCollider != null)
@@ -54,15 +55,47 @@ namespace Nox.XR.Runtime.Connectors {
 
 				if (_collider == null) {
 					_collider = GetComponent<Collider>();
+
 					if (_collider == null) {
 						var grab = GetGrabbable();
 						if (grab != null)
 							_collider = grab.GetComponentInChildren<Collider>();
 					}
+
+					if (_collider == null && GetComponentInParent<IGrabColliders>() is { } colliders && colliders.GrabColliders.Count > 0)
+						_collider = colliders.GrabColliders[0];
 				}
 
 				return _collider;
 			}
+		}
+
+		/// <summary>
+		/// Extra grab conditions for a palm at <paramref name="palmPosition"/> looking along
+		/// <paramref name="palmForward"/>. Returns true when the grab is allowed.
+		/// </summary>
+		public bool CanGrab(Vector3 palmPosition, Vector3 palmForward) {
+			var col = ConditionCollider;
+			if (col == null)
+				return true;
+
+			if (allowedSide != Vector3.zero) {
+				var normal = col.transform.TransformDirection(allowedSide.normalized);
+				var depth  = Vector3.Dot(palmPosition - col.bounds.center, normal);
+				if (depth < -sideTolerance)
+					return false;
+			}
+
+			if (maxDistance > 0f && Vector3.Distance(palmPosition, col.ClosestPoint(palmPosition)) > maxDistance)
+				return false;
+
+			if (allowedForward != Vector3.zero) {
+				var direction = col.transform.TransformDirection(allowedForward.normalized);
+				if (Vector3.Angle(palmForward, direction) > maxAngle)
+					return false;
+			}
+
+			return true;
 		}
 
 		/// <summary>
@@ -77,29 +110,8 @@ namespace Nox.XR.Runtime.Connectors {
 			if (hand == null || hand.palmTransform == null)
 				return true;
 
-			var col = ConditionCollider;
-			if (col == null)
-				return true;
-
 			var palm = hand.palmTransform;
-
-			if (allowedSide != Vector3.zero) {
-				var normal = col.transform.TransformDirection(allowedSide.normalized);
-				var depth  = Vector3.Dot(palm.position - col.bounds.center, normal);
-				if (depth < -sideTolerance)
-					return false;
-			}
-
-			if (maxDistance > 0f && Vector3.Distance(palm.position, col.ClosestPoint(palm.position)) > maxDistance)
-				return false;
-
-			if (allowedForward != Vector3.zero) {
-				var direction = col.transform.TransformDirection(allowedForward.normalized);
-				if (Vector3.Angle(palm.forward, direction) > maxAngle)
-					return false;
-			}
-
-			return true;
+			return CanGrab(palm.position, palm.forward);
 		}
 
 		private static Vector3 Abs(Vector3 v)

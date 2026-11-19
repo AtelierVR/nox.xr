@@ -183,12 +183,10 @@ namespace Nox.XR.Player {
 		}
 
 		/// <summary>
-		/// Keeps the parts that collide with the environment out of level geometry, and crouches the
-		/// player when a part has a ceiling right above it.
+		/// Crouches the player when a part has a ceiling right above it.
 		/// <para>
-		/// The correction is a pure function of the <b>raw</b> tracked pose (see <see cref="Part.RawPosition"/>):
-		/// the same pose always gives the same result, so a part resting against the floor or a wall is
-		/// stable instead of bouncing between the tracker pose and the correction.
+		/// Nothing is pushed here: the parts are bodies with their own colliders, so the world holds them by itself. Only the
+		/// crouch is ours, since it folds the player and not a collider.
 		/// </para>
 		/// </summary>
 		protected virtual void ResolveEnvironmentCollisions() {
@@ -201,13 +199,11 @@ namespace Nox.XR.Player {
 				if (!part)
 					continue;
 
-				if (!part.PartEnabled || !part.CollideWithEnvironment) {
-					part.SetEnvironmentOffset(Vector3.zero);
+				if (part.PhysicsFollow || !part.PartEnabled || !part.CollideWithEnvironment) {
 					part.IsUnderLowCeiling = false;
 					continue;
 				}
 
-				part.SetEnvironmentOffset(GetEnvironmentPush(part));
 				part.IsUnderLowCeiling = TryGetLowCeiling(part, out _);
 
 				if (part.IsUnderLowCeiling)
@@ -216,6 +212,9 @@ namespace Nox.XR.Player {
 
 			UpdateAutoCrouch(crouch);
 		}
+
+		private int EnvironmentMask(Part part)
+			=> part is Hand ? handPartMask : _handPlayerMask;
 
 		/// <summary>Whether the free space above a part is lower than its standing clearance.</summary>
 		private bool TryGetLowCeiling(Part part, out RaycastHit hit) {
@@ -231,124 +230,7 @@ namespace Nox.XR.Player {
 			return Physics.SphereCast(
 				part.RawPosition, radius, Vector3.up,
 				out hit, part.StandingClearance,
-				_handPlayerMask, QueryTriggerInteraction.Ignore);
-		}
-
-		/// <summary>Correction keeping a part out of the geometry it entered.</summary>
-		private Vector3 GetEnvironmentPush(Part part) {
-			var volume = part.EnvironmentCollider;
-			var radius = part.CollisionRadius;
-			if (!volume || radius <= 0f)
-				return Vector3.zero;
-
-			var offset = part.EnvironmentOffset;
-			var center = part.CollisionCenter - offset;
-
-			var push = GetWallPush(part, volume, center, radius);
-			push.y = 0f;
-			push += Vector3.up * GetGroundPush(center, radius);
-			return push;
-		}
-
-		/// <summary>
-		/// How far the part has to go up to rest <b>on</b> the surface below it.
-		/// <para>
-		/// The floor is handled on its own instead of through a depenetration: a sphere whose center
-		/// slipped just under the surface has its closest surface point <i>above</i> it, so a generic
-		/// depenetration would push it further down, through the floor.
-		/// </para>
-		/// </summary>
-		private float GetGroundPush(Vector3 center, float radius) {
-			var origin = center + Vector3.up * radius;
-			var maxDistance = radius * 2f;
-
-			var count = Physics.RaycastNonAlloc(
-				origin, Vector3.down, _hitsNonAlloc, maxDistance,
-				_handPlayerMask, QueryTriggerInteraction.Ignore);
-
-			var highest = -1f;
-			for (var i = 0; i < count; i++) {
-				var hit = _hitsNonAlloc[i];
-				if (!hit.collider || IsOwnCollider(hit.collider))
-					continue;
-
-				if (highest >= 0f && hit.distance >= highest)
-					continue;
-
-				highest = hit.distance;
-			}
-
-			return highest < 0f
-				? 0f
-				: Mathf.Clamp(maxDistance - highest, 0f, maxDistance);
-		}
-
-		/// <summary>Horizontal depenetration against the geometry around the part.</summary>
-		private Vector3 GetWallPush(Part part, Collider volume, Vector3 center, float radius) {
-			var count = Physics.OverlapSphereNonAlloc(
-				center, radius + Physics.defaultContactOffset,
-				_colliderNonAlloc, _handPlayerMask, QueryTriggerInteraction.Ignore);
-
-			var sum = Vector3.zero;
-			var overlapping = 0;
-
-			for (var i = 0; i < count; i++) {
-				var other = _colliderNonAlloc[i];
-				if (!other || other == volume || IsOwnCollider(other))
-					continue;
-
-				var otherPosition = other.transform.position;
-				var otherRotation = other.transform.rotation;
-
-				if (Physics.ComputePenetration(
-					other,
-					otherPosition,
-					otherRotation,
-					volume,
-					volume.transform.position,
-					volume.transform.rotation,
-					out var direction,
-					out var distance
-				)) {
-					sum += direction * distance;
-					overlapping++;
-					continue;
-				}
-
-				var closest = Physics.ClosestPoint(center, other, otherPosition, otherRotation);
-				var toSurface = center - closest;
-				var gap = toSurface.magnitude;
-				if (gap <= float.Epsilon || gap >= radius)
-					continue;
-
-				sum += toSurface / gap * (radius - gap);
-				overlapping++;
-			}
-
-			if (overlapping == 0)
-				return Vector3.zero;
-
-			var push = Vector3.ClampMagnitude(sum / overlapping, radius);
-			return push.sqrMagnitude > float.Epsilon
-				? push
-				: Vector3.zero;
-		}
-
-		/// <summary>
-		/// Whether a collider belongs to this player: a part of the rig, or the volume of its own body.
-		/// <para>
-		/// Being a child of the player is not enough: the menu is parented under the tracking space on purpose
-		/// (so it travels with the player), and it is an obstacle like any other - skipping it let the hands and
-		/// the body go straight through the panel.
-		/// </para>
-		/// </summary>
-		private bool IsOwnCollider(Collider collider) {
-			var own = BodyColliders;
-			for (var i = 0; i < own.Count; i++)
-				if (own[i] == collider)
-					return true;
-
-			return false;
+				EnvironmentMask(part), QueryTriggerInteraction.Ignore);
 		}
 
 		/// <summary>Latches the automatic crouch while something squeezes the player.</summary>

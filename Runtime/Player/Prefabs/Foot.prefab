@@ -70,7 +70,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   part: {fileID: 1002}
   follow: 1
-  freeTrackerId: 
+  freeTrackerId:
   freeTrackerIndex: 0
   applyVelocity: 0
   disableWhenMissing: 1

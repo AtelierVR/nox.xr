@@ -4,6 +4,7 @@
   "references": [
     "Nox.CCK",
     "Nox.CCK.Entities",
+    "Nox.Interactions",
     "Nox.XR.Calibration",
     "UniTask",
     "Nox.XR",

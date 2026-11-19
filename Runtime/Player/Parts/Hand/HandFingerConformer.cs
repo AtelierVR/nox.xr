@@ -3,7 +3,7 @@ using Nox.Avatars.Hand;
 using Nox.Interactions;
 using UnityEngine;
 
-namespace Nox.XR.Interactions {
+namespace Nox.XR.Player {
 	/// <summary>
 	/// Blends the fingers of an avatar hand onto the shape of a grabbable, the way AutoHand does it: each
 	/// finger is bent step by step from its open pose to its closed pose, and the first bend whose tip
@@ -119,7 +119,7 @@ namespace Nox.XR.Interactions {
 		/// are probed, so a finger never stops on the palm or on a neighbouring prop.
 		/// </summary>
 		public void Conform(IGrabbable grabbable, in RaycastHit contact, int steps)
-			=> TryConform(grabbable, contact, steps);
+			=> TryConform(grabbable, contact, steps, Vector3.zero);
 
 		/// <summary>
 		/// Shapes the fingers around the grabbable and reports whether the sweep found the object.
@@ -129,7 +129,10 @@ namespace Nox.XR.Interactions {
 		/// retries instead, and the return value says whether any finger could be shaped.
 		/// </para>
 		/// </summary>
-		public bool TryConform(IGrabbable grabbable, in RaycastHit contact, int steps) {
+		public bool TryConform(IGrabbable grabbable, in RaycastHit contact, int steps)
+			=> TryConform(grabbable, contact, steps, Vector3.zero);
+
+		public bool TryConform(IGrabbable grabbable, in RaycastHit contact, int steps, Vector3 objectOffset) {
 			if (grabbable == null || _entries.Count == 0)
 				return false;
 
@@ -145,7 +148,7 @@ namespace Nox.XR.Interactions {
 
 			for (var i = 0; i < _entries.Count; i++) {
 				var entry = _entries[i];
-				var target = Sweep(entry, mask, steps);
+				var target = Sweep(entry, mask, steps, objectOffset);
 
 				entry.shaped = target >= 0f;
 				entry.target = entry.shaped ? target : 0f;
@@ -240,14 +243,14 @@ namespace Nox.XR.Interactions {
 			return mask;
 		}
 
-		private float Sweep(Entry entry, int mask, int steps) {
+		private float Sweep(Entry entry, int mask, int steps, Vector3 objectOffset) {
 			steps = Mathf.Max(steps, 4);
 
 			var coarse = 5f / steps;
 			var hit = -1f;
 
 			for (var value = 0f; value <= 1f; value += coarse) {
-				if (!Overlaps(entry, mask, value))
+				if (!Overlaps(entry, mask, value, objectOffset))
 					continue;
 
 				hit = value;
@@ -268,14 +271,14 @@ namespace Nox.XR.Interactions {
 			var fine = 1f / steps;
 
 			for (var value = from; value <= hit; value += fine) {
-				if (Overlaps(entry, mask, value))
+				if (Overlaps(entry, mask, value, objectOffset))
 					return value;
 			}
 
 			return hit;
 		}
 
-		private bool Overlaps(Entry entry, int mask, float value) {
+		private bool Overlaps(Entry entry, int mask, float value, Vector3 objectOffset) {
 			Apply(entry, value);
 			Physics.SyncTransforms();
 
@@ -287,7 +290,7 @@ namespace Nox.XR.Interactions {
 				? entry.finger.TipRadius
 				: InteractionConstants.DefaultTipRadius;
 
-			return Physics.OverlapSphereNonAlloc(tip.position, radius, _overlap, mask, QueryTriggerInteraction.Ignore) > 0;
+			return Physics.OverlapSphereNonAlloc(tip.position - objectOffset, radius, _overlap, mask, QueryTriggerInteraction.Ignore) > 0;
 		}
 
 		private void Apply(Entry entry, float value) {

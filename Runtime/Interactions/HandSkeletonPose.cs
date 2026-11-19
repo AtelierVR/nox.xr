@@ -40,9 +40,6 @@ namespace Nox.XR.Interactions {
 		[SerializeField, Tooltip("Hand part whose fingers are posed. Found on this GameObject when empty.")]
 		private Hand hand;
 
-		[SerializeField, Tooltip("Grabber that owns the fingers while it grabs. Found on this GameObject when empty.")]
-		private HandGrabber grabber;
-
 		[SerializeField, Tooltip("Pose the fingers from the provider skeleton. Disable to leave the fingers to the animation.")]
 		private bool enabledPose = true;
 
@@ -73,6 +70,7 @@ namespace Nox.XR.Interactions {
 		private const float DebugLogInterval = 0.25f;
 
 		private IHand _source;
+		private HandPhysical _owner;
 		private float[] _curls = System.Array.Empty<float>();
 		private float _spread = NeutralSpread;
 		private bool _posed;
@@ -91,33 +89,51 @@ namespace Nox.XR.Interactions {
 			set => hand = value;
 		}
 
+		/// <summary>
+		/// Hand the fingers are actually written on: the physical hand of the part when it has one (the physical owns
+		/// the pose and gives it back to the avatar), the avatar hand otherwise.
+		/// </summary>
+		public IHand PoseHand {
+			get {
+				var physical = _owner ? _owner.Physical : null;
+				return physical ? physical : _source;
+			}
+		}
+
 		/// <summary>Whether the fingers are currently driven by the provider skeleton.</summary>
 		public bool PoseEnabled {
 			get => enabledPose;
 			set => enabledPose = value;
 		}
 
-		/// <summary>Wires the component to its hand and grabber.</summary>
-		public void Configure(Hand part, HandGrabber owner = null) {
+		/// <summary>Wires the component to its hand.</summary>
+		public void Configure(Hand part) {
 			hand = part;
-			grabber = owner;
 
 			if (!hand)
 				return;
+
+			TakePhysical();
 
 			hand.SourceChanged.RemoveListener(OnSourceChanged);
 			hand.SourceChanged.AddListener(OnSourceChanged);
 			OnSourceChanged(hand.Source);
 		}
 
+		private void TakePhysical() {
+			_owner = hand ? hand.GetComponent<HandPhysical>() : null;
+
+			if (_owner)
+				_owner.ExternalPose = true;
+		}
+
 		private void Awake() {
 			if (!hand)
 				hand = GetComponent<Hand>();
 
-			if (!grabber)
-				grabber = GetComponent<HandGrabber>();
-
 			if (hand) {
+				TakePhysical();
+
 				hand.SourceChanged.RemoveListener(OnSourceChanged);
 				hand.SourceChanged.AddListener(OnSourceChanged);
 				OnSourceChanged(hand.Source);
@@ -132,7 +148,7 @@ namespace Nox.XR.Interactions {
 		private void OnSourceChanged(IHand source) {
 			_source = source;
 
-			var count = source?.Fingers?.Length ?? 0;
+			var count = PoseHand?.Fingers?.Length ?? 0;
 			_curls = new float[count];
 			_spread = NeutralSpread;
 			_posed = false;
@@ -143,11 +159,20 @@ namespace Nox.XR.Interactions {
 		/// conformer is writing them.
 		/// </summary>
 		private void LateUpdate() {
-			if (!enabledPose || !hand || _source == null)
+			var pose = PoseHand;
+
+			if (!enabledPose || !hand || pose == null)
 				return;
 
-			if (grabber && grabber.IsConformingFingers)
+			if (hand && hand.IsConformingFingers)
 				return;
+
+			var fingers = pose.Fingers;
+			if (fingers == null || fingers.Length == 0)
+				return;
+
+			if (_curls.Length != fingers.Length)
+				_curls = new float[fingers.Length];
 
 			var tracked = TryReadCurls(out var curls, out var pinch);
 
@@ -166,8 +191,7 @@ namespace Nox.XR.Interactions {
 				? targetSpread
 				: Mathf.MoveTowards(_spread, targetSpread, spreadSpeed * deltaTime);
 
-			var palm = _source.Palm ? _source.Palm : hand.transform;
-			var fingers = _source.Fingers;
+			var palm = pose.Palm ? pose.Palm : hand.transform;
 
 			GetLateralSpan(fingers, palm, out var lateralCenter, out var lateralHalfSpan);
 			var middle = FindFinger(fingers, FingerType.Middle);

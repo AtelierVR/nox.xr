@@ -4,6 +4,7 @@
 	"references": [
 		"Nox.CCK",
 		"Nox.CCK.Entities",
+                "Nox.CCK.Interactions",
 		"Nox.CCK.XR",
 		"Nox.Interactions",
 		"Nox.XR",

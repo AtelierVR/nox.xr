@@ -1,9 +1,19 @@
+using System.Collections.Generic;
 using Nox.Avatars.Hand;
 using Nox.CCK.Entities;
 using Nox.CCK.Utils;
 using UnityEngine;
 using UnityEngine.Events;
 using Logger = Nox.CCK.Utils.Logger;
+using IGrabber = Nox.Interactions.IGrabber;
+using IGrabberBody = Nox.Interactions.IGrabberBody;
+using IGrabberFollower = Nox.Interactions.IGrabberFollower;
+using IGrabberOffset = Nox.Interactions.IGrabberOffset;
+using IGrabberPose = Nox.Interactions.IGrabberPose;
+using IGrabPull = Nox.Interactions.IGrabPull;
+using IGrabberPalm = Nox.Interactions.IGrabberPalm;
+using IGrabberTargeting = Nox.Interactions.IGrabberTargeting;
+using IPhysicsGrabber = Nox.Interactions.IPhysicsGrabber;
 
 namespace Nox.XR.Player {
 	public enum HandSide {
@@ -12,8 +22,9 @@ namespace Nox.XR.Player {
 	}
 
 	[AddComponentMenu("Nox/XR/Player/Hand Part")]
+	[DefaultExecutionOrder(11000)]
 	[RequireComponent(typeof(Rigidbody))]
-	public class Hand : Part {
+	public partial class Hand : Part, IGrabber, IGrabberTargeting, IGrabberBody, IPhysicsGrabber, IGrabberFollower, IGrabPull, IGrabberPalm {
 		[Header("Rig")]
 		[SerializeField]
 		private HandSide side = HandSide.Right;
@@ -44,32 +55,12 @@ namespace Nox.XR.Player {
 		private Vector3 adjustPosition;
 
 		[Header("Physical hold")]
-		[SerializeField, Min(0f), Tooltip("Spring gain pulling the physical hand toward its follow point.")]
-		private float physicalStrength = 60f;
-
-		[SerializeField, Min(0f), Tooltip("Maximum linear acceleration of the physical hand, in m/s per fixed step.")]
-		private float physicalAcceleration = 20f;
-		[SerializeField, Min(0f), Tooltip("Maximum speed of the physical hand when the held object does not impose one.")]
-		private float physicalMaxVelocity = 12f;
-
-		[SerializeField, Min(0f), Tooltip("Spring gain driving the rotation of the physical hand.")]
-		private float physicalRotationStrength = 100f;
-
-		[SerializeField, Min(0f), Tooltip("Maximum angular acceleration of the physical hand, in rad/s per fixed step.")]
-		private float physicalAngularAcceleration = 60f;
-
-		[SerializeField, Min(0.01f), Tooltip("Lightest the physical hand can be, in kg.")]
+		[SerializeField, Min(0.01f), Tooltip("Lightest the physical hand can be, in kg (fallback when no follower drives its mass).")]
 		private float physicalMinMass = 0.25f;
 
-		[SerializeField, Min(0.01f), Tooltip("Heaviest the physical hand can be, in kg: it takes the mass of the held object up to this cap.")]
-		private float physicalMaxMass = 10f;
-
-		private Transform _followPoint;
 		private bool _physical;
 		private float _physicalSpeed;
-		private float _startMass;
 
-		private readonly RaycastHit[] _clipHits = new RaycastHit[16];
 
 		protected override EntityRig DefaultRig
 			=> side == HandSide.Left
@@ -81,8 +72,11 @@ namespace Nox.XR.Player {
 			set => side = value;
 		}
 
-		public Rigidbody Body
+		public override Rigidbody Body
 			=> body ? body : body = GetComponent<Rigidbody>();
+
+		public override float FollowSpeed
+			=> _physical ? _physicalSpeed : 0f;
 
 		private Vector3 _lastPosition;
 		private Quaternion _lastRotation = Quaternion.identity;
@@ -115,9 +109,6 @@ namespace Nox.XR.Player {
 			hand.moveTo = null;
 			hand.encapsulationBox = null;
 			hand.AdjustRotation = handSide == HandSide.Left ? LeftSideAdjustRotation : RightSideAdjustRotation;
-
-			if (hand.body)
-				hand.body.isKinematic = true;
 
 			hand.Configure(handSide == HandSide.Left ? "HandLeft" : "HandRight", rig);
 			return hand;
@@ -195,54 +186,38 @@ namespace Nox.XR.Player {
 			ApplyRigTarget();
 		}
 
-		private void OnDestroy() {
-			if (_followPoint)
-				_followPoint.gameObject.Destroy();
-		}
-
 		public override Transform RigTarget
 			=> _target ? _target : MoveTo;
 
 		public bool Physical
 			=> _physical;
 
-		public Transform FollowPoint {
+		/// <summary>Whether one of the fingers is pressing something with its poke.</summary>
+		public bool Gripping {
 			get {
-				if (_followPoint)
-					return _followPoint;
-
-				var point = new GameObject($"{name} Follow Point");
-				_followPoint = point.transform;
-				_followPoint.SetParent(transform.parent, false);
-				_followPoint.SetPositionAndRotation(transform.position, transform.rotation);
-				return _followPoint;
+				var physical = GetPhysical();
+				return physical && physical.Gripping;
 			}
 		}
 
 		public float PhysicalStretch
-			=> _physical && _followPoint && Body ? Vector3.Distance(Body.position, _followPoint.position) : 0f;
+			=> _physical && Body ? Vector3.Distance(Body.position, FollowPoint.position) : 0f;
 
-		public void BeginPhysical(float maxSpeed, float heldMass = 0f) {
-			if (_physical || !Body)
+		/// <summary>
+		/// Turns the hand physical: it is then driven by its follower while it carries a joint-held object, capped at
+		/// <paramref name="maxSpeed"/> (the held object's own speed, AutoHand's <c>maxHeldVelocity</c>). The mass is
+		/// left to the follower, which derives it from the lag, the way AutoHand's <c>HandFollow.SetMass</c> does.
+		/// </summary>
+		public void BeginPhysical(float maxSpeed) {
+			if (!Body)
 				return;
 
-			_physical = true;
-			_physicalSpeed = maxSpeed > 0f ? maxSpeed : physicalMaxVelocity;
-			_startMass = Body.mass;
+			if (!_physical) {
+				_physical = true;
+				FollowPoint.SetPositionAndRotation(transform.position, transform.rotation);
+			}
 
-			FollowPoint.SetPositionAndRotation(transform.position, transform.rotation);
-
-			Body.isKinematic = false;
-			Body.useGravity = false;
-			Body.interpolation = RigidbodyInterpolation.Interpolate;
-			Body.constraints = RigidbodyConstraints.None;
-			Body.solverIterations = 100;
-			Body.solverVelocityIterations = 100;
-			Body.mass = heldMass > 0f ? Mathf.Clamp(heldMass, physicalMinMass, physicalMaxMass) : physicalMinMass;
-			Body.linearDamping = 0f;
-			Body.angularDamping = 0f;
-			Body.linearVelocity = Vector3.zero;
-			Body.angularVelocity = Vector3.zero;
+			_physicalSpeed = maxSpeed > 0f ? maxSpeed : 0f;
 			Body.WakeUp();
 		}
 
@@ -251,37 +226,23 @@ namespace Nox.XR.Player {
 				return;
 
 			_physical = false;
+			_physicalSpeed = 0f;
 
-			if (_followPoint)
-				transform.SetPositionAndRotation(_followPoint.position, _followPoint.rotation);
+			if (!Body)
+				return;
 
-			if (Body) {
-				Body.linearVelocity = Vector3.zero;
-				Body.angularVelocity = Vector3.zero;
-				Body.isKinematic = true;
-				Body.mass = _startMass > 0f ? _startMass : Body.mass;
+			if (PhysicsFollow) {
+				Body.WakeUp();
+				return;
 			}
+
+			Body.mass = physicalMinMass;
+
+			Body.linearVelocity = Vector3.zero;
+			Body.angularVelocity = Vector3.zero;
+			Body.isKinematic = true;
 
 			SnapToTarget();
-		}
-
-		public override void SetPosition(Vector3 position) {
-			if (!_physical) {
-				base.SetPosition(position);
-				return;
-			}
-
-			SetRawPosition(position);
-			FollowPoint.position = position;
-		}
-
-		public override void SetRotation(Quaternion rotation) {
-			if (!_physical) {
-				base.SetRotation(rotation);
-				return;
-			}
-
-			FollowPoint.rotation = rotation;
 		}
 
 		private void ApplyRigTarget() {
@@ -308,21 +269,49 @@ namespace Nox.XR.Player {
 			set => encapsulationBox = value;
 		}
 
+		/// <summary>
+		/// Volume enclosing every collider of the hand, once it has been sized: the player depenetrates against
+		/// it, so a finger entering a panel is corrected too and no longer only the palm.
+		/// </summary>
+		private BoxCollider EncapsulationVolume
+			=> encapsulationBox && encapsulationBox.size.sqrMagnitude > 0f ? encapsulationBox : null;
+
 		public override Collider EnvironmentCollider
-			=> GetHandPhysics() is { } physics ? physics.BodyCollider : base.EnvironmentCollider;
+			=> GetPhysical() is { BodyCollider: { } palm }
+				? palm
+				: base.EnvironmentCollider;
 
 		public override float CollisionRadius
 			=> GetHandPhysics() is { } physics ? physics.EnvironmentRadius : base.CollisionRadius;
 
 		public override Vector3 CollisionCenter
-			=> GetHandPhysics() is { BodyCollider: { } body }
-				? body.bounds.center
+			=> GetPhysical() is { BodyCollider: { } palm }
+				? palm.bounds.center
 				: base.CollisionCenter;
 
+		public override void GetBodyColliders(List<Collider> results) {
+			var physical = GetPhysical();
+
+			if (physical) {
+				physical.GetBodyColliders(results);
+				return;
+			}
+
+			base.GetBodyColliders(results);
+		}
+
 		private HandPhysics _handPhysics;
+		private HandPhysical _physicalHand;
 
 		private HandPhysics GetHandPhysics()
-			=> _handPhysics ? _handPhysics : _handPhysics = gameObject.GetComponent<HandPhysics>();
+			=> _handPhysics
+				? _handPhysics
+				 : _handPhysics = gameObject.GetComponent<HandPhysics>();
+
+		private HandPhysical GetPhysical()
+			=> _physicalHand
+				? _physicalHand
+				: _physicalHand = gameObject.GetComponent<HandPhysical>();
 
 		public bool EnableMovement {
 			get => enableMovement;
@@ -346,42 +335,23 @@ namespace Nox.XR.Player {
 		public override bool CanFollow
 			=> true;
 
-		public override void FollowTrackingSpace(Vector3 previousPosition) {
-			if (!PartEnabled || _physical)
-				return;
+		private bool IsBodyCollider(Collider collider) {
+			if (!Player)
+				return false;
 
-			var box = EncapsulationBox;
-			if (!box)
-				return;
+			var own = Player.BodyColliders;
+			for (var i = 0; i < own.Count; i++)
+				if (own[i] == collider)
+					return true;
 
-			var delta = transform.position - previousPosition;
-			if (delta.magnitude < Physics.defaultContactOffset)
-				return;
-
-			var center = box.transform.TransformPoint(box.center) - delta;
-			var halfExtents = box.transform.TransformVector(box.size) / 2f;
-			var mask = Player ? Player.handPlayerMask : ~0;
-			var count = Physics.BoxCastNonAlloc(
-				center, halfExtents, delta, _clipHits,
-				box.transform.rotation, delta.magnitude * 1.5f, mask
-			);
-
-			for (var i = 0; i < count; i++) {
-				var hit = _clipHits[i];
-				if (hit.collider.isTrigger)
-					continue;
-
-				var toHit = hit.point - transform.position;
-				transform.position = Vector3.MoveTowards(transform.position, previousPosition, toHit.magnitude);
-				break;
-			}
+			return false;
 		}
 
 		public override void FollowTurn() {
 			if (!PartEnabled || !Body)
 				return;
 
-			if (_physical)
+			if (PhysicsFollow || _physical)
 				return;
 
 			Body.position = transform.position;
@@ -391,13 +361,8 @@ namespace Nox.XR.Player {
 		}
 
 		public override void OnPlayerFixedUpdate() {
-			if (!enableMovement || !Body)
+			if (!enableMovement || !Body || PhysicsFollow)
 				return;
-
-			if (_physical) {
-				DrivePhysical();
-				return;
-			}
 
 			var deltaTime = Time.fixedDeltaTime;
 			if (deltaTime <= 0f)
@@ -424,7 +389,7 @@ namespace Nox.XR.Player {
 		}
 
 		public void SetHandLocation(Vector3 position) {
-			if (_physical) {
+			if (PhysicsFollow) {
 				FollowPoint.position = position;
 				Body.position = position;
 				Body.linearVelocity = Vector3.zero;
@@ -441,7 +406,7 @@ namespace Nox.XR.Player {
 			if (!Body)
 				return;
 
-			var point = _physical && _followPoint ? _followPoint : MoveTo;
+			var point = PhysicsFollow && Body ? FollowPoint : MoveTo;
 
 			Body.position = point.position;
 			Body.rotation = point.rotation;
@@ -458,34 +423,6 @@ namespace Nox.XR.Player {
 
 			_lastPosition = transform.position;
 			_lastRotation = transform.rotation;
-		}
-
-		private void DrivePhysical() {
-			var deltaTime = Time.fixedDeltaTime;
-			if (deltaTime <= 0f || !_followPoint)
-				return;
-
-			var delta = _followPoint.position - Body.position;
-			var desired = Vector3.ClampMagnitude(delta * physicalStrength, _physicalSpeed);
-
-			if (desired.sqrMagnitude > 0.0001f)
-				Body.WakeUp();
-
-			Body.linearVelocity = Vector3.MoveTowards(Body.linearVelocity, desired, physicalAcceleration * deltaTime);
-
-			var rotation = _followPoint.rotation * Quaternion.Inverse(Body.rotation);
-			rotation.ToAngleAxis(out var angle, out var axis);
-
-			if (float.IsInfinity(axis.x) || angle <= 0f) {
-				Body.angularVelocity = Vector3.MoveTowards(Body.angularVelocity, Vector3.zero, physicalAngularAcceleration * deltaTime);
-				return;
-			}
-
-			if (angle > 180f)
-				angle -= 360f;
-
-			var desiredAngular = axis.normalized * (angle * Mathf.Deg2Rad * physicalRotationStrength);
-			Body.angularVelocity = Vector3.MoveTowards(Body.angularVelocity, desiredAngular, physicalAngularAcceleration * deltaTime);
 		}
 
 		protected override bool SupportsRig(EntityRig value)

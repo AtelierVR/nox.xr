@@ -41,12 +41,23 @@ namespace Nox.XR.Player {
 		[SerializeField, Min(0f), Tooltip("Headroom needed above this part to stay standing.")]
 		private float standingClearance = 0.35f;
 
-		private Vector3 _environmentOffset;
 		private Vector3 _rawPosition;
 		private bool _hasRawPosition;
+		private Vector3 _trackedPosition;
+		private Quaternion _trackedRotation = Quaternion.identity;
+		private bool _hasTrackedPose;
 
 		/// <summary>Whether this part is currently driven by its player.</summary>
 		public bool PartEnabled => partEnabled;
+
+		/// <summary>Whether a tracked pose was received.</summary>
+		public bool HasTrackedPose => _hasTrackedPose;
+
+		/// <summary>Last tracked position.</summary>
+		public Vector3 TrackedPosition => _trackedPosition;
+
+		/// <summary>Last tracked rotation.</summary>
+		public Quaternion TrackedRotation => _trackedRotation;
 
 		/// <summary>
 		/// Whether this part stays alive when its device stops tracking or leaves.
@@ -130,29 +141,61 @@ namespace Nox.XR.Player {
 		/// <summary>World center of the environment volume.</summary>
 		public virtual Vector3 CollisionCenter
 			=> environmentCollider
-				? environmentCollider.transform.TransformPoint(EnvironmentLocalCenter)
+				? CenterOf(environmentCollider)
 				: TrackingSource ? TrackingSource.position : transform.position;
 
 		/// <summary>World radius of the environment volume (0 when the part has none).</summary>
-		public virtual float CollisionRadius {
-			get {
-				if (!environmentCollider)
-					return 0f;
+		public virtual float CollisionRadius
+			=> RadiusOf(environmentCollider);
 
-				var scale = environmentCollider.transform.lossyScale;
-				var maxScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+		/// <summary>World center of a collider, read from its own shape rather than from <c>Collider.bounds</c>.</summary>
+		public static Vector3 CenterOf(Collider collider)
+			=> collider
+				? collider.transform.TransformPoint(LocalCenterOf(collider))
+				: Vector3.zero;
 
-				return environmentCollider switch {
-					SphereCollider sphere     => sphere.radius * maxScale,
-					CapsuleCollider capsule   => Mathf.Max(capsule.radius, capsule.height * 0.5f) * maxScale,
-					BoxCollider box           => Mathf.Max(box.size.x, Mathf.Max(box.size.y, box.size.z)) * 0.5f * maxScale,
-					_                         => environmentCollider.bounds.extents.magnitude
-				};
-			}
+		/// <summary>World half extent of the largest dimension of a collider.</summary>
+		public static float RadiusOf(Collider collider) {
+			if (!collider)
+				return 0f;
+
+			var scale = collider.transform.lossyScale;
+			var maxScale = Mathf.Max(
+				Mathf.Abs(scale.x),
+				Mathf.Abs(scale.y),
+				Mathf.Abs(scale.z)
+			);
+
+			return collider switch {
+				SphereCollider sphere     => sphere.radius * maxScale,
+				CapsuleCollider capsule   => Mathf.Max(capsule.radius, capsule.height * 0.5f) * maxScale,
+				BoxCollider box           => Mathf.Max(box.size.x, Mathf.Max(box.size.y, box.size.z)) * 0.5f * maxScale,
+				_                         => collider.bounds.extents.magnitude
+			};
 		}
 
-		private Vector3 EnvironmentLocalCenter
-			=> environmentCollider switch {
+		/// <summary>World radius of the sphere enclosing a collider: how far its queries have to reach.</summary>
+		public static float EnclosingRadiusOf(Collider collider) {
+			if (!collider)
+				return 0f;
+
+			var scale = collider.transform.lossyScale;
+			var maxScale = Mathf.Max(
+				Mathf.Abs(scale.x),
+				Mathf.Abs(scale.y),
+				Mathf.Abs(scale.z)
+			);
+
+			return collider switch {
+				SphereCollider sphere     => sphere.radius * maxScale,
+				CapsuleCollider capsule   => (capsule.radius + capsule.height * 0.5f) * maxScale,
+				BoxCollider box           => box.size.magnitude * 0.5f * maxScale,
+				_                         => collider.bounds.extents.magnitude
+			};
+		}
+
+		private static Vector3 LocalCenterOf(Collider collider)
+			=> collider switch {
 				SphereCollider sphere      => sphere.center,
 				CapsuleCollider capsule    => capsule.center,
 				BoxCollider box            => box.center,
@@ -169,12 +212,72 @@ namespace Nox.XR.Player {
 				? _rawPosition
 				: TrackingSource ? TrackingSource.position : transform.position;
 
-		/// <summary>Correction the player applies on top of the tracked pose to keep the part out of geometry.</summary>
-		public Vector3 EnvironmentOffset => _environmentOffset;
+		/// <summary>Rigidbody the follower drives, or <c>null</c> when the part is only teleported.</summary>
+		public virtual Rigidbody Body
+			=> null;
 
-		/// <summary>Set (or clear, with <see cref="Vector3.zero"/>) the correction applied to the tracked pose.</summary>
-		public void SetEnvironmentOffset(Vector3 offset)
-			=> _environmentOffset = offset;
+		/// <summary>
+		/// Whether the tracked pose is handed to the body through the follower (see <c>XRFollow</c>) instead of
+		/// being written on the part. Set by the follower when it drives a body.
+		/// </summary>
+		public bool PhysicsFollow { get; set; }
+
+		/// <summary>Speed cap of the follower for this part, 0 to use the follower default.</summary>
+		public virtual float FollowSpeed
+			=> 0f;
+
+		/// <summary>
+		/// Offset applied on top of the tracked pose when the follower target is written, so a held object can drag this
+		/// part onto itself instead of letting it stay on its controller (see <c>Nox.Interactions.IGrabberOffset</c>).
+		/// </summary>
+		public Vector3 HoldOffsetPosition { get; private set; }
+
+		/// <summary>Rotation of <see cref="HoldOffsetPosition"/>: applied in the tracked frame.</summary>
+		public Quaternion HoldOffsetRotation { get; private set; } = Quaternion.identity;
+
+		/// <summary>Sets the hold offset and rewrites the follower target at once.</summary>
+		public void SetHoldOffset(Vector3 position, Quaternion rotation) {
+			HoldOffsetPosition = position;
+			HoldOffsetRotation = rotation;
+			ApplyFollowPoint();
+		}
+
+		/// <summary>Drops the hold offset: the part follows its tracked pose again.</summary>
+		public void ClearHoldOffset()
+			=> SetHoldOffset(Vector3.zero, Quaternion.identity);
+
+		/// <summary>
+		/// Rewrites the follower target from the last tracked pose and the current hold offset. Called when the offset
+		/// changes, so the physics step of the same frame already sees the new target.
+		/// </summary>
+		public void ApplyFollowPoint() {
+			if (!PhysicsFollow)
+				return;
+
+			var point = FollowPoint;
+			point.SetPositionAndRotation(_trackedPosition + HoldOffsetPosition, _trackedRotation * HoldOffsetRotation);
+		}
+
+		private Transform _followPoint;
+
+		/// <summary>Target the follower pulls the body towards.</summary>
+		public Transform FollowPoint {
+			get {
+				if (_followPoint)
+					return _followPoint;
+
+				var point = new GameObject($"{name} Follow Point");
+				_followPoint = point.transform;
+				_followPoint.SetParent(transform.parent, false);
+				_followPoint.SetPositionAndRotation(transform.position, transform.rotation);
+				return _followPoint;
+			}
+		}
+
+		protected virtual void OnDestroy() {
+			if (_followPoint)
+				_followPoint.gameObject.Destroy();
+		}
 
 		/// <summary>
 		/// Whether the part carries a follow behaviour: the tracking space can move or turn under it, and the part
@@ -262,11 +365,19 @@ namespace Nox.XR.Player {
 
 		/// <summary>Set the tracked position of this part. The environment correction is applied on top.</summary>
 		public virtual void SetPosition(Vector3 position) {
+			_trackedPosition = position;
+			_hasTrackedPose = true;
+
 			SetRawPosition(position);
+
+			if (PhysicsFollow) {
+				FollowPoint.position = position + HoldOffsetPosition;
+				return;
+			}
 
 			var source = TrackingSource;
 			if (source)
-				source.position = position + _environmentOffset;
+				source.position = position + HoldOffsetPosition;
 		}
 
 		/// <summary>
@@ -280,9 +391,17 @@ namespace Nox.XR.Player {
 
 		/// <summary>Set the tracked rotation of this part.</summary>
 		public virtual void SetRotation(Quaternion rotation) {
+			_trackedRotation = rotation;
+			_hasTrackedPose = true;
+
+			if (PhysicsFollow) {
+				FollowPoint.rotation = rotation * HoldOffsetRotation;
+				return;
+			}
+
 			var source = TrackingSource;
 			if (source)
-				source.rotation = rotation;
+				source.rotation = rotation * HoldOffsetRotation;
 		}
 
 		/// <summary>Set the linear velocity of this part (no-op when the part has no body).</summary>
@@ -293,6 +412,10 @@ namespace Nox.XR.Player {
 
 		/// <summary>Set both the tracked position and rotation.</summary>
 		public virtual void SetPose(Vector3 position, Quaternion rotation) {
+			_trackedPosition = position;
+			_trackedRotation = rotation;
+			_hasTrackedPose = true;
+
 			SetPosition(position);
 			SetRotation(rotation);
 		}

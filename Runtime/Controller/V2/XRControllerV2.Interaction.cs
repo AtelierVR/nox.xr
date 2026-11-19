@@ -67,7 +67,7 @@ namespace Nox.XR.Controller.V2 {
 		[SerializeField, Tooltip("Bend the fingers of the avatar hand around the grabbed object.")]
 		private bool conformFingers = true;
 
-		private readonly Dictionary<Hand, HandGrabber> _grabbers = new();
+		private readonly List<Hand> _grabbedHands = new();
 
 		/// <summary>
 		/// Wires the UI systems the interactors of this rig need: the <see cref="EventSystem"/> carrying the
@@ -142,11 +142,11 @@ namespace Nox.XR.Controller.V2 {
 				player.OnPartUnregistered.RemoveListener(OnInteractionPartUnregistered);
 			}
 
-			foreach (var grabber in _grabbers.Values)
-				if (grabber)
-					grabber.Release(grabThrowPower);
+			foreach (var hand in _grabbedHands)
+				if (hand)
+					hand.Release(grabThrowPower);
 
-			_grabbers.Clear();
+			_grabbedHands.Clear();
 		}
 
 		/// <summary>
@@ -157,40 +157,36 @@ namespace Nox.XR.Controller.V2 {
 			if (part is not Hand hand)
 				return;
 
-			HandGrabber grabber = null;
-
 			if (enableGrab) {
 				var layers = grabLayers == 0
 					? InteractionConstants.GrabbableMask
 					: grabLayers;
 
-				grabber = hand.gameObject.GetOrAddComponent<HandGrabber>();
-				grabber.Configure(hand, grabReach, layers, grabHighlight, conformFingers);
+				hand.ConfigureGrab(grabReach, layers, grabHighlight, conformFingers);
 
 				var distance = hand.gameObject.GetOrAddComponent<HandDistanceGrabber>();
 				distance.Configure(hand, distanceReach, layers, grabHighlight);
 
 				hand.gameObject.GetOrAddComponent<HandGrabInput>()
-					.Configure(hand, grabber, distance, grabThrowPower);
+					.Configure(hand, distance, grabThrowPower);
 
-				_grabbers[hand] = grabber;
+				_grabbedHands.Add(hand);
 			}
 
 			hand.gameObject.GetOrAddComponent<HandSkeletonPose>()
-				.Configure(hand, grabber);
+				.Configure(hand);
 
 			hand.gameObject.GetOrAddComponent<HandNearFar>();
 		}
 
 		/// <summary>Releases the hand that is going away.</summary>
 		private void OnInteractionPartUnregistered(Part part) {
-			if (part is not Hand hand || !_grabbers.TryGetValue(hand, out var grabber))
+			if (part is not Hand hand)
 				return;
 
-			if (grabber)
-				grabber.Release(grabThrowPower);
+			hand.Release(grabThrowPower);
 
-			_grabbers.Remove(hand);
+			_grabbedHands.Remove(hand);
 		}
 	}
 }

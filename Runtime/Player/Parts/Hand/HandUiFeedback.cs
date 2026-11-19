@@ -36,6 +36,24 @@ namespace Nox.XR.Player {
 			private bool Held
 				=> _lockSpace != null || _scroll != null;
 
+			/// <summary>
+			/// Drops everything the pointer holds, including the points frozen on the interactor: a pointer removed in the
+			/// middle of a press (the element it pressed was destroyed with its menu) would otherwise leave the ray of the
+			/// hand frozen in the world, and that hand no longer hits any UI.
+			/// </summary>
+			public void LetGo() {
+				if (Interactor is NearFarInteractor near)
+					near.ReleaseUiPointer();
+
+				_selecting   = false;
+				_lockSpace   = null;
+				_scroll      = null;
+				_scrollSpace = null;
+				_clamped     = false;
+				_lockLocal.Clear();
+				_lockWorld.Clear();
+			}
+
 			public bool TryRead(out UiPointerState state) {
 				state = default;
 
@@ -116,14 +134,7 @@ namespace Nox.XR.Player {
 					return;
 
 				if (!model.select) {
-					if (Held)
-						near.ReleaseUiPointer();
-
-					_selecting   = false;
-					_lockSpace   = null;
-					_scroll      = null;
-					_scrollSpace = null;
-					_clamped     = false;
+					LetGo();
 					return;
 				}
 
@@ -139,7 +150,8 @@ namespace Nox.XR.Player {
 						_scroll = Scrollable(hit.gameObject);
 
 						if (_scroll) {
-							// The pointer keeps its place in the content: the rows do not slide under the hand.
+							// The pointer keeps its place in the content: the rows stay under the hand instead of sliding
+							// through it.
 							_scrollSpace = _scroll.content ? _scroll.content : _scroll.transform;
 							_scrollLocal = _scrollSpace.InverseTransformPoint(hit.worldPosition);
 							_scrollPoint = hit.worldPosition;
@@ -176,11 +188,8 @@ namespace Nox.XR.Player {
 			/// <summary>
 			/// Holds the pointer on the list: once grabbed it keeps its place <b>in the content</b>, so the rows stay under the
 			/// hand instead of sliding through it, and it stops on the border of the visible area instead of running over the
-			/// elements the mask hides. The scroll follows the free hand ray: the list clamps on its own ends.
-			/// <para>
-			/// The held point sits off the ray by design, so <see cref="HandNearFar"/> turns the ray towards it while it is
-			/// held: the line stays straight, it does not bow towards the pointer.
-			/// </para>
+			/// elements the mask hides. The list follows the hand one to one, so the grabbed place stays on the ray; it clamps
+			/// on its own ends, and only there does the pointer leave the ray.
 			/// </summary>
 			private void HoldOnScroll(NearFarInteractor near) {
 				_clamped = false;
@@ -190,11 +199,9 @@ namespace Nox.XR.Player {
 				if (!view || !_scrollSpace || !TryReadRay(out var origin, out var direction))
 					return;
 
-				// The scroll follows the hand everywhere: the list clamps itself on its own ends, with its elasticity.
 				_scrollPoint = DragPoint(view, origin, direction);
-
-				_holdPoint = Clamp(view, _scrollSpace.TransformPoint(_scrollLocal));
-				_clamped   = true;
+				_holdPoint   = Clamp(view, _scrollSpace.TransformPoint(_scrollLocal));
+				_clamped     = true;
 
 				_lockWorld.Add(origin);
 				_lockWorld.Add(_holdPoint + (_holdPoint - origin).normalized * Overshoot);
@@ -511,14 +518,6 @@ namespace Nox.XR.Player {
 				if (pair.Value is not Hand hand)
 					continue;
 
-				var handPokes = hand.GetComponent<HandPokes>();
-				if (handPokes) {
-					var pokes = handPokes.Pokes;
-					for (var i = 0; i < pokes.Count; i++)
-						Add(pokes[i].poke);
-				}
-
-				// The fingertips can live outside the hand object (avatar armature): walk the children as a fallback.
 				var found = hand.GetComponentsInChildren<PokeInteractor>(true);
 				for (var i = 0; i < found.Length; i++)
 					Add(found[i]);
@@ -555,8 +554,10 @@ namespace Nox.XR.Player {
 		}
 
 		private void Release() {
-			for (var i = 0; i < _pointers.Count; i++)
+			for (var i = 0; i < _pointers.Count; i++) {
+				_pointers[i].LetGo();
 				UIPointer.Remove(_pointers[i]);
+			}
 
 			_pointers.Clear();
 			ScrollableFocused = false;

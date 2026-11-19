@@ -162,7 +162,6 @@ namespace Nox.XR.Player {
 		/// <summary>Backing field of <see cref="heightOffset"/>.</summary>
 		[FormerlySerializedAs("heightOffset")]
 		private float _heightOffset;
-		private readonly Collider[] _colliderNonAlloc = new Collider[128];
 		private readonly RaycastHit[] _hitsNonAlloc = new RaycastHit[128];
 
 		private Coroutine _disableGroundingRoutine;
@@ -185,6 +184,7 @@ namespace Nox.XR.Player {
 		private Quaternion _lastPlatformRotation;
 		private float _turningAxis;
 		private int _handPlayerMask;
+		private int _handPartMask;
 
 		/// <summary>Whether the player crouches, because of the input or of the environment.</summary>
 		public bool IsCrouching => crouching || _autoCrouching;
@@ -199,6 +199,23 @@ namespace Nox.XR.Player {
 		public RaycastHit lastPlatformingHit { get; protected set; }
 
 		public int handPlayerMask => _handPlayerMask;
+
+		/// <summary>
+		/// Mask of the layers a <see cref="Hand"/> collides with. Read lazily: the hands change their own rules
+		/// when they spawn (see <c>HandPhysics</c>), which is after the player woke up, so a mask captured in
+		/// <c>Awake</c> would miss the layers they just turned on (the menu panel, for instance).
+		/// </summary>
+		public int handPartMask
+			=> _handPartMask != 0 ? _handPartMask : RefreshHandPartMask();
+
+		/// <summary>Recomputes <see cref="handPartMask"/> now. Called by the hands when they change their layer rules.</summary>
+		public int RefreshHandPartMask() {
+			_handPartMask = Layers.LayerExists(Layers.Hand)
+				? GetPhysicsLayerMask(LayerMask.NameToLayer(Layers.Hand))
+				: _handPlayerMask;
+
+			return _handPartMask;
+		}
 
 		/// <summary>Registered parts, keyed by their rig slot.</summary>
 		public IReadOnlyDictionary<EntityRig, Part> Parts => _parts;
@@ -408,8 +425,10 @@ namespace Nox.XR.Player {
 
 			RefreshBodyColliders();
 
-			if (part is Hand hand)
+			if (part is Hand hand) {
+				_handPartMask = 0;
 				SubscribeHand(hand);
+			}
 
 			OnPartRegistered.Invoke(part);
 			return true;
@@ -425,8 +444,10 @@ namespace Nox.XR.Player {
 			if (_parts.TryGetValue(part.Rig, out var current) && current == part)
 				_parts.Remove(part.Rig);
 
-			if (part is Hand hand)
+			if (part is Hand hand) {
+				_handPartMask = 0;
 				UnsubscribeHand(hand);
+			}
 
 			part.EnabledChanged.RemoveListener(OnPartEnabledChanged);
 			part.Detach(this);
@@ -447,6 +468,7 @@ namespace Nox.XR.Player {
 			BuildBodyColliders();
 
 			_handPlayerMask = GetPhysicsLayerMask(gameObject.layer);
+			RefreshHandPartMask();
 
 			RegisterParts();
 

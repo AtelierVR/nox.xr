@@ -13,10 +13,10 @@ GameObject:
   - component: {fileID: 1003}
   - component: {fileID: 1004}
   - component: {fileID: 1005}
-  - component: {fileID: 1006}
-  - component: {fileID: 1007}
   - component: {fileID: 1008}
   - component: {fileID: 1009}
+  - component: {fileID: 1014}
+  - component: {fileID: 1017}
   m_Layer: 8
   m_Name: Hand
   m_TagString: Untagged
@@ -38,6 +38,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1011}
+  - {fileID: 1013}
+  - {fileID: 1016}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &1002
@@ -63,7 +65,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 0
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 3
@@ -84,8 +86,8 @@ MonoBehaviour:
   partEnabled: 1
   collideWithEnvironment: 1
   environmentCollider: {fileID: 0}
-  crouchUnderCeiling: 1
-  standingClearance: 1
+  crouchUnderCeiling: 0
+  standingClearance: 0.35
   Attached:
     m_PersistentCalls:
       m_Calls: []
@@ -106,6 +108,29 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   _target: {fileID: 1011}
+  grabReach: 0.2
+  grabLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  grabHighlight: 1
+  grabHighlightMaterial: {fileID: 0}
+  targetRate: 30
+  minGrabDuration: 0.05
+  maxGrabDuration: 0.25
+  grabType: 1
+  maxReachMass: 2
+  reachDuration: 0.08
+  returnDuration: 0.2
+  maxReachOffset: 0.25
+  velocityGrabHandAmplifier: 120
+  conformFingers: 1
+  conformRetry: 0.05
+  conformSteps: 40
+  contactDistance: 0.02
+  relaxDuration: 0.2
+  useGentleGrab: 0
+  gentleGrabSpeed: 1
+  maintainGrabOffset: 0
 --- !u!114 &1004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,32 +164,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hand: {fileID: 1003}
-  addBody: 1
-  bodySize: {x: 0.06, y: 0.05, z: 0.1}
-  bodyCenter: {x: 0, y: 0, z: 0.02}
   environmentRadius: 0.035
   bodyLayer: Hand
   ignoredLayers:
   - Hand
-  - HandPlayer
+  - LocalPlayer
   - Player
-  - LocalAvatar
-  - RemoteAvatar
-  - Grabbing
---- !u!114 &1006
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7d9694a4084caa45a0c714b92ad034c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  hand: {fileID: 1003}
-  addPokes: 1
 --- !u!1 &1010
 GameObject:
   m_ObjectHideFlags: 0
@@ -196,60 +201,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1001}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1007
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 60e88b0ac4a79d84da979ad675db4c49, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nox.XR.Interactions::Nox.XR.Interactions.HandGrabber
-  hand: {fileID: 1003}
-  palm: {fileID: 0}
-  targetRate: 30
-  minGrabDuration: 0.05
-  maxGrabDuration: 0.25
-  conformFingers: 1
-  conformDistance: 0.15
-  conformRetry: 0.05
-  conformSteps: 40
-  bindJoint: 0
-  jointBreakForce: 3500
-  relaxDuration: 0.2
-  grabType: 2
-  maxReachMass: 2
-  reachDuration: 0.08
-  returnDuration: 0.2
-  maxReachOffset: 0.15
-  grabPoint: {fileID: 1001}
-  rig: 0
-  source: 0
-  kind: 0
-  ray:
-    layers:
-      serializedVersion: 2
-      m_Bits: 0
-    reach: 0.2
-    offset: 0.02
-  highlight:
-    enabled: 1
-    material: {fileID: 0}
-  onGrabbed:
-    m_PersistentCalls:
-      m_Calls: []
-  onReleased:
-    m_PersistentCalls:
-      m_Calls: []
-  onTargetChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  onStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!114 &1008
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -265,9 +216,17 @@ MonoBehaviour:
   hand: {fileID: 1003}
   pointer: {fileID: 0}
   maxRange: 5
+  minRange: 0.25
   sphereRadius: 0.03
-  pullDuration: 0.2
   forwardSmoothing: 5
+  reelByHandMotion: 1
+  minAdditionalVelocity: 0.05
+  maxAdditionalVelocity: 1.5
+  pushBias: 1.25
+  pullBias: 1
+  motionRampThreshold: 0.3
+  useMomentum: 1
+  momentumDecay: 1.25
   grabPoint: {fileID: 1001}
   rig: 0
   source: 1
@@ -306,9 +265,253 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Nox.XR.Interactions::Nox.XR.Interactions.HandGrabInput
   hand: {fileID: 1003}
-  near: {fileID: 1007}
+  near: {fileID: 1003}
   far: {fileID: 1008}
   grabBinding: select
   altGrabBinding: activate
   grabThreshold: 0.5
   throwPower: 1.25
+--- !u!1 &1012
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1013}
+  m_Layer: 8
+  m_Name: NearFar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1013
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1012}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43103fd49098fcf408c93eab549ef41d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Player::Nox.XR.Player.HandNearFar
+  hand: {fileID: 1003}
+  pokeRayStopDistance: 0.15
+  pokeRayReleaseFactor: 1.6
+  lineWidth: 0.004
+  bendRatio: 0.5
+  restingLength: 0.25
+  lineOpacity: 0.9
+  hoverDesaturation: 0.45
+  uiHoverFadeSpeed: 12
+  hitLinger: 0.3
+  restCurveFade: 0.4
+  aimPosition: {x: -0.1013, y: -0.0707, z: -0.0222}
+  aimOffset: {x: 0, y: 0, z: 0}
+  anchor: {fileID: 1013}
+  stabilizeFarCaster: 1
+  farPositionStabilization: 0.25
+  farAngleStabilization: 20
+--- !u!1 &1015
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1016}
+  - component: {fileID: 1018}
+  m_Layer: 8
+  m_Name: Physical
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1016
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1020}
+  - {fileID: 1023}
+  m_Father: {fileID: 1001}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe80d6bdd490da3448f898c9ae79326c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Player::Nox.XR.Player.HandPhysical
+  hand: {fileID: 1003}
+  physical: {fileID: 1018}
+--- !u!114 &1018
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1560a751749df74fbf57ec70fe38bc2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nox.XR.Player::Nox.XR.Player.PhysicalHand
+  fingers: []
+  palm: {fileID: 1021}
+  material: {fileID: 13400000, guid: b41d7e93c2a64f5da8e0c1f2b3d4e5f6, type: 2}
+  pokeGrip: {fileID: 13400000, guid: c58a2f61d7b34e9e8f1a2c3d4e5f6a7b, type: 2}
+  palmSize: {x: 0.085, y: 0.03, z: 0.09}
+  knuckleSpacing: 0.019
+  fingerRadius: 0.009
+  phalanx: {x: 0.038, y: 0.024, z: 0.019}
+  fingerScales:
+  - 0.9
+  - 1
+  - 1.05
+  - 1
+  - 0.88
+  spreadAngle: 9
+  thumbAngle: 55
+  curlAngle: 80
+  equip: 1
+--- !u!1 &1019
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1020}
+  - component: {fileID: 1021}
+  m_Layer: 8
+  m_Name: Palm
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1020
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1019}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1016}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1021
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1019}
+  m_Material: {fileID: 13400000, guid: b41d7e93c2a64f5da8e0c1f2b3d4e5f6, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.08, y: 0.02, z: 0.08}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &1022
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1023}
+  - component: {fileID: 1024}
+  m_Layer: 8
+  m_Name: Encapsulation
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1023
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1016}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1024
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.08, y: 0.03, z: 0.15}
+  m_Center: {x: 0, y: 0, z: 0.05}

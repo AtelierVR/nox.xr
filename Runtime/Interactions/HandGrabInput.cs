@@ -1,3 +1,5 @@
+using Nox.Interactions;
+using Nox.XR.Bindings;
 using Nox.XR.Player;
 using Nox.XR.Runtime;
 using UnityEngine;
@@ -20,8 +22,8 @@ namespace Nox.XR.Interactions {
 		[SerializeField, Tooltip("Hand part whose binding is read. Found on this GameObject when empty.")]
 		private Hand hand;
 
-		[SerializeField, Tooltip("Near grabber driven by this input. Found on this GameObject when empty.")]
-		private HandGrabber near;
+		[SerializeField, Tooltip("Near grabber driven by this input: the hand itself. Resolved from the hand when empty.")]
+		private Hand near;
 
 		[SerializeField, Tooltip("Distance grabber driven by this input. Found on this GameObject when empty.")]
 		private HandDistanceGrabber far;
@@ -38,9 +40,18 @@ namespace Nox.XR.Interactions {
 		[SerializeField, Min(0f), Tooltip("Throw power applied when the binding is released.")]
 		private float throwPower = 1.25f;
 
+		[SerializeField, Range(0f, 1f), Tooltip("Value at or above which the squeeze binding crushes the held object.")]
+		private float squeezeThreshold = 0.8f;
+
+		[SerializeField, Range(0f, 1f), Tooltip("Value at or below which the squeeze is released, so it cannot blink at the threshold.")]
+		private float squeezeRelease = 0.6f;
+
 		private string _key;
 		private string _altKey;
 		private bool _pressed;
+
+		private IGrabSqueeze _squeezed;
+		private bool _squeezing;
 
 		/// <summary>Hand part this input belongs to.</summary>
 		public Hand HandPart {
@@ -49,9 +60,9 @@ namespace Nox.XR.Interactions {
 		}
 
 		/// <summary>Wires the input to its hand and grabbers.</summary>
-		public void Configure(Hand part, HandGrabber nearGrabber, HandDistanceGrabber farGrabber, float throwMultiplier = 1.25f) {
+		public void Configure(Hand part, HandDistanceGrabber farGrabber, float throwMultiplier = 1.25f) {
 			hand = part;
-			near = nearGrabber;
+			near = part;
 			far = farGrabber;
 			throwPower = throwMultiplier;
 			RefreshKey();
@@ -62,7 +73,7 @@ namespace Nox.XR.Interactions {
 				hand = GetComponent<Hand>();
 
 			if (!near)
-				near = GetComponent<HandGrabber>();
+				near = hand;
 
 			if (!far)
 				far = GetComponent<HandDistanceGrabber>();
@@ -89,13 +100,15 @@ namespace Nox.XR.Interactions {
 				return;
 
 			if (!near)
-				near = GetComponent<HandGrabber>();
+				near = hand;
 
 			if (!far)
 				far = GetComponent<HandDistanceGrabber>();
 
 			if (string.IsNullOrEmpty(_key))
 				RefreshKey();
+
+			UpdateSqueeze();
 
 			var value = Keybindings.GetFloatValue(_key);
 			if (!string.IsNullOrEmpty(_altKey))
@@ -122,11 +135,64 @@ namespace Nox.XR.Interactions {
 				$"[HandGrab] {_key}={Keybindings.GetFloatValue(_key):0.00} pressed; near={(near ? near.CurrentTarget?.Target : null)}, far={(far ? far.CurrentTarget?.Target : null)}",
 				this, tag: nameof(HandGrabInput));
 
-			if (near != null && near.Grab())
-				return;
+			// the palm always goes first: a fresh targeting pass decides what it can take now, so the ray never
+			// steals an object the hand could have grabbed
+			if (near != null) {
+				near.RefreshTarget();
+
+				if (near.Grab())
+					return;
+			}
 
 			if (far != null && far.Select())
 				far.Pull();
+		}
+
+		/// <summary>
+		/// Crushes the object the hand holds, the way AutoHand fires <c>onSqueeze</c> when the squeeze input is pressed on a
+		/// held grabbable: the grip axis of the hand is the squeeze here, so closing the hand further on what it already
+		/// carries is the gesture. The object decides what it means (a shape key, a sound, a break).
+		/// </summary>
+		private void UpdateSqueeze() {
+			var grabber = near != null && near.HeldGrabbable != null
+				? (IGrabber)near
+				: far != null && far.HeldGrabbable != null ? far : null;
+
+			var held = grabber != null ? grabber.HeldGrabbable as IGrabSqueeze : null;
+
+			if (held == null) {
+				ReleaseSqueeze();
+				return;
+			}
+
+			var left = hand && hand.Side == HandSide.Left;
+			var grip = Keybindings.GetFloatValue(left ? XRBinding.FingerLeftMiddle : XRBinding.FingerRightMiddle);
+
+			if (!_squeezing && grip >= squeezeThreshold) {
+				_squeezing = true;
+				_squeezed  = held;
+				held.Squeeze(grabber);
+				return;
+			}
+
+			if (_squeezing && grip <= squeezeRelease) {
+				_squeezing = false;
+				_squeezed  = null;
+				held.Unsqueeze(grabber);
+			}
+		}
+
+		private void ReleaseSqueeze() {
+			if (!_squeezing)
+				return;
+
+			_squeezing = false;
+
+			if (_squeezed == null)
+				return;
+
+			_squeezed.Unsqueeze(near);
+			_squeezed = null;
 		}
 	}
 }

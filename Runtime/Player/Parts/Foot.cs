@@ -48,7 +48,7 @@ namespace Nox.XR.Player {
 		}
 
 		public override void SetPosition(Vector3 position)
-			=> transform.position = position + EnvironmentOffset;
+			=> transform.position = position;
 
 		public override void SetRotation(Quaternion rotation)
 			=> transform.rotation = rotation;

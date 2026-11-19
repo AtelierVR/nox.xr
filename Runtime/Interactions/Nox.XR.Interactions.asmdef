@@ -9,6 +9,7 @@
         "Nox.XR",
         "Nox.XR.Runtime",
         "Nox.XR.Player",
+        "Nox.XR.Calibration",
         "Nox.Avatars.Hand",
         "Unity.XR.CoreUtils",
         "Unity.XR.Interaction.Toolkit"
