@@ -133,6 +133,7 @@ namespace Nox.XR.Controller.V2 {
 			SetupUi();
 			SetupInteraction();
 			SetupCalibration();
+			SetupAvatarFollower();
 
 			player.OnPartRegistered.AddListener(OnPartRegistered);
 			player.OnPartUnregistered.AddListener(OnPartUnregistered);

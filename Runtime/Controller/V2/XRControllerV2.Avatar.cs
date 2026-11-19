@@ -132,25 +132,18 @@ namespace Nox.XR.Controller.V2 {
 		/// play-space origin, with its spawn orientation. Only X/Z and the yaw are written - the height is the one
 		/// <see cref="GroundAvatar"/> applies.
 		/// </para>
+		/// <para>
+		/// The placement itself lives in <see cref="AvatarFollower"/>: it has to run <b>before</b> the IK solves, and
+		/// this controller runs after it (execution order 15). Placing the container from here moved the armature
+		/// after the arms had been solved from the hand targets, which are siblings of the container: the hands then
+		/// carried the move of the frame.
+		/// </para>
 		/// </summary>
-		private void LateUpdate() {
-			var space = player.TrackingContainer;
-
-			if (!space || avatarContainer.childCount == 0)
+		private void SetupAvatarFollower() {
+			if (!avatarContainer)
 				return;
 
-			var pose = player.transform;
-
-			// The avatar follows the head, not the body: the body catches up with the view through physics
-			// (SyncBodyHead) and is blocked by walls and by its own colliders, so a body-based avatar stays
-			// behind while the player walks in room-scale. The head is always where the player is.
-			var head   = player.Head;
-			var source = head ? head.Position : pose.position;
-			var local  = space.InverseTransformPoint(new Vector3(source.x, space.position.y, source.z));
-			var current = avatarContainer.localPosition;
-
-			avatarContainer.localPosition = new Vector3(local.x, current.y, local.z);
-			avatarContainer.localRotation = Quaternion.Inverse(space.rotation) * pose.rotation;
+			avatarContainer.gameObject.GetOrAddComponent<AvatarFollower>().Bind(player, avatarContainer);
 		}
 
 		/* ------------------------------------------------------------------ */
@@ -284,6 +277,7 @@ namespace Nox.XR.Controller.V2 {
 
 			UnbindRigProvider();
 			UnbindMovementParameters();
+			UnbindHandModules();
 
 			_avatar = avatar;
 
@@ -293,6 +287,8 @@ namespace Nox.XR.Controller.V2 {
 			BindRigProvider(descriptor);
 
 			BindMovementParameters(descriptor);
+
+			BindHandModules(descriptor);
 
 			AttachAvatar(descriptor.Anchor.transform);
 
@@ -365,7 +361,7 @@ namespace Nox.XR.Controller.V2 {
 		/// </para>
 		/// </summary>
 		private void ApplyHandOffsets(IAvatarDescriptor descriptor) {
-			var handModule = descriptor.GetModules<IHandModule>().FirstOrDefault();
+			var handModule = descriptor?.GetModules<IHandModule>().FirstOrDefault();
 			if (handModule == null) {
 				Logger.LogWarning("The avatar has no hand module: the rig keeps the raw controller pose for the hands.", this, tag: nameof(XRControllerV2));
 				return;
@@ -431,6 +427,58 @@ namespace Nox.XR.Controller.V2 {
 				ApplyHandOffset(source, hand);
 				return;
 			}
+		}
+
+		/// <summary>
+		/// Listens to the modules of the avatar so the hands are told about its hands as soon as it carries
+		/// them: a module can register long after the avatar root, and a hand part without its source keeps
+		/// the raw controller pose and the default physical hand.
+		/// </summary>
+		private void BindHandModules(IAvatarDescriptor descriptor) {
+			UnbindHandModules();
+
+			if (descriptor == null)
+				return;
+
+			descriptor.OnModuleRegistered.AddListener(OnHandModuleRegistered);
+			descriptor.OnModuleUnregistered.AddListener(OnHandModuleUnregistered);
+		}
+
+		private void UnbindHandModules() {
+			var descriptor = _avatar?.Descriptor;
+			if (descriptor != null) {
+				descriptor.OnModuleRegistered.RemoveListener(OnHandModuleRegistered);
+				descriptor.OnModuleUnregistered.RemoveListener(OnHandModuleUnregistered);
+			}
+		}
+
+		private void OnHandModuleRegistered(IAvatarModule module) {
+			if (module is IHandModule)
+				ApplyHandOffsets(_avatar?.Descriptor);
+		}
+
+		private void OnHandModuleUnregistered(IAvatarModule module) {
+			if (module is IHandModule)
+				ClearHandOffsets();
+		}
+
+		/// <summary>Takes the avatar hand away from every hand part (its module left the avatar).</summary>
+		private void ClearHandOffsets() {
+			if (!player)
+				return;
+
+			ClearHandOffset(HandSide.Left);
+			ClearHandOffset(HandSide.Right);
+		}
+
+		private void ClearHandOffset(HandSide side) {
+			var hand = player?.GetHand(side);
+			if (!hand)
+				return;
+
+			hand.PivotOffset = Vector3.zero;
+			hand.PivotRotation = Quaternion.identity;
+			hand.Source = null;
 		}
 
 		/// <summary>Applies the avatar size to the player (the view height follows the avatar).</summary>
