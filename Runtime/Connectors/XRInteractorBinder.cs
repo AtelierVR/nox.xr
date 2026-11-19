@@ -82,6 +82,39 @@ namespace Nox.XR.Runtime.Connectors {
 		private const string ModuleField     = "m_InputModule";
 		private const string RegisteredField = "m_RegisteredInputModule";
 
+		private const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.NonPublic;
+		private const string HitDataField   = "s_InteractorHitData";
+		private const string HitRaycasterField = "s_InteractorRaycasters";
+
+		private static FieldInfo _hitDataField;
+		private static FieldInfo _hitRaycasterField;
+
+		/// <summary>
+		/// Drops the element the graphic raycaster remembers for a poke.
+		/// <para>
+		/// <see cref="TrackedDeviceGraphicRaycaster"/> keeps one hit per interactor and only replaces it with a hit
+		/// that sorts <b>behind</b> it. The first element a fingertip reaches is often a label inside a card, i.e.
+		/// deeper in the canvas than the card itself: it then stays the remembered hit, every later element is
+		/// rejected, the interactor is never marked as selecting again, and the following buttons stop clicking -
+		/// even though the poke does meet the select requirements. The only way out used to be a disabled poke.
+		/// Forgetting the hit while the poke is not selecting gives the next raycast a clean start.
+		/// </para>
+		/// </summary>
+		public static void ForgetUiHit(IUIInteractor interactor) {
+			if (interactor == null)
+				return;
+
+			try {
+				_hitDataField ??= typeof(TrackedDeviceGraphicRaycaster).GetField(HitDataField, StaticFlags);
+				(_hitDataField?.GetValue(null) as System.Collections.IDictionary)?.Remove(interactor);
+
+				_hitRaycasterField ??= typeof(TrackedDeviceGraphicRaycaster).GetField(HitRaycasterField, StaticFlags);
+				(_hitRaycasterField?.GetValue(null) as System.Collections.IDictionary)?.Remove(interactor);
+			} catch (System.Exception e) {
+				Logger.LogDebug($"{nameof(XRInteractorBinder)}: UI poke hit not cleared ({e.GetType().Name}).");
+			}
+		}
+
 		/// <summary>
 		/// Drops the module XRI resolved for this interactor: it keeps it in a private cache, only ever clears it
 		/// when that module is destroyed, and logs a warning whenever the interactor is registered with another

@@ -229,7 +229,7 @@ namespace Nox.XR.Runtime.Connectors {
 				if (poke.hasSelection)
 					return 0f;
 
-				var point = poke.attachTransform != null ? poke.attachTransform.position : poke.transform.position;
+				var point = poke.PokePoint;
 				nearest = Mathf.Min(nearest, Vector3.Distance(point, data.axisAlignedPokeInteractionPoint));
 			}
 

@@ -1,6 +1,9 @@
+using System;
+using Nox.XR.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace Nox.XR.Runtime.Connectors {
 	/// <summary>
@@ -46,24 +49,44 @@ namespace Nox.XR.Runtime.Connectors {
 		public float minPokeDepth = 0.08f;
 
 		/// <summary>
-		/// Fraction of the fingertip radius (<see cref="localRadius"/>) the poke point is pushed along the
-		/// finger so it sits on the fingertip surface instead of the bone centre.
+		/// Trim applied to the distance the poke point is pushed along the finger, so it sits on the surface the
+		/// finger touches instead of the bone centre.
 		/// <para>
-		/// The finger colliders stop the hand a few mm short of a surface, so a poke point left at the bone
-		/// centre never reaches what the finger is visibly touching; <c>localRadius</c> (the fingertip
-		/// radius) places it on the surface instead.
-		/// </para>
-		/// <para>
-		/// The offset is proportional to the fingertip so it keeps working at any avatar scale, and it is
-		/// written as a <b>local</b> position: the transform hierarchy applies the avatar scale to it.
+		/// The distance itself is measured on the fingertip collider (see <see cref="Offset"/>): the colliders stop
+		/// the hand where the finger visibly ends, so a poke point left at the bone centre stays a whole radius
+		/// behind the surface. XRI then reads that gap as the poke depth of a UI element - a UI button follows the
+		/// poke point, so a point that never reaches the canvas never sinks the button, while the poke still
+		/// selects it.
 		/// </para>
 		/// </summary>
-		[Tooltip("Fraction of the fingertip radius the poke point is pushed along the finger, so it presses from the fingertip surface instead of the bone centre.")]
+		[Tooltip("Trim on the distance the poke point is pushed along the finger, so it presses from the fingertip surface instead of the bone centre.")]
 		public float pokeOffsetRatio = 1f;
+
+		[Tooltip("Physics material the fingertip collider takes while this poke is active (the PokeGrip asset of the hand). " +
+				 "A frictionless tip keeps slipping on what it presses, which trembles once the poke is engaged.")]
+		public PhysicsMaterial gripMaterial;
+
+		[Tooltip("Collider that takes the grip material while this poke is enabled (the distal phalanx capsule). Empty uses " +
+				 "the closest collider in the parents.")]
+		public Collider gripCollider;
+
+		private PhysicsMaterial _restingMaterial;
+		private bool _gripping;
+		private Func<Vector3> _pokePointProvider;
 
 		public bool Enable {
 			get => enabled;
-			set => enabled = value;
+			set {
+				if (enabled == value)
+					return;
+
+				enabled = value;
+
+				// The toolkit takes a registration slot per enabled poke (eight for the whole rig, five pokes per hand):
+				// this project does not use UI Toolkit world space, so the slot is given back right away.
+				if (value)
+					UiToolkitSlots.Release(this);
+			}
 		}
 
 		public float Radius {
@@ -77,6 +100,11 @@ namespace Nox.XR.Runtime.Connectors {
 		}
 
 		public override void ProcessInteractor(XRInteractionUpdateOrder.UpdatePhase updatePhase) {
+			if (!PokeSettings.Enabled) {
+				Enable = false;
+				return;
+			}
+
 			if (updatePhase == XRInteractionUpdateOrder.UpdatePhase.Dynamic) {
 				ApplyRadius();
 				ApplyDepth();
@@ -88,18 +116,91 @@ namespace Nox.XR.Runtime.Connectors {
 
 		protected override void Awake() {
 			base.Awake();
+			_pokePointProvider = GetPokePoint;
 			ApplyRadius();
 			ApplyDepth();
 			ApplyOffset();
 			ApplyClick();
+
+			PokeSettings.Changed.AddListener(OnPokeEnabledChanged);
+		}
+
+		protected override void OnDestroy() {
+			PokeSettings.Changed.RemoveListener(OnPokeEnabledChanged);
+			base.OnDestroy();
 		}
 
 		protected override void OnEnable() {
 			base.OnEnable();
+
+			if (!PokeSettings.Enabled) {
+				Enable = false;
+				return;
+			}
+
+			UiToolkitSlots.Release(this);
+
 			ApplyRadius();
 			ApplyDepth();
 			ApplyOffset();
 			ApplyClick();
+			ApplyGrip(true);
+		}
+
+		/// <summary>
+		/// Cuts the poke as soon as the poke setting is turned off. It is left to the connector to bring it back
+		/// (curl threshold, open hand, grab), so the setting always wins over the per-finger rules.
+		/// </summary>
+		private void OnPokeEnabledChanged(bool enabled) {
+			if (!enabled)
+				Enable = false;
+		}
+
+		protected override void OnDisable() {
+			ApplyGrip(false);
+			base.OnDisable();
+		}
+
+		/// <summary>
+		/// Applies the grip again if this poke is enabled: something may have rewritten the physics material of the
+		/// collider (<see cref="Nox.XR.Player.PhysicalHand.RefreshColliders"/> does it on every rebuild), which
+		/// would otherwise silently drop it.
+		/// </summary>
+		public void RefreshGrip() {
+			_gripping = false;
+			ApplyGrip(isActiveAndEnabled);
+		}
+
+		/// <summary>
+		/// Swaps the fingertip collider between its own physics material and the gripping one for as long as the
+		/// poke is enabled (see <see cref="OnEnable"/> and <see cref="OnDisable"/>). A frictionless tip slides on
+		/// the surface it presses, and the servo holding the finger there then trembles; a bit of grip settles it.
+		/// </summary>
+		private void ApplyGrip(bool active) {
+			if (!gripMaterial || active == _gripping)
+				return;
+
+			if (!gripCollider)
+				gripCollider = GetComponentInParent<Collider>();
+
+			if (!gripCollider)
+				return;
+
+			_gripping = active;
+
+			if (!active) {
+				if (gripCollider.sharedMaterial != _restingMaterial)
+					gripCollider.sharedMaterial = _restingMaterial;
+
+				return;
+			}
+
+			// Writing the same material again is not free: the collider is rebuilt and its ignore pairs are dropped.
+			if (gripCollider.sharedMaterial == gripMaterial)
+				return;
+
+			_restingMaterial = gripCollider.sharedMaterial;
+			gripCollider.sharedMaterial = gripMaterial;
 		}
 
 		/// <summary>
@@ -143,37 +244,84 @@ namespace Nox.XR.Runtime.Connectors {
 			=> clickUIOnDown = false;
 
 		/// <summary>
-		/// Moves the auto-created attach transform onto the fingertip surface.
-		/// The finger axis is the tip bone's <c>up</c> axis (AutoHand convention), and the attach
-		/// transform is a child with an identity rotation, so a local <c>up</c> offset follows the finger
-		/// and is scaled with the avatar.
+		/// Finger axis of the poke: the tip bone's <c>up</c> axis (AutoHand convention).
+		/// </summary>
+		public Vector3 Axis
+			=> transform.up;
+
+		/// <summary>
+		/// Distance from the tip bone to the surface of the fingertip, along <see cref="Axis"/>, trimmed by
+		/// <see cref="pokeOffsetRatio"/>.
 		/// <para>
-		/// The push (<c>localRadius</c>) is what lets the poke point reach the target: the finger colliders
-		/// stop the hand short of the surface, so the bone centre never gets close enough on its own. It is
-		/// applied everywhere, UI included - a poke point left at the bone centre hovers a UI element but
-		/// never enters the depth window XRI needs to press it.
+		/// Measured on the collider the poke grips with (the last phalanx): the furthest point of that collider
+		/// along the finger is where the finger stops on what it presses. Without a collider it falls back to the
+		/// fingertip radius, scaled with the avatar.
 		/// </para>
 		/// </summary>
-		public void ApplyOffset() {
-			var attach = attachTransform;
-			if (attach == null || attach == transform)
+		public float Offset {
+			get {
+				var axis = Axis;
+
+				if (gripCollider && gripCollider.enabled && gripCollider.gameObject.activeInHierarchy) {
+					var surface = gripCollider.ClosestPoint(transform.position + axis);
+					var distance = Vector3.Dot(surface - transform.position, axis);
+
+					if (distance > 0f)
+						return distance * pokeOffsetRatio;
+				}
+
+				return localRadius * Mathf.Abs(transform.lossyScale.x) * pokeOffsetRatio;
+			}
+		}
+
+		/// <summary>
+		/// Point the poke presses from: the fingertip surface, not the bone centre.
+		/// <para>
+		/// Everything XRI reads is taken from <c>GetAttachTransform</c> (the tip bone) and that cannot be offset on
+		/// the transform itself, so the point is provided where XRI asks for it: the UI model (the raycast origin
+		/// and the point the poke depth is measured from) and, for the world poke interactables, through
+		/// <see cref="XRPokeInteractor.pokeInteractionOffset"/>.
+		/// </para>
+		/// </summary>
+		public Vector3 PokePoint
+			=> transform.position + Axis * Offset;
+
+		/// <summary>
+		/// Feeds the UI model the fingertip point instead of the bone centre. XRI's own provider returns the raw
+		/// attach pose, and a point a radius behind the finger keeps a UI button from following the press.
+		/// </summary>
+		public override void UpdateUIModel(ref TrackedDeviceModel model) {
+			base.UpdateUIModel(ref model);
+
+			if (!isActiveAndEnabled || this.IsBlockedByInteractionWithinGroup())
 				return;
 
-			var distance = localRadius * pokeOffsetRatio;
+			model.positionProvider = _pokePointProvider;
+		}
 
-			var local = Vector3.up * distance;
-			if (attach.localPosition != local)
-				attach.localPosition = local;
+		private Vector3 GetPokePoint()
+			=> PokePoint;
+
+		/// <summary>
+		/// Pushes the poke point onto the fingertip surface: the offset XRI applies to a poke against a world
+		/// interactable (see <see cref="XRPokeInteractor.pokeInteractionOffset"/>). Without it the depth is read
+		/// from the bone centre, i.e. a whole finger radius short of what the finger touches.
+		/// </summary>
+		public void ApplyOffset() {
+			var offset = Offset;
+
+			if (!Mathf.Approximately(offset, pokeInteractionOffset))
+				pokeInteractionOffset = offset;
 		}
 
 		private void OnDrawGizmos() {
-			var attach = attachTransform != null ? attachTransform : transform;
+			var point = PokePoint;
 
 			Gizmos.color = Color.yellow;
-			Gizmos.DrawLine(transform.position, attach.position);
+			Gizmos.DrawLine(transform.position, point);
 
 			Gizmos.color = Color.red;
-			Gizmos.DrawWireSphere(attach.position, pokeWidth);
+			Gizmos.DrawWireSphere(point, pokeWidth);
 		}
 	}
 }

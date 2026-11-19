@@ -14,12 +14,14 @@ namespace Nox.XR.Runtime.Connectors {
 	/// by itself; the <c>PokeSettings.OpenHandIndex</c> setting (off by default) restores the previous
 	/// behaviour where only the index finger poked on an open hand. As soon as one finger is bent, the
 	/// <c>poke disable threshold</c> takes over: only the extended fingers (value below the
-	/// threshold) keep their poke. Finally, a hand that is <b>grabbing</b> something also cuts all
-	/// of its pokes.
+	/// threshold) keep their poke. The <b>thumb</b> only pokes when it is the only extended finger, so an
+	/// index pointing next to a raised thumb does not poke with both tips. Finally, a hand that is
+	/// <b>grabbing</b> something also cuts all of its pokes.
 	/// </para>
 	/// </summary>
 	public class HandPokeConnector : MonoBehaviour {
 		private Hand _hand;
+		private Func<bool> _grabbing;
 		private readonly Dictionary<string, float> _fingerValues = new();
 		private readonly Dictionary<string, bool> _bent = new();
 		private (string key, PokeInteractor poke)[] _pokes = Array.Empty<(string, PokeInteractor)>();
@@ -35,6 +37,18 @@ namespace Nox.XR.Runtime.Connectors {
 
 		public void Setup(Hand hand, (string key, PokeInteractor poke)[] pokes) {
 			_hand = hand;
+			_grabbing = null;
+			_pokes = pokes ?? Array.Empty<(string key, PokeInteractor poke)>();
+			RefreshAllPokes();
+		}
+
+		/// <summary>
+		/// Drives pokes that do not belong to an AutoHand hand: the physical hand of a <c>Nox.XR.Player.Hand</c>,
+		/// which builds its own fingers and pokes. The grab state then comes from <paramref name="grabbing"/>.
+		/// </summary>
+		public void SetupPokes((string key, PokeInteractor poke)[] pokes, Func<bool> grabbing) {
+			_hand = null;
+			_grabbing = grabbing;
 			_pokes = pokes ?? Array.Empty<(string, PokeInteractor)>();
 			RefreshAllPokes();
 		}
@@ -62,7 +76,7 @@ namespace Nox.XR.Runtime.Connectors {
 		/// its fingers crossing the threshold.
 		/// </summary>
 		private void Update() {
-			if (_hand == null)
+			if (_hand == null && _grabbing == null)
 				return;
 
 			RefreshAllPokes();
@@ -76,6 +90,8 @@ namespace Nox.XR.Runtime.Connectors {
 			// Read every finger and detect a "fully open" hand: NO finger bent past the threshold.
 			// In that case the hand would poke with all of its fingers -> we cut them all.
 			var allOpen = _pokes.Length > 0;
+			var otherUp = false;
+
 			for (var i = 0; i < _pokes.Length; i++) {
 				var key   = _pokes[i].key;
 				var value = Keybindings.GetFloatValue(key);
@@ -87,6 +103,8 @@ namespace Nox.XR.Runtime.Connectors {
 
 				if (isBent)
 					allOpen = false;
+				else if (!IsThumbFinger(key))
+					otherUp = true;
 			}
 
 			// A hand grabbing something does not poke: it is busy with the object.
@@ -98,6 +116,11 @@ namespace Nox.XR.Runtime.Connectors {
 
 				var value = _fingerValues.TryGetValue(_pokes[i].key, out var v) ? v : 0f;
 
+				// The thumb only pokes when it is the only extended finger: an extended index in front of an
+				// extended thumb (a pointing hand) would poke with both tips at once, and the thumb presses
+				// whatever it grazes next to the button the index aims at.
+				var thumbOnly = !IsThumbFinger(_pokes[i].key) || !otherUp;
+
 				// A fully open hand cuts every poke by default: an unrestricted open hand would poke with
 				// all five fingers. `PokeSettings.OpenHandIndex` (off by default) restores the opposite -
 				// only the index finger pokes on an open hand, to point with the index and poke.
@@ -105,15 +128,25 @@ namespace Nox.XR.Runtime.Connectors {
 				// the player gets the hover sound without the click.
 				var interacting = poke.Enable && (poke.hasHover || poke.hasSelection || PressesUi(poke, module));
 				var enabled = !blocked && (interacting
-					|| (value < threshold && (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(_pokes[i].key)))));
+					|| (thumbOnly && value < threshold && (!allOpen || (PokeSettings.OpenHandIndex && IsIndexFinger(_pokes[i].key)))));
 				if (poke.Enable != enabled)
 					poke.Enable = enabled;
+
+				// Drops the element the graphic raycaster keeps for this poke while it is not selecting: it only
+				// ever replaces that hit with one behind it, so a label reached once locked the poke out of every
+				// other element (see XRInteractorBinder.ForgetUiHit).
+				if (!TrackedDeviceGraphicRaycaster.IsPokeSelectingWithUI(poke))
+					XRInteractorBinder.ForgetUiHit(poke);
 
 				// Keeps the poke on the rig's manager and on the UI module in use: a poke built before the
 				// desktop -> VR switch keeps the module of the previous controller and never reaches the UI.
 				XRInteractorBinder.Bind(poke, module);
 			}
 		}
+
+		/// <summary>Is this finger binding key the thumb (<c>finger.&lt;side&gt;.thumb</c>)?</summary>
+		private static bool IsThumbFinger(string key)
+			=> key != null && key.EndsWith(".thumb", StringComparison.Ordinal);
 
 		/// <summary>Is this finger binding key the index finger (<c>finger.&lt;side&gt;.index</c>)?</summary>
 		private static bool IsIndexFinger(string key)
@@ -124,6 +157,9 @@ namespace Nox.XR.Runtime.Connectors {
 			=> module && module.GetTrackedDeviceModel(poke, out var model) && model.select;
 
 		private bool IsGrabbing() {
+			if (_grabbing != null)
+				return _grabbing();
+
 			var hand = physicalHand != null ? physicalHand : _hand;
 			return hand != null && (hand.IsGrabbing() || hand.IsHolding());
 		}

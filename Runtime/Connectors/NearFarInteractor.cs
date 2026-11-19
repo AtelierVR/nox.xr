@@ -20,6 +20,15 @@ namespace Nox.XR.Runtime.Connectors {
 
 		private bool _interactive = true;
 
+		/// <summary>
+		/// Analog value of the UI press input (0 released, 1 fully pulled). A control that animates its press reads
+		/// it to sink by the force of the trigger instead of snapping down.
+		/// </summary>
+		public float PressValue
+			=> uiPressInput != null
+				? Mathf.Clamp01(uiPressInput.ReadValue())
+				: 0f;
+
 		[SerializeField, Min(0f), Tooltip("Part of the joystick scroll given to the UI: below one, the lists scroll slower.")]
 		private float uiScrollSpeed = 0.4f;
 
@@ -42,13 +51,6 @@ namespace Nox.XR.Runtime.Connectors {
 
 		public void ReleaseUiPointer()
 			=> _lockedPoints.Clear();
-
-		/// <summary>
-		/// Whether the UI pointer is currently held on an element instead of following the ray. A held point sits off the
-		/// ray, so the ray has to be turned towards it for the line to stay straight.
-		/// </summary>
-		public bool HasHeldPointer
-			=> _lockedPoints.Count > 1;
 
 		void IUIInteractor.UpdateUIModel(ref TrackedDeviceModel model) {
 			base.UpdateUIModel(ref model);
@@ -120,6 +122,10 @@ namespace Nox.XR.Runtime.Connectors {
 		protected override void OnEnable() {
 			ResetInputs();
 			base.OnEnable();
+
+			// The toolkit takes a registration slot per enabled interactor (eight for the whole rig); UI Toolkit world
+			// space is not used here, so the slot goes back at once and every poke of both hands can stay enabled.
+			UiToolkitSlots.Release(this);
 		}
 
 		protected override void OnDisable() {
