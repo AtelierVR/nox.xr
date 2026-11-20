@@ -4,7 +4,6 @@ using Nox.CCK.Entities;
 using Nox.CCK.Utils;
 using Nox.CCK.XR;
 using Nox.Controllers;
-using Nox.XR.Menu;
 using Nox.XR.Player;
 using Nox.XR.Runtime;
 using UnityEngine;
@@ -23,7 +22,7 @@ namespace Nox.XR.Controller.V2 {
 	/// </summary>
 	[AddComponentMenu("Nox/XR/Player/XR Controller V2")]
 	[DefaultExecutionOrder(15)]
-	public partial class XRControllerV2 : MonoBehaviour, IController, IXRController {
+	public partial class XRControllerV2 : MonoBehaviour, IController, IXRController, IControllerMenu {
 		/// <summary>Id of the v2 proxy in the controller layer (v1 is <c>"xr"</c>).</summary>
 		public const string Id = "xr2";
 
@@ -38,9 +37,6 @@ namespace Nox.XR.Controller.V2 {
 
 		[SerializeField, Tooltip("Component spawning the tracked hands/feet. Found on the player when empty.")]
 		private PlayerPartBinder binder;
-
-		[SerializeField, Tooltip("Component building and showing the main menu. Found on the player when empty.")]
-		private PersonalMenu menu;
 
 		[Header("Proxy nodes")]
 		[Tooltip("Node holding the player pose (head camera, hands). Defaults to the player tracking container.")]
@@ -59,9 +55,6 @@ namespace Nox.XR.Controller.V2 {
 		public PlayerMovementDriver Driver => driver;
 
 		public PlayerPartBinder Binder => binder;
-
-		/// <summary>Menu connector of this rig, or <c>null</c> when it could not be created.</summary>
-		public PersonalMenu Menu => menu;
 
 		/// <summary>Node holding the tracked pose (head camera, hands, feet).</summary>
 		public Transform Trackers
@@ -125,11 +118,7 @@ namespace Nox.XR.Controller.V2 {
 			driver.Player = player;
 			binder.Player = player;
 
-			if (menu) {
-				menu.Origin = player.transform;
-				menu.View = player.headCamera;
-			}
-
+			SetupMenu();
 			SetupUi();
 			SetupInteraction();
 			SetupCalibration();
@@ -250,19 +239,13 @@ namespace Nox.XR.Controller.V2 {
 			if (!player)
 				return parts;
 
-			var baseTransform = avatarContainer ? avatarContainer : player.transform;
-			parts[EntityRig.Base.ToIndex()] = baseTransform.TryGetComponent(out Rigidbody baseBody)
-				? new TransformObject(baseTransform, baseBody)
-				: new TransformObject(baseTransform);
+			parts[EntityRig.Base.ToIndex()] = FromTransform(BaseTransform);
 			foreach (var pair in player.Parts) {
 				var part = pair.Value;
 				if (!part)
 					continue;
 
-				var partTransform = part.transform;
-				parts[pair.Key.ToIndex()] = partTransform.TryGetComponent(out Rigidbody body)
-					? new TransformObject(partTransform, body)
-					: new TransformObject(partTransform);
+				parts[pair.Key.ToIndex()] = FromTransform(part.transform);
 			}
 
 			return parts;
@@ -274,16 +257,33 @@ namespace Nox.XR.Controller.V2 {
 			if (!player)
 				return false;
 
+			if (index == EntityRig.Base.ToIndex()) {
+				transform = FromTransform(BaseTransform);
+				return true;
+			}
+
 			var part = player.GetPart(index.ToEntityRig());
 			if (!part)
 				return false;
 
-			var partTransform = part.transform;
-			transform = partTransform.TryGetComponent(out Rigidbody body)
-				? new TransformObject(partTransform, body)
-				: new TransformObject(partTransform);
+			transform = FromTransform(part.transform);
 			return true;
 		}
+
+		/// <summary>
+		/// Transform the base part is read from: the container the tracked parts live in, i.e. where the
+		/// player actually is (the body moves that space, it is never a child of it).
+		/// </summary>
+		private Transform BaseTransform
+			=> player.TrackingContainer
+				? player.TrackingContainer
+				: player.transform;
+
+		/// <summary>Wire value of a part transform, with the body it carries when it has one.</summary>
+		private static TransformObject FromTransform(Transform target)
+			=> target.TryGetComponent(out Rigidbody body)
+				? new TransformObject(target, body)
+				: new TransformObject(target);
 
 		public void SetPart(ushort index, TransformObject transform) {
 			if (player)

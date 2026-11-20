@@ -21,6 +21,7 @@
         "Nox.Avatars.StateMachines",
         "Nox.CCK.Avatars.Playable",
         "Nox.CCK.Avatars.Rigging",
+        "Nox.UI",
         "Nox.XR",
         "Nox.XR.Runtime",
         "Nox.XR.Player",
