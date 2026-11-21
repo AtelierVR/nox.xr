@@ -38,8 +38,10 @@ namespace Nox.XR.Runtime {
 			=> eventSystem;
 
 		[NoxPublic(NoxAccess.Method)]
-		public Collider GetCollider()
-			=> player.bodyCollider;
+		public IReadOnlyList<Collider> GetColliders()
+			=> player && player.bodyCollider
+				? new[] { player.bodyCollider }
+				: System.Array.Empty<Collider>();
 
 		#region View Recentering (IXRController)
 

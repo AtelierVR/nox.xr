@@ -76,7 +76,7 @@ namespace Nox.XR.Player {
 		public float heightSmoothSpeed = 10f;
 		public bool crouching;
 		public float crouchHeight = 0.6f;
-		public Vector2 minMaxHeight = new Vector2(0.5f, 2.5f);
+		public Vector2 minMaxHeight = new Vector2(Constants.MINIMUM_BODY_HEIGHT, Constants.MAXIMUM_BODY_HEIGHT);
 
 		[Header("Environment collision")]
 		[Tooltip("Push the parts flagged with environment collision out of level geometry.")]

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Entities;
@@ -213,8 +214,11 @@ namespace Nox.XR.Controller.V2 {
 		public Camera GetCamera()
 			=> HeadCamera;
 
-		public Collider GetCollider()
-			=> player ? player.floorCollider : null;
+		/// <summary>Colliders of the body of the XR player: the capsule, the floor and the avatar parts.</summary>
+		public IReadOnlyList<Collider> GetColliders()
+			=> player
+				? player.BodyColliders
+				: Array.Empty<Collider>();
 
 		public UniTask Dispose() {
 			Logger.LogDebug("Disposing the v2 XR proxy.", this, tag: nameof(XRControllerV2));
